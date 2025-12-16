@@ -1,0 +1,12 @@
+{
+  "endpoint": "https://api.example.com/webhook",
+  "method": "POST",
+  "headers": {
+    "Authorization": "Bearer YOUR_TOKEN_HERE",
+    "X-Custom-Header": "custom-value"
+  },
+  "format": "json",
+  "includeStderr": true,
+  "timeout": 30000,
+  "trim": true
+}

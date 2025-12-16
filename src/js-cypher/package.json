@@ -1,0 +1,28 @@
+{
+  "name": "encode-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for encoding, decoding, and hashing with multiple algorithms",
+  "type": "module",
+  "main": "encode-cli.ts",
+  "scripts": {
+    "start": "bun cli.ts",
+    "help": "bun cli.ts --help"
+  },
+  "bin": {
+    "encode-cli": "./encode-cli.ts"
+  },
+  "keywords": [
+    "cli",
+    "encoding",
+    "decoding",
+    "base64",
+    "hash",
+    "hmac",
+    "crypto"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

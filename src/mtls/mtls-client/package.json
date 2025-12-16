@@ -1,0 +1,32 @@
+{
+  "name": "bun-mtls-client",
+  "version": "1.0.0",
+  "description": "A Bun-based HTTP client with mTLS support",
+  "type": "module",
+  "bin": {
+    "bun-mtls": "./cli.ts",
+    "bmtls": "./cli.ts"
+  },
+  "scripts": {
+    "cli": "bun run cli.ts",
+    "test": "bun test",
+    "build": "bun build cli.ts --compile --outfile bmtls",
+    "install-global": "bun link"
+  },
+  "keywords": [
+    "mtls",
+    "http",
+    "client",
+    "bun",
+    "tls",
+    "certificate"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

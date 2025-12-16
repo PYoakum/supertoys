@@ -1,0 +1,10 @@
+{
+  "urls": [
+    "http://localhost:3001"
+  ],
+  "waitTime": 3000,
+  "outputFile": "output.txt",
+  "screenshotDir": "./screenshots",
+  "useOCR": true,
+  "preprocessImage": true
+}

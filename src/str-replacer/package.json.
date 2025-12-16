@@ -1,0 +1,22 @@
+{
+  "name": "greplacer",
+  "version": "1.0.0",
+  "description": "A CLI tool to replace strings in files",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "greplacer": "./index.js"
+  },
+  "scripts": {
+    "start": "bun index.js",
+    "test": "bun test.js"
+  },
+  "keywords": [
+    "cli",
+    "string",
+    "replace",
+    "text-processing"
+  ],
+  "author": "",
+  "license": "MIT"
+}

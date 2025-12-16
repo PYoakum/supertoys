@@ -1,0 +1,19 @@
+{
+  "name": "yaml2html",
+  "private": true,
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "bun": "vite build",
+    "start": "vite preview"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "linkedom": "^0.18.12",
+    "vite": "^7.2.6"
+  }
+}

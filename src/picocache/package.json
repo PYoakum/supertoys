@@ -1,0 +1,13 @@
+{
+  "name": "configurable-proxy-bun-js",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run ./server.js ./config.yaml",
+    "start": "bun run ./server.js ./config.yaml"
+  },
+  "dependencies": {
+    "yaml": "^2.5.1"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "js-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server.js ./config.yaml",
+    "start": "bun run src/server.js ./config.yaml"
+  },
+  "dependencies": {
+    "yaml": "^2.5.1"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "supertoys",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "commander" : "bun run src/commander.ts",
+    "crawl" : "bun run src/puppet-reader/crawl.ts",
+    "crawl-server" : "bun run src/puppet-reader/asset-crawler.ts",
+    "micro" : "bun run src/microserver/microserver.js",
+    "h2c" : "bun run src/html2csv/html2csv.ts",
+    "c2j" : "bun run src/csv2json-cli/csv2json.ts",
+    "xtractor" : "bun run src/json-xtractor/json-xtractor.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "puppeteer": "^24.31.0",
+    "yaml": "^2.8.2"
+  }
+}

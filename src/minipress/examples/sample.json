@@ -1,0 +1,40 @@
+{
+  "blocks": [
+    {
+      "type": "markdown",
+      "content": "# Welcome to HTML Blocks CLI\n\nThis document demonstrates all the available content block types.\n\n## Features\n\n- **Markdown sections** with full GFM support\n- **Data tables** from arrays or objects\n- **Images** with captions and responsive options\n- **Videos** from YouTube, Vimeo, or native sources\n- **Iframes** for embedding external content\n- **Canvas** elements with custom scripts"
+    },
+    {
+      "type": "table",
+      "caption": "Product Comparison",
+      "headers": ["Feature", "Basic Plan", "Pro Plan", "Enterprise"],
+      "rows": [
+        ["Storage", "10 GB", "100 GB", "Unlimited"],
+        ["Users", "1", "10", "Unlimited"],
+        ["Support", "Email", "Priority", "Dedicated"],
+        ["Price", "$9/mo", "$29/mo", "Custom"]
+      ],
+      "columnAlign": {
+        "1": "center",
+        "2": "center",
+        "3": "center"
+      }
+    },
+    {
+      "type": "markdown",
+      "content": "## Code Example\n\n```javascript\n// Using the CLI tool\nconst config = {\n  blocks: [\n    { type: 'markdown', content: '# Hello World' }\n  ]\n};\n```\n\n> The CLI supports both JSON and JavaScript configuration files."
+    },
+    {
+      "type": "canvas",
+      "width": 600,
+      "height": 300,
+      "caption": "Interactive Bar Chart",
+      "data": {
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
+        "values": [65, 59, 80, 81, 56],
+        "colors": ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6"]
+      },
+      "script": "function init(canvas, ctx, data, config) {\n  const { labels, values, colors } = data;\n  const padding = 50;\n  const chartWidth = config.width - padding * 2;\n  const chartHeight = config.height - padding * 2;\n  const barWidth = chartWidth / values.length - 10;\n  const maxValue = Math.max(...values);\n  \n  ctx.clearRect(0, 0, config.width, config.height);\n  \n  values.forEach((value, i) => {\n    const barHeight = (value / maxValue) * chartHeight;\n    const x = padding + i * (barWidth + 10);\n    const y = config.height - padding - barHeight;\n    \n    ctx.fillStyle = colors[i % colors.length];\n    ctx.fillRect(x, y, barWidth, barHeight);\n    \n    ctx.fillStyle = '#666';\n    ctx.font = '12px system-ui';\n    ctx.textAlign = 'center';\n    ctx.fillText(labels[i] || '', x + barWidth / 2, config.height - padding + 20);\n    ctx.fillText(value, x + barWidth / 2, y - 10);\n  });\n}"
+    }
+  ]
+}

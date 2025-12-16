@@ -1,0 +1,28 @@
+name: John Doe
+age: 30
+email: john.doe@example.com
+address:
+  street: 123 Main St
+  city: San Francisco
+  state: CA
+  zip: 94103
+skills:
+  - JavaScript
+  - TypeScript
+  - Python
+  - Bun
+projects:
+  - name: Web App
+    status: active
+    technologies:
+      - React
+      - Node.js
+  - name: CLI Tool
+    status: completed
+    technologies:
+      - Bun
+      - TypeScript
+interests:
+  - coding
+  - music
+  - travel

@@ -1,0 +1,30 @@
+{
+  "name": "crud-tools",
+  "version": "1.0.0",
+  "description": "A comprehensive set of SQL CRUD helper functions for Bun with YAML configuration",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "init": "bun run init-database.ts",
+    "example": "bun run examples.ts"
+  },
+  "dependencies": {
+    "pg": "^8.16.3",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.10.9",
+    "bun-types": "latest"
+  },
+  "keywords": [
+    "bun",
+    "sql",
+    "postgresql",
+    "crud",
+    "database",
+    "helpers",
+    "yaml"
+  ],
+  "author": "",
+  "license": "MIT"
+}

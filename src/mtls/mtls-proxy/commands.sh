@@ -1,0 +1,1 @@
+cargo run  -- --listen 0.0.0.0:8443 --upstream http://backend:8080 --server-cert certs/server-cert.pem --server-key certs/server-key.pem --client-ca certs/ca-cert.pem --require-client-cert true --timeout 30 --log-level info

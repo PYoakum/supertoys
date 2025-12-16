@@ -1,0 +1,114 @@
+# Request Handler Configuration
+# ================================
+
+# Override mappings - transform content before rendering
+overrides:
+  # Example: Replace placeholder text
+  - field: content
+    from: "[SITE_NAME]"
+    to: "My Awesome Site"
+    global: true
+
+  # Example: Fix old links
+  - field: markdown
+    from: "http://old-domain.com"
+    to: "https://new-domain.com"
+    global: true
+
+# Default template delimiters
+defaultDelimiters:
+  start: "{{"
+  end: "}}"
+
+# SQL sanitization - security settings
+sqlSanitization:
+  # Only allow these tables to be queried
+  allowedTables:
+    - posts
+    - pages
+    - articles
+
+  # Only allow these columns
+  allowedColumns:
+    - id
+    - title
+    - slug
+    - content
+    - markdown
+    - excerpt
+    - author
+    - status
+    - category
+    - tags
+    - featured_image
+    - created_at
+    - updated_at
+    - published_at
+
+  # Maximum rows per query
+  maxLimit: 100
+
+# HTML sanitization - XSS protection
+htmlSanitization:
+  # Allowed HTML tags in output
+  allowedTags:
+    - p
+    - br
+    - strong
+    - em
+    - b
+    - i
+    - u
+    - h1
+    - h2
+    - h3
+    - h4
+    - h5
+    - h6
+    - ul
+    - ol
+    - li
+    - a
+    - img
+    - code
+    - pre
+    - blockquote
+    - table
+    - thead
+    - tbody
+    - tr
+    - th
+    - td
+    - div
+    - span
+    - hr
+
+  # Allowed attributes per tag
+  allowedAttributes:
+    a:
+      - href
+      - title
+      - target
+      - rel
+    img:
+      - src
+      - alt
+      - title
+      - width
+      - height
+    code:
+      - class
+    pre:
+      - class
+    div:
+      - class
+      - id
+    span:
+      - class
+    td:
+      - colspan
+      - rowspan
+    th:
+      - colspan
+      - rowspan
+      - scope

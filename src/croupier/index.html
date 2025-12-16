@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Croupier - Demo</title>
+  <link href="./style.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <h1>♠︎♢ 𝑪𝑹𝑶𝑼𝑷𝑰𝑬𝑹 ♣︎♤</h1>
+    <p class="subtitle">Fast, lightweight static file server with range request support</p>
+    
+    <div class="status">
+      <div class="status-title">✅ Server Status: Running</div>
+      <div class="status-info">
+        <div class="status-item">
+          <div class="status-icon"></div>
+          <span>HTTP Server Active</span>
+        </div>
+        <div class="status-item">
+          <div class="status-icon"></div>
+          <span>Range Requests Enabled</span>
+        </div>
+        <div class="status-item">
+          <div class="status-icon"></div>
+          <span id="cors-status">CORS: Check Console</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>🎞️ Range Requests</h3>
+        <p>Support for video streaming and partial content delivery</p>
+      </div>
+      
+      <div class="feature">
+        <h3>🚀 Blazing Fast</h3>
+        <p>Built on Bun's native HTTP server for maximum performance</p>
+      </div>
+      
+      <div class="feature">
+        <h3>🛠️ Configurable</h3>
+        <p>Custom headers, CORS, caching, and more via CLI flags</p>
+      </div>
+      
+      <div class="feature">
+        <h3>🔒 Secure</h3>
+        <p>Path traversal protection and security best practices</p>
+      </div>
+    </div>
+    
+    <h2 style="margin-top: 30px; color: #667eea;">Quick Start</h2>
+    
+    <div class="command-box">
+# Basic usage
+bun run server.ts
+
+# With CORS and directory listing
+bun run server.ts --cors -l
+
+# Custom port and verbose logging
+bun run server.ts -p 8080 -v
+    </div>
+    
+    <h2 style="margin-top: 30px; color: #667eea;">Test Range Requests</h2>
+    <p style="margin: 10px 0;">Open your browser's developer console and run:</p>
+    
+    <div class="command-box">
+// Test range request
+fetch(window.location.href, {
+  headers: { 'Range': 'bytes=0-100' }
+}).then(r => {
+  console.log('Status:', r.status); // Should be 206
+  console.log('Content-Range:', r.headers.get('Content-Range'));
+});
+    </div>
+    
+
+    <footer>
+      <p>♧♥︎♤♦︎ Croupier ♧♥︎♤♦︎</p>
+      <p style="margin-top: 5px;">
+        Server Time: <span id="server-time"></span>
+      </p>
+    </footer>
+  </div>
+  
+  <script>
+    // Update server time
+    function updateTime() {
+      document.getElementById('server-time').textContent = new Date().toLocaleString();
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+    
+    // Check CORS
+    fetch(window.location.origin, { method: 'OPTIONS' })
+      .then(r => {
+        const corsEnabled = r.headers.has('access-control-allow-origin');
+        document.getElementById('cors-status').textContent = 
+          `CORS: ${corsEnabled ? 'Enabled ✓' : 'Disabled'}`;
+      });
+    
+    // Log server info
+    console.log('%c🥖📁 Bun Static Server', 'font-size: 20px; font-weight: bold; color: #667eea;');
+    console.log('%cServer is running successfully!', 'color: #4caf50;');
+    console.log('\nTest range requests with:');
+    console.log(`fetch('${window.location.href}', { headers: { 'Range': 'bytes=0-100' } })`);
+  </script>
+</body>
+</html>

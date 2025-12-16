@@ -1,0 +1,29 @@
+{
+  "name": "croupier",
+  "version": "1.0.0",
+  "description": "A fast static file server with range request support built for Bun runtime",
+  "main": "server.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run server.ts",
+    "dev": "bun run server.ts -v",
+    "serve": "bun run server.ts -d ./public",
+    "serve:cors": "bun run server.ts --cors -l"
+  },
+  "bin": {
+    "bun-static-server": "./server.ts"
+  },
+  "keywords": [
+    "bun",
+    "static-server",
+    "http-server",
+    "range-requests",
+    "file-server",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

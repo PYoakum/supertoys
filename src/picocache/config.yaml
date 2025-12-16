@@ -1,0 +1,40 @@
+upstream_base: "http://localhost:3000"
+
+server:
+  bind: "0.0.0.0:8081"
+
+defaults:
+  respect_upstream: true
+  default_ttl_secs: 60
+  override_ttl_secs: null
+  cache_methods: ["GET", "HEAD"]
+  no_store_honored: true
+  private_disallowed: true
+  stale_if_error_secs: 120
+  status_headers:
+    cache: "X-Cache"
+    key: "X-Cache-Key"
+    expires: "X-Cache-Expires"
+  invalidation:
+    invalidate_header: "X-Cache-Invalidate"
+    bypass_header: "X-Cache-Bypass"
+    value_regex: "^(?:1|true|yes)$"
+
+rules:
+  - name: "cache-root"
+    match:
+      path_regex: "^/"
+      methods: ["GET"]
+    key_template: "{method}:{host}:root"
+    respect_upstream: true
+    override_ttl_secs: 300
+  - name: "dynamic-api"
+    match:
+      path_regex: "^/api/."
+      methods: ["GET"]
+    key_template: "{method}:{host}:dynamic"
+    respect_upstream: false
+    override_ttl_secs: 0
+  
+
+

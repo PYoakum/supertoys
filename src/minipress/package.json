@@ -1,0 +1,21 @@
+{
+  "name": "html-blocks-cli",
+  "version": "1.0.0",
+  "description": "CLI tool to convert JSON/JS configurations into HTML content blocks",
+  "type": "module",
+  "bin": {
+    "html-blocks": "./src/cli.js"
+  },
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "start": "bun run src/cli.js",
+    "example:json": "bun run src/cli.js examples/sample.json -o output.html",
+    "example:js": "bun run src/cli.js examples/sample.js -o output.html"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "keywords": ["html", "cli", "bun", "content-blocks", "generator"],
+  "author": "",
+  "license": "MIT"
+}

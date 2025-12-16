@@ -1,0 +1,12 @@
+{
+  "user:1": "Alice Johnson",
+  "user:2": "Bob Smith",
+  "user:3": "Charlie Brown",
+  "config:database": "postgresql://localhost:5432/mydb",
+  "config:timeout": "30",
+  "config:max_connections": "100",
+  "cache:homepage": "<html><body>Welcome!</body></html>",
+  "session:abc123": "{\"user_id\": 1, \"expires\": \"2024-12-31\"}",
+  "feature:dark_mode": "enabled",
+  "feature:beta_access": "disabled"
+}

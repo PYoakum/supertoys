@@ -1,0 +1,37 @@
+# Database Configuration
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: supermonkeyrhinosquash
+  database: app_db
+  ssl: false
+  connection_timeout: 30000
+  max_connections: 10
+
+# Initial schema setup
+schema:
+  tables:
+    - name: users
+      columns:
+        - name: id
+          type: SERIAL PRIMARY KEY
+        - name: email
+          type: VARCHAR(255) UNIQUE NOT NULL
+        - name: username
+          type: VARCHAR(100) NOT NULL
+        - name: created_at
+          type: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    
+    - name: posts
+      columns:
+        - name: id
+          type: SERIAL PRIMARY KEY
+        - name: user_id
+          type: INTEGER REFERENCES users(id) ON DELETE CASCADE
+        - name: title
+          type: VARCHAR(255) NOT NULL
+        - name: content
+          type: TEXT
+        - name: created_at
+          type: TIMESTAMP DEFAULT CURRENT_TIMESTAMP

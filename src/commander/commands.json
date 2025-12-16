@@ -1,0 +1,70 @@
+{
+  "name": "Web Crawl and Data Extraction Pipeline",
+  "version": "1.0",
+  "tasks": [
+    {
+      "name": "Crawl Website",
+      "command": "bun",
+      "args": [
+        "run",
+        "crawl",
+        "--url",
+        "http://localhost:3001/",
+        "--mode",
+        "dir",
+        "--out",
+        "../dist/data",
+        "--content-types",
+        "text/css,text/html,text/plain,application/json"
+      ]
+    },
+    {
+      "name": "Convert HTML to CSV",
+      "command": "bun",
+      "args": [
+        "run",
+        "h2c",
+        "dist/data/index.html",
+        "-o",
+        "dist/data/result.csv"
+      ]
+    },
+    {
+      "name": "Convert CSV to JSON",
+      "command": "bun",
+      "args": [
+        "run",
+        "c2j",
+        "--input",
+        "dist/data/result.csv",
+        "--output",
+        "dist/data/result.json"
+      ]
+    },
+    {
+      "name": "Extract JSON content to Text File",
+      "command": "bun",
+      "args": [
+        "run",
+        "xtractor",
+        "--input",
+        "dist/data/result.json",
+        "--array",
+        "data",
+        "--key",
+        "Content",
+        "--output",
+        "dist/data/result.txt"
+      ]
+    },
+    {
+      "name": "Serve Text File",
+      "command": "bun",
+      "args": [
+        "run",
+        "micro",
+        "--file=dist/data/result.txt"
+      ]
+    }
+  ]
+}

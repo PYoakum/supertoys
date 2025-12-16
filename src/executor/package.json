@@ -1,0 +1,32 @@
+{
+  "name": "cli-executor",
+  "version": "1.0.0",
+  "description": "A CLI tool for running bash scripts and executables with flexible output handling",
+  "main": "index.ts",
+  "type": "module",
+  "bin": {
+    "cli-executor": "index.ts"
+  },
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun --watch index.ts",
+    "build": "bun build index.ts --compile --outfile cli-executor",
+    "test": "bun test"
+  },
+  "keywords": [
+    "cli",
+    "executor",
+    "bash",
+    "script",
+    "automation",
+    "bun"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

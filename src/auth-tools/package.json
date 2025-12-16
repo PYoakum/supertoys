@@ -1,0 +1,37 @@
+{
+  "name": "auth-tools",
+  "version": "1.0.0",
+  "description": "Comprehensive authentication helper functions for Bun applications",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapters": "./src/adapters.ts"
+  },
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "dev": "bun --watch run src/server.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jose": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "bun",
+    "authentication",
+    "jwt",
+    "auth",
+    "middleware",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT"
+}

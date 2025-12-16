@@ -1,0 +1,74 @@
+server:
+  bind: "0.0.0.0:8080"
+
+# Global catch-all when no route matches
+not_found:
+  status: 404
+  body: "Nothing to see here at {host}{path}\n"
+  headers:
+    Content-Type: "text/plain; charset=utf-8"
+    X-Miss: "proxy"
+
+# URL normalization & sanitation
+normalization:
+  enabled: true
+  lowercase_host: true
+  strip_default_port: true
+  collapse_slashes: true
+  remove_dot_segments: true
+  decode_unreserved: true
+  strip_fragment: true
+  sort_query: true
+  trailing_slash: "preserve"   # "add" | "remove" | "preserve"
+  drop_query_params: ["utm_source","utm_medium","utm_campaign","utm_term","utm_content"]
+  keep_only_query_params: []   # if non-empty, acts as allowlist
+  max_path_length: 4096
+
+routes:
+  # 1) Static response (no origin call)
+  - name: "hello"
+    match_:
+      hosts: ["*"]
+      kind: "pattern"          # "exact" | "prefix" | "pattern"
+      path: "/hello/{name}"
+    methods: ["GET"]
+    backend:
+      type: "static"
+      status: 200
+      body: "Hi {name}! You reached {host}{path}\n"
+      headers:
+        Content-Type: "text/plain; charset=utf-8"
+        X-Static: "{name}"
+
+  # 2) Origin proxy with conditions and templated headers
+  - name: "api"
+    match_:
+      hosts: ["api.example.com", "*.staging.example.com"]
+      kind: "prefix"
+      path: "/api"
+    methods: ["GET","POST"]
+    backend:
+      type: "origin"
+      origin: "https://httpbin.org"
+    add_request_headers:
+      X-Forwarded-Host: "{host}"
+    add_response_headers:
+      X-Proxied-By: "configurable-proxy"
+    conditions:
+      - when_status: ["5xx"]
+        action:
+          type: "fallback"
+          origin: "https://postman-echo.com"
+
+  # 3) Health check example
+  - name: "health"
+    match_:
+      hosts: ["*"]
+      kind: "exact"
+      path: "/healthz"
+    methods: ["GET"]
+    backend:
+      type: "origin"
+      origin: "http://127.0.0.1:9090"
+    add_response_headers:
+      X-Health: "ok"

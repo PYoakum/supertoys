@@ -1,0 +1,24 @@
+{
+  "name": "web-screenshot-ocr-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for capturing screenshots and extracting text using OCR",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "help": "bun run index.ts --help"
+  },
+  "keywords": [
+    "cli",
+    "screenshot",
+    "ocr",
+    "puppeteer",
+    "opencv"
+  ],
+  "dependencies": {
+    "puppeteer": "^24.31.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
