@@ -115,7 +115,7 @@ function htmlPage(title: string, tableHTML: string): string {
         <div class="c-header">
           <div class="c-header__bar c-window" role="navigation" aria-label="Primary">
             <strong class="c-header__brand" style="">𝑻𝑨𝑩𝑳𝑬𝑴𝑨𝑲𝑬𝑹</strong>
-            <form class="c-header__search" role="search" aria-label="Site search" action="#">
+            <form class="c-header__search" role="search" action="#">
               <div>
                 <input id="fn-input" class="c-input" value="table.csv"/>
               </div>

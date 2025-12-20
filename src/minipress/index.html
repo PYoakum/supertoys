@@ -92,9 +92,7 @@ body {
   color: var(--color-text);
   background:
     /* pinstripe desktop */
-    /*#ac86cd*/
-    
-      rgba(172, 134, 205, 0.6);
+    #ac86cd
     /* repeating-linear-gradient(0deg, #f8f8f8 0 6px, #eaeaea 6px 12px); */
 }
 
@@ -147,7 +145,7 @@ li::marker {
   background: var(--color-bg);
   box-shadow:
     1px 1px 0 0 var(--mac-black),
-    2px 2px 0 0 #222;
+    2px 2px 0 0 #999;
 }
 
 .c-window__titlebar {
@@ -173,18 +171,13 @@ li::marker {
   letter-spacing: 0.3px;
 }
 
-#window-content {
-  position: relative;
-  margin: 1em 0;
-  width: inherit;
-}
 
 .c-window__content {
-  display: absolute;
-  margin: 0 auto;
+  margin: 1em 0;
   background: var(--color-bg);
   padding: 2.5em;
-
+  width: inherit;
+  overflow-x: hidden;
 }
 
 /* ---------- Layout grid & landmarks ---------- */
@@ -442,7 +435,7 @@ footer[role="contentinfo"] {
 }
 
 .c-table th {
-  background: #efefef;
+  background: var(--dither-12), var(--mac-gray1);
 }
 
 .c-table caption {
@@ -521,11 +514,13 @@ pre.c-code {
   border: 1px solid var(--mac-black);
   background:
     repeating-linear-gradient(0deg, #fff 0 18px, #f5f5f5 18px 36px);
+    
   /* ruled paper vibe */
   padding: var(--space-3);
   overflow: auto;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
+
 }
 
 /* ---------- Timeline ---------- */
@@ -708,13 +703,13 @@ pre.c-code {
   background: var(--color-border);
   padding: 0.125em 0.375em;
   border-radius: 3px;
-  color: #444;
+  color: #fff;
 }
 
 .markdown-block pre {
-  background: #efefef;
+  background: #222;
   padding: 16px 24px;
-  border: 1px solid #444;
+  border-radius: var(--radius);
   overflow-x: auto;
 }
 
@@ -878,11 +873,11 @@ pre.c-code {
   			</header>
   			<section id="window-content">
   				<div class="c-window c-window__content" id="window-content">
-  <section id="md-0q870w4c" class="block markdown-block">
+  <section id="md-4t3n36lb" class="block markdown-block">
 <h1>Welcome to HTML Blocks CLI</h1><p>This document demonstrates all the available content block types.</p><h2>Features</h2><ul><li><strong>Markdown sections</strong> with full GFM support</li><li><strong>Data tables</strong> from arrays or objects</li><li><strong>Images</strong> with captions and responsive options</li><li><strong>Videos</strong> from YouTube, Vimeo, or native sources</li><li><strong>Iframes</strong> for embedding external content</li><li><strong>Canvas</strong> elements with custom scripts</li></ul>
 </section>
 
-<div id="table-y7qxjrvx" class="block c-table table-hoverable">
+<div id="table-1foazlrm" class="block c-table table-hoverable">
   <table>
     <caption>Product Comparison</caption>
     <thead>
@@ -922,7 +917,7 @@ pre.c-code {
   </table>
 </div>
 
-<section id="md-jf0yfmov" class="block markdown-block">
+<section id="md-7nqh9vy8" class="block markdown-block">
 <h2>Code Example</h2><pre><code>// Using the CLI tool
 const config = {
   blocks: [
@@ -932,18 +927,18 @@ const config = {
 </section>
 
 <div class="block canvas-block">
-  <canvas id="canvas-0e06ba21" width="600" height="300"></canvas>
+  <canvas id="canvas-ecip7ouk" width="600" height="300"></canvas>
   <div class="canvas-caption">Interactive Bar Chart</div>
 </div>
 
 <script>
 (function() {
 
-// Canvas: canvas-0e06ba21
+// Canvas: canvas-ecip7ouk
 (function() {
-  const canvas = document.getElementById('canvas-0e06ba21');
+  const canvas = document.getElementById('canvas-ecip7ouk');
   if (!canvas) {
-    console.error('Canvas not found: canvas-0e06ba21');
+    console.error('Canvas not found: canvas-ecip7ouk');
     return;
   }
   

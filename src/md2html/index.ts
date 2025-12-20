@@ -1,7 +1,7 @@
 import { Tokenizer } from './tokenizer';
 import { Parser } from './parser';
 import { Renderer } from './renderer';
-import { ConversionOptions } from './types';
+import { type ConversionOptions } from './types';
 
 /**
  * Convert Markdown text to HTML

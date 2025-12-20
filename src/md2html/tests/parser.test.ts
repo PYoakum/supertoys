@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'bun:test';
 import { Parser } from '../parser';
-import { Token, TokenType } from '../types';
+import { TokenType } from '../types';
+import { Token } from "../Token";
 
 describe('Parser', () => {
   const parser = new Parser();

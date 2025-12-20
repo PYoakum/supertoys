@@ -51,7 +51,6 @@ src/mtls/mtls-proxy/certs
 src/mtls/mtls-client/target
 src/mtls/mtls-client/certs
 
-
 # SQLite
 *content.db*
 *.backup

@@ -1,4 +1,6 @@
-import { Token, TokenType, ASTNode } from './types';
+import { TokenType } from './types';
+import { type ASTNode } from "./ASTNode";
+import { type Token } from "./Token";
 
 /**
  * Parser class for building an Abstract Syntax Tree from tokens

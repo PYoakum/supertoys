@@ -1,4 +1,5 @@
-import { ASTNode, ConversionOptions } from './types';
+import { type ConversionOptions } from './types';
+import { type ASTNode } from "./ASTNode";
 import { escapeHtml, isSafeUrl, sanitizeHtml, generateSlug } from './sanitizer';
 
 /**

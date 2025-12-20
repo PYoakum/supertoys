@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { Renderer } from '../renderer';
-import { ASTNode } from '../types';
+import { ASTNode } from "../ASTNode";
 
 describe('Renderer', () => {
   describe('basic rendering', () => {

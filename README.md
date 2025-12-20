@@ -1,8 +1,10 @@
 # supertoys
 
-A suite of super-powered tools for developers human and non-human alike.
+A suite of super-powered tools for developers; human and non-human alike.
 
 ## Installation
+
+### Prerequsites
 
 To install dependencies:
 
@@ -10,17 +12,11 @@ To install dependencies:
 bun install
 ```
 
-To run:
-
-```bash
-bun run asset-crawler.ts --port 3005 --out ./dist/data
-```
-
-# Server Tools
-
 ## Crawl Server
 
-**Start the Server:**
+A webserver that initiates synthetic browser crawls with puppeteer and generates output file 
+
+**Start the Crawl Server:**
 ```bash
 bun run crawl-server 
 ```
@@ -34,6 +30,8 @@ curl -X POST http://localhost:3005/assets \
 
 ## Caravan
 
+A tool for sending file contents as a POST body while collecting receipts
+
 This sends the CSV file to the conversion server and outputs a result
 
 ***Example:***
@@ -41,13 +39,17 @@ This sends the CSV file to the conversion server and outputs a result
 bun run caravan.ts --input dist/data/result.csv --endpoint http://localhost:3000/convert --output dist/data/result.json
 ```
 
-# Automatic Start
+## Commander 
 
-### Run Commander (Task Manager)
+A task manager/workflow tool built in Bun that ingests a 
+
+### Automatic Start
 
 ```bash
 bun run commander.ts --config commands.json
 ```
+
+***Example Workflow File***
 
 ```json
 {
@@ -122,7 +124,7 @@ bun run commander.ts --config commands.json
 }
 ```
 
-# Manual Start
+### Manual Start
 
 #### Step 1 - Crawl CLI-only
 

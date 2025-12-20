@@ -242,3 +242,5 @@ bun test
 ```
 
 bun run ./index.ts ./test-script.sh
+
+bun run ./index.ts -o results.json -f json curl https://api.github.com

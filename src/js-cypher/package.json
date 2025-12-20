@@ -1,5 +1,5 @@
 {
-  "name": "encode-cli",
+  "name": "js-cypher",
   "version": "1.0.0",
   "description": "CLI tool for encoding, decoding, and hashing with multiple algorithms",
   "type": "module",

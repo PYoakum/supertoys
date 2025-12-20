@@ -1,4 +1,5 @@
-import { Token, TokenType } from './types';
+import { TokenType } from './types.ts';
+import { type Token } from "./Token.ts";
 
 /**
  * Tokenizer class for converting Markdown text into tokens

@@ -1,3 +1,4 @@
+
 /**
  * Token types for Markdown parsing
  */
@@ -18,27 +19,6 @@ export enum TokenType {
   HR = 'HR',
   TEXT = 'TEXT',
   LINE_BREAK = 'LINE_BREAK',
-}
-
-/**
- * Token interface representing a parsed Markdown element
- */
-export interface Token {
-  type: TokenType;
-  value: string;
-  depth?: number;
-  metadata?: Record<string, any>;
-}
-
-/**
- * AST Node interface for building the abstract syntax tree
- */
-export interface ASTNode {
-  type: string;
-  content?: string;
-  children?: ASTNode[];
-  attributes?: Record<string, string>;
-  metadata?: Record<string, any>;
 }
 
 /**
