@@ -1,0 +1,128 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+/* Hide radio buttons */
+.page-radio {
+    display: none;
+}
+
+/* Navigation bar */
+.nav-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+/* Navigation labels (buttons) */
+.nav-label {
+    padding: 10px 24px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.nav-label:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Active state for navigation */
+.page-radio:checked+.nav-label {
+    background: white;
+    color: #667eea;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Container styles */
+.page-container {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: calc(100vh - 60px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    opacity: 0;
+    overflow-y:scroll;
+    transition: opacity 0.3s ease;
+}
+
+/* Show active container */
+#page1:checked~.container-wrapper .page1-container,
+#page2:checked~.container-wrapper .page2-container,
+#page3:checked~.container-wrapper .page3-container,
+#page0:checked~.container-wrapper .page0-container {
+    display: flex;
+    opacity: 1;
+}
+
+/* Individual page styles */
+.page1-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.page2-container {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.page3-container {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.page0-container {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+}
+
+/* Content box */
+.content-box {
+    max-width: 600px;
+    text-align: center;
+}
+
+.content-box h1 {
+    font-size: 3em;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.content-box p {
+    font-size: 1.2em;
+    line-height: 1.6;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.icon {
+    font-size: 5em;
+    margin-bottom: 20px;
+    filter: drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.2));
+}

@@ -41,7 +41,7 @@ bun run caravan.ts --input dist/data/result.csv --endpoint http://localhost:3000
 
 ## Commander 
 
-A task manager/workflow tool built in Bun that ingests a 
+A task manager/workflow tool built in Bun that ingests a JSON manifest file and execute tasks in sequence or in parallel
 
 ### Automatic Start
 

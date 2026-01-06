@@ -53,6 +53,10 @@ src/mtls/mtls-client/certs
 
 # SQLite
 *content.db*
+
+# Backup
+*backup/
+*legacy/
 *.backup
 
 # ngrok 

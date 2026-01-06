@@ -1,0 +1,71 @@
+{
+  "tasks": [
+    {
+      "name": "Daily Database Backup",
+      "schedule": "0 2 * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "backupDatabase",
+      "enabled": true
+    },
+    {
+      "name": "Hourly System Health Check",
+      "schedule": "0 * * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "monitorSystemHealth",
+      "enabled": true
+    },
+    {
+      "name": "Daily Summary Email",
+      "schedule": "0 8 * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "sendDailySummary",
+      "args": ["admin@example.com"],
+      "enabled": true
+    },
+    {
+      "name": "Weekly Cleanup",
+      "schedule": "0 3 * * 0",
+      "module": "./tasks/advanced.ts",
+      "function": "cleanTempFiles",
+      "args": [7],
+      "enabled": true
+    },
+    {
+      "name": "5-Minute API Sync",
+      "schedule": "*/5 * * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "syncWithExternalAPI",
+      "args": ["https://api.example.com/data", "your-api-key-here"],
+      "enabled": false
+    },
+    {
+      "name": "Morning Cache Warm",
+      "schedule": "0 6 * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "warmCache",
+      "args": [
+        [
+          "https://example.com/api/popular",
+          "https://example.com/api/trending",
+          "https://example.com/api/featured"
+        ]
+      ],
+      "enabled": false
+    },
+    {
+      "name": "End of Day Stats",
+      "schedule": "0 23 * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "aggregateDailyStats",
+      "enabled": true
+    },
+    {
+      "name": "Critical Event Webhook",
+      "schedule": "*/10 * * * *",
+      "module": "./tasks/advanced.ts",
+      "function": "sendWebhook",
+      "args": ["https://hooks.example.com/critical", "health_check"],
+      "enabled": false
+    }
+  ]
+}

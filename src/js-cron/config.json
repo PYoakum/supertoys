@@ -1,0 +1,33 @@
+{
+  "tasks": [
+    {
+      "name": "Daily Report",
+      "schedule": "0 9 * * *",
+      "module": "./tasks/example.ts",
+      "function": "generateDailyReport",
+      "enabled": true
+    },
+    {
+      "name": "Hourly Health Check",
+      "schedule": "0 * * * *",
+      "module": "./tasks/example.ts",
+      "function": "healthCheck",
+      "enabled": true
+    },
+    {
+      "name": "Every 5 Minutes Sync",
+      "schedule": "*/5 * * * *",
+      "module": "./tasks/example.ts",
+      "function": "syncData",
+      "args": ["production", 100],
+      "enabled": true
+    },
+    {
+      "name": "Weekly Cleanup",
+      "schedule": "0 0 * * 0",
+      "module": "./tasks/example.ts",
+      "function": "weeklyCleanup",
+      "enabled": false
+    }
+  ]
+}
