@@ -5,8 +5,6 @@ import loadDocuments from './load-documents.js'
 import markdownToHtml from '../../md2html/index.js'
 
 
-
-
 export default async function render(_url) {
 
     function isChecked(index){
@@ -47,7 +45,7 @@ docs.forEach((doc, index) => {
 
 const _head = `<style>${await css}</style><title>${await title}</title>`
 
-function generatePages(content){
+async function generatePages(content){
     return `<div id="app">
         ${content.buttons}
         <nav class="nav-bar">
@@ -62,12 +60,12 @@ function generatePages(content){
     
 
     let html = await baseTemplate;
-    let rendered = generatePages(content)
+    let rendered = await generatePages(content)
     const regexHead = /{{HEAD}}/i;
-    html.replace(regexHead, _head.toString());
+    html = html.replace(regexHead, _head.toString());
     
-
-    html.replace('{{BODY}}', rendered);
+    const regexBody = /{{BODY}}/i;
+    html = html.replace(regexBody, rendered);
     console.log('html',html)
     console.log(rendered)
     return await html
