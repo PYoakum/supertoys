@@ -61,3 +61,10 @@ src/mtls/mtls-client/certs
 
 # ngrok 
 *ngrok.yml
+
+# ISOs and BIOs for js-vm
+src/js-vm/src/iso/*
+src/js-vm/src/bios/*
+
+# default documents directory for webedit
+src/webedit/documents

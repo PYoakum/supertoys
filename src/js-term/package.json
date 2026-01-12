@@ -1,0 +1,9 @@
+{
+  "name": "js-term",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

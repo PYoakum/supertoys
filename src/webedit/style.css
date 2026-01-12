@@ -1,0 +1,356 @@
+/* Markdown Editor Styles */
+/* CSS Variables are set dynamically from config.js */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--preview-font-family);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow: hidden;
+    height: 100vh;
+}
+
+.editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: var(--max-width);
+    margin: 0 auto;
+}
+
+/* Menu Bar */
+.menu-bar {
+    background-color: var(--menu-bg);
+    height: var(--menu-height);
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 10px;
+}
+
+.menu-title {
+    color: var(--menu-text);
+    font-size: 14px;
+    font-weight: 600;
+    margin-right: auto;
+}
+
+.menu-button {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    border: none;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: inherit;
+}
+
+.menu-button:hover {
+    background-color: var(--button-hover);
+}
+
+.menu-button:active {
+    transform: translateY(1px);
+}
+
+.menu-button.secondary {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--menu-text);
+}
+
+.menu-button.secondary:hover {
+    background-color: var(--menu-hover);
+}
+
+.file-info {
+    color: var(--accent-secondary);
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+/* Main Content Area */
+.content-area {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Editor Panel */
+.editor-panel {
+    flex: var(--split-ratio);
+    display: flex;
+    flex-direction: column;
+    background-color: var(--editor-bg);
+    border-right: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.editor-header {
+    padding: 10px var(--padding);
+    background-color: var(--menu-bg);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--menu-text);
+    font-weight: 600;
+}
+
+.editor-content {
+    flex: 1;
+    padding: var(--padding);
+    overflow-y: auto;
+    font-family: var(--editor-font-family);
+    font-size: var(--editor-font-size);
+    line-height: var(--editor-line-height);
+    color: var(--text-color);
+    position: relative;
+}
+
+.editor-content:focus {
+    outline: none;
+}
+
+/* Editor Text Elements */
+.text-before-cursor,
+.text-after-cursor {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.2em;
+    background-color: var(--cursor-color);
+    animation: blink 1s infinite;
+    vertical-align: text-bottom;
+}
+
+@keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* Preview Panel */
+.preview-panel {
+    flex: calc(1 - var(--split-ratio));
+    display: flex;
+    flex-direction: column;
+    background-color: var(--preview-bg);
+    overflow: hidden;
+}
+
+.preview-header {
+    padding: 10px var(--padding);
+    background-color: var(--menu-bg);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--menu-text);
+    font-weight: 600;
+}
+
+.preview-content {
+    flex: 1;
+    padding: var(--padding);
+    overflow-y: auto;
+    font-family: var(--preview-font-family);
+    font-size: var(--preview-font-size);
+    line-height: var(--preview-line-height);
+    color: var(--text-color);
+}
+
+/* Markdown Preview Styles */
+.preview-content h1 {
+    font-size: 2em;
+    margin: 0.67em 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.3em;
+}
+
+.preview-content h2 {
+    font-size: 1.5em;
+    margin: 0.75em 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.3em;
+}
+
+.preview-content h3 {
+    font-size: 1.25em;
+    margin: 1em 0;
+}
+
+.preview-content h4 {
+    font-size: 1em;
+    margin: 1.33em 0;
+}
+
+.preview-content h5 {
+    font-size: 0.875em;
+    margin: 1.67em 0;
+}
+
+.preview-content h6 {
+    font-size: 0.85em;
+    margin: 2.33em 0;
+    color: #888;
+}
+
+.preview-content p {
+    margin: 1em 0;
+}
+
+.preview-content a {
+    color: var(--accent-primary);
+    text-decoration: none;
+}
+
+.preview-content a:hover {
+    text-decoration: underline;
+}
+
+.preview-content code {
+    background-color: rgba(110, 118, 129, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--editor-font-family);
+    font-size: 0.9em;
+}
+
+.preview-content pre {
+    background-color: rgba(110, 118, 129, 0.1);
+    padding: 16px;
+    border-radius: var(--border-radius);
+    overflow-x: auto;
+    margin: 1em 0;
+}
+
+.preview-content pre code {
+    background-color: transparent;
+    padding: 0;
+}
+
+.preview-content blockquote {
+    border-left: 4px solid var(--border-color);
+    padding-left: 16px;
+    margin: 1em 0;
+    color: #888;
+}
+
+.preview-content ul,
+.preview-content ol {
+    margin: 1em 0;
+    padding-left: 2em;
+}
+
+.preview-content li {
+    margin: 0.25em 0;
+}
+
+.preview-content hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 2em 0;
+}
+
+.preview-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.preview-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+.preview-content th,
+.preview-content td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.preview-content th {
+    background-color: rgba(110, 118, 129, 0.1);
+}
+
+/* Scrollbar Styles */
+.editor-content::-webkit-scrollbar,
+.preview-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.editor-content::-webkit-scrollbar-track,
+.preview-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.editor-content::-webkit-scrollbar-thumb,
+.preview-content::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-color);
+    border-radius: 5px;
+}
+
+.editor-content::-webkit-scrollbar-thumb:hover,
+.preview-content::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* Status Message */
+.status-message {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    padding: 10px 20px;
+    border-radius: var(--border-radius);
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.status-message.show {
+    opacity: 1;
+}
+
+.status-message.error {
+    background-color: #d32f2f;
+}
+
+.status-message.success {
+    background-color: #388e3c;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .content-area {
+        flex-direction: column;
+    }
+    
+    .editor-panel,
+    .preview-panel {
+        flex: 1;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .menu-title {
+        font-size: 12px;
+    }
+    
+    .menu-button {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+}

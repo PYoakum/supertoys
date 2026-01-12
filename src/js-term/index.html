@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Emulator</title>
+    <link rel="stylesheet" href="./main.css">
+    <script src="./app.js"></script>
+</head>
+<body>
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="terminal-title">Terminal Emulator</div>
+        </div>
+        <div class="terminal-body" id="terminal">
+            <div class="controls">
+                <button class="control-btn" onclick="clearTerminal()">Clear</button>
+            </div>
+            <div class="welcome-text">Terminal Emulator v1.0</div>
+            <div class="welcome-text">Use arrow keys to move cursor, Home/End to jump</div>
+            <div class="welcome-text">---</div>
+            <span class="text-before-cursor" id="textBefore"></span><span class="cursor" id="cursor"></span><span class="text-after-cursor" id="textAfter"></span>
+        </div>
+    </div>
+</body>
+</html>

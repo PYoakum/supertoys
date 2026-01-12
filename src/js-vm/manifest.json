@@ -1,0 +1,23 @@
+{
+  "vms": {
+    "tiny-core": {
+      "name": "tiny-core-linux",
+      "description": "Tiny Core",
+      "memory_size": 134217728,
+      "vga_memory_size": 8388608,
+      "bios": "./bios/seabios.bin",
+      "vga_bios": "./bios/vgabios.bin",
+      "hda": "./iso/tiny-core.iso",
+      "autostart": true
+    },
+    "freedos": {
+      "name": "FreeDOS",
+      "description": "FreeDOS operating system",
+      "memory_size": 33554432,
+      "vga_memory_size": 8388608,
+      "bios": "./bios/seabios.bin",
+      "vga_bios": "./bios/vgabios.bin",
+      "fda": "./bios/freedos722.img"
+    }
+  }
+}

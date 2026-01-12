@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✎𝗪𝗲𝗯𝗘𝗱𝗶𝘁</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div class="editor-container">
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+            <div class="menu-title">✎𝗪𝗲𝗯𝗘𝗱𝗶𝘁</div>
+            <span class="file-info" id="fileInfo">𝚄𝚗𝚜𝚊𝚟𝚎𝚍 𝙳𝚘𝚌𝚞𝚖𝚎𝚗𝚝</span>
+            <button class="menu-button secondary" id="newBtn">𝙉𝙀𝙒</button>
+            <button class="menu-button secondary" id="clearBtn">𝘾𝙇𝙀𝘼𝙍</button>
+            <button class="menu-button" id="saveBtn">𝙎𝘼𝙑𝙀 (𝚌𝚝𝚛𝚕 + 𝚂)</button>
+            <button class="menu-button" id="exportBtn">𝙀𝙓𝙋𝙊𝙍𝙏 (.𝚖𝚍)</button>
+        </div>
+        
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Editor Panel -->
+            <div class="editor-panel">
+                <div class="editor-header">𝙀𝘿𝙄𝙏𝙊𝙍</div>
+                <div class="editor-content" id="editorContent" tabindex="0">
+                    <span class="text-before-cursor" id="textBefore"></span><span class="cursor" id="cursor"></span><span class="text-after-cursor" id="textAfter"></span>
+                </div>
+            </div>
+            
+            <!-- Preview Panel -->
+            <div class="preview-panel">
+                <div class="preview-header">𝙋𝙍𝙀𝙑𝙄𝙀𝙒</div>
+                <div class="preview-content" id="previewContent">
+                    <p>𝚜𝚝𝚊𝚛𝚝 𝚝𝚢𝚙𝚒𝚗𝚐</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Status Message -->
+    <div class="status-message" id="statusMessage"></div>
+    
+    <!-- Scripts -->
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>
