@@ -1,0 +1,675 @@
+/**
+ * @fileoverview REST API router for Goals Session Server
+ * @module api/router
+ */
+
+import { ServerError, ValidationError } from '../lib/errors.js';
+
+/**
+ * Simple router for HTTP request handling
+ */
+export class Router {
+  constructor() {
+    /** @type {Map<string, Map<string, Function>>} */
+    this.routes = new Map();
+    
+    // Initialize method maps
+    for (const method of ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']) {
+      this.routes.set(method, new Map());
+    }
+  }
+
+  /**
+   * Register a route
+   * @param {string} method - HTTP method
+   * @param {string} path - Route path (supports :param syntax)
+   * @param {Function} handler - Route handler
+   */
+  register(method, path, handler) {
+    const methodRoutes = this.routes.get(method.toUpperCase());
+    if (methodRoutes) {
+      methodRoutes.set(path, handler);
+    }
+  }
+
+  /**
+   * Convenience methods
+   */
+  get(path, handler) { this.register('GET', path, handler); }
+  post(path, handler) { this.register('POST', path, handler); }
+  put(path, handler) { this.register('PUT', path, handler); }
+  delete(path, handler) { this.register('DELETE', path, handler); }
+  patch(path, handler) { this.register('PATCH', path, handler); }
+
+  /**
+   * Match a request to a route
+   * @param {string} method - HTTP method
+   * @param {string} pathname - Request pathname
+   * @returns {{handler: Function, params: Object}|null}
+   */
+  match(method, pathname) {
+    const methodRoutes = this.routes.get(method.toUpperCase());
+    if (!methodRoutes) return null;
+
+    // Try exact match first
+    const exactHandler = methodRoutes.get(pathname);
+    if (exactHandler) {
+      return { handler: exactHandler, params: {} };
+    }
+
+    // Try pattern matching
+    for (const [pattern, handler] of methodRoutes) {
+      const params = this.matchPattern(pattern, pathname);
+      if (params) {
+        return { handler, params };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Match a URL pattern to a pathname
+   * @param {string} pattern - Route pattern
+   * @param {string} pathname - Actual pathname
+   * @returns {Object|null} - Matched parameters or null
+   */
+  matchPattern(pattern, pathname) {
+    const patternParts = pattern.split('/');
+    const pathParts = pathname.split('/');
+
+    if (patternParts.length !== pathParts.length) {
+      return null;
+    }
+
+    const params = {};
+
+    for (let i = 0; i < patternParts.length; i++) {
+      const patternPart = patternParts[i];
+      const pathPart = pathParts[i];
+
+      if (patternPart.startsWith(':')) {
+        // Parameter
+        const paramName = patternPart.slice(1);
+        params[paramName] = pathPart;
+      } else if (patternPart !== pathPart) {
+        // No match
+        return null;
+      }
+    }
+
+    return params;
+  }
+}
+
+/**
+ * Create request context from request
+ * @param {Request} request
+ * @param {Object} params - Route parameters
+ * @returns {Promise<Object>}
+ */
+async function createContext(request, params) {
+  const url = new URL(request.url);
+  
+  // Parse query parameters
+  const query = Object.fromEntries(url.searchParams);
+  
+  // Parse body for POST/PUT/PATCH
+  let body = null;
+  if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        body = await request.json();
+      } catch (err) {
+        throw new ValidationError('Invalid JSON body', 'body');
+      }
+    }
+  }
+  
+  return {
+    method: request.method,
+    path: url.pathname,
+    params,
+    query,
+    body,
+    headers: Object.fromEntries(request.headers),
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    userAgent: request.headers.get('user-agent') || 'unknown'
+  };
+}
+
+/**
+ * Create JSON response
+ * @param {Object} data - Response data
+ * @param {number} [status=200] - HTTP status code
+ * @param {Object} [headers={}] - Additional headers
+ * @returns {Response}
+ */
+export function jsonResponse(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers
+    }
+  });
+}
+
+/**
+ * Create error response
+ * @param {Error} error
+ * @returns {Response}
+ */
+export function errorResponse(error) {
+  if (error instanceof ServerError) {
+    return jsonResponse(error.toJSON(), error.statusCode);
+  }
+  
+  // Generic error
+  return jsonResponse({
+    success: false,
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: error.message
+    }
+  }, 500);
+}
+
+/**
+ * Create the API handler
+ * @param {Object} services - Injected services
+ * @param {import('../lib/session-manager.js').SessionManager} services.sessionManager
+ * @param {import('../lib/tool-router.js').ToolRouter} services.toolRouter
+ * @param {import('../lib/llm-client.js').LLMClient} services.llmClient
+ * @param {Object} services.config
+ * @returns {Function}
+ */
+export function createApiHandler(services) {
+  const router = new Router();
+  const { sessionManager, toolRouter, llmClient, config } = services;
+
+  // Import route handlers
+  const sessionRoutes = createSessionRoutes(sessionManager);
+  const evaluateRoutes = createEvaluateRoutes(sessionManager, llmClient);
+  const tasklistRoutes = createTasklistRoutes(sessionManager, toolRouter, llmClient);
+  const toolRoutes = createToolRoutes(toolRouter);
+
+  // Register routes
+  
+  // Sessions
+  router.post('/api/sessions', sessionRoutes.create);
+  router.get('/api/sessions', sessionRoutes.list);
+  router.get('/api/sessions/:id', sessionRoutes.get);
+  router.delete('/api/sessions/:id', sessionRoutes.delete);
+
+  // Evaluation
+  router.post('/api/evaluate', evaluateRoutes.evaluate);
+
+  // Task list
+  router.post('/api/tasklist/generate', tasklistRoutes.generate);
+
+  // Tools
+  router.get('/api/tools', toolRoutes.list);
+  router.get('/api/tools/:name', toolRoutes.get);
+
+  // Health
+  router.get('/health', async () => {
+    const stats = sessionManager.getStats();
+    const llmHealthy = llmClient ? await llmClient.healthCheck() : false;
+    
+    return jsonResponse({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      components: {
+        sessionStore: 'healthy',
+        toolRouter: toolRouter ? 'healthy' : 'unavailable',
+        llmClient: llmHealthy ? 'healthy' : 'unavailable'
+      },
+      stats: {
+        activeSessions: stats.totalSessions,
+        uptime: process.uptime ? Math.floor(process.uptime()) : 0
+      }
+    });
+  });
+
+  // Return handler function
+  return async (request) => {
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+      });
+    }
+
+    const url = new URL(request.url);
+    const match = router.match(request.method, url.pathname);
+
+    if (!match) {
+      return jsonResponse({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Route not found: ${request.method} ${url.pathname}`
+        }
+      }, 404);
+    }
+
+    try {
+      const ctx = await createContext(request, match.params);
+      const response = await match.handler(ctx);
+      
+      // Add CORS headers
+      if (response instanceof Response) {
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        return response;
+      }
+      
+      return jsonResponse(response);
+    } catch (error) {
+      console.error('API Error:', error);
+      return errorResponse(error);
+    }
+  };
+}
+
+/**
+ * Create session route handlers
+ */
+function createSessionRoutes(sessionManager) {
+  return {
+    async create(ctx) {
+      const { goals, context } = ctx.body || {};
+      
+      if (!goals) {
+        throw new ValidationError('goals is required', 'goals');
+      }
+      if (!context) {
+        throw new ValidationError('context is required', 'context');
+      }
+      
+      const session = sessionManager.createSession({
+        goals,
+        context,
+        metadata: {
+          sourceIp: ctx.ip,
+          userAgent: ctx.userAgent
+        }
+      });
+      
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId: session.id,
+          state: session.state,
+          createdAt: session.metadata.createdAt,
+          goalsCount: session.goals.items.length,
+          contextFilesCount: session.context.files.length,
+          links: {
+            self: `/api/sessions/${session.id}`,
+            evaluate: '/api/evaluate',
+            generate: '/api/tasklist/generate'
+          }
+        }
+      }, 201);
+    },
+
+    async list(ctx) {
+      const result = sessionManager.listSessions({
+        state: ctx.query.state,
+        limit: parseInt(ctx.query.limit, 10) || 20,
+        offset: parseInt(ctx.query.offset, 10) || 0,
+        sortBy: ctx.query.sortBy || 'createdAt',
+        sortOrder: ctx.query.sortOrder || 'desc'
+      });
+      
+      return jsonResponse({
+        success: true,
+        data: result
+      });
+    },
+
+    async get(ctx) {
+      const session = sessionManager.getSession(ctx.params.id);
+      
+      const includeContext = ctx.query.includeContext === 'true';
+      const includeTaskList = ctx.query.includeTaskList !== 'false';
+      
+      const data = {
+        id: session.id,
+        state: session.state,
+        goals: session.goals,
+        context: includeContext ? session.context : {
+          metadata: session.context.metadata,
+          fileCount: session.context.files.length
+        },
+        evaluation: session.evaluation,
+        taskList: includeTaskList ? session.taskList : null,
+        metadata: session.metadata,
+        error: session.error
+      };
+      
+      return jsonResponse({
+        success: true,
+        data
+      });
+    },
+
+    async delete(ctx) {
+      sessionManager.deleteSession(ctx.params.id);
+      
+      return jsonResponse({
+        success: true,
+        data: {
+          deleted: true,
+          sessionId: ctx.params.id
+        }
+      });
+    }
+  };
+}
+
+/**
+ * Create evaluate route handlers
+ */
+function createEvaluateRoutes(sessionManager, llmClient) {
+  const { 
+    buildEvaluationPrompt, 
+    parseJsonResponse, 
+    validateEvaluationResponse 
+  } = require('../prompts/templates.js');
+  
+  return {
+    async evaluate(ctx) {
+      const { sessionId, options = {} } = ctx.body || {};
+      
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+      
+      const session = sessionManager.getSession(sessionId);
+      
+      // Build prompt
+      const { systemPrompt, userPrompt } = buildEvaluationPrompt({
+        goals: session.goals,
+        formattedContext: session.context.formattedContent
+      });
+      
+      // Send to LLM
+      const response = await llmClient.send({
+        systemPrompt,
+        userPrompt,
+        parameters: options
+      });
+      
+      // Parse response
+      const parsed = parseJsonResponse(response.content);
+      
+      // Validate
+      const validation = validateEvaluationResponse(parsed);
+      if (!validation.valid) {
+        throw new ValidationError(
+          `Invalid LLM response: ${validation.errors.join(', ')}`,
+          'llmResponse'
+        );
+      }
+      
+      // Build evaluation result
+      const evaluationResult = {
+        evaluatedAt: new Date().toISOString(),
+        modelUsed: response.model || llmClient.model,
+        executionOrder: parsed.executionOrder,
+        inferredDependencies: parsed.inferredDependencies,
+        reasoning: parsed.reasoning,
+        warnings: parsed.warnings || [],
+        tokenUsage: response.usage
+      };
+      
+      // Update session
+      const updatedSession = sessionManager.setEvaluation(sessionId, evaluationResult);
+      
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          state: updatedSession.state,
+          evaluation: evaluationResult
+        }
+      });
+    }
+  };
+}
+
+/**
+ * Create task list route handlers
+ */
+function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
+  const { 
+    buildTaskGenerationPrompt, 
+    parseJsonResponse, 
+    validateTaskGenerationResponse 
+  } = require('../prompts/templates.js');
+  const { ToolBindingError } = require('../lib/errors.js');
+  
+  return {
+    async generate(ctx) {
+      const { sessionId, options = {} } = ctx.body || {};
+      
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+      
+      const session = sessionManager.getSession(sessionId);
+      const toolManifest = toolRouter.getManifest();
+      
+      // Build prompt
+      const { systemPrompt, userPrompt } = buildTaskGenerationPrompt({
+        goals: session.goals,
+        executionOrder: session.goals.executionOrder,
+        formattedContext: session.context.formattedContent,
+        toolManifest
+      });
+      
+      // Send to LLM
+      const response = await llmClient.send({
+        systemPrompt,
+        userPrompt,
+        parameters: options
+      });
+      
+      // Parse response
+      const parsed = parseJsonResponse(response.content);
+      
+      // Validate
+      const validation = validateTaskGenerationResponse(parsed);
+      if (!validation.valid) {
+        throw new ValidationError(
+          `Invalid LLM response: ${validation.errors.join(', ')}`,
+          'llmResponse'
+        );
+      }
+      
+      // Check for unbound tasks
+      if (parsed.unboundTasks && parsed.unboundTasks.length > 0) {
+        throw new ToolBindingError(
+          parsed.unboundTasks,
+          toolManifest.tools.map(t => t.name)
+        );
+      }
+      
+      // Validate tool bindings
+      for (const task of parsed.tasks) {
+        if (!toolRouter.hasTool(task.tool.toolName)) {
+          throw new ToolBindingError(
+            [{
+              goalId: task.goalId,
+              taskTitle: task.title,
+              taskDescription: task.description,
+              reason: `Tool '${task.tool.toolName}' not found in manifest`,
+              suggestedTools: []
+            }],
+            toolManifest.tools.map(t => t.name)
+          );
+        }
+      }
+      
+      // Build task list
+      const tasksByState = { pending: parsed.tasks.length };
+      const tasksByTool = {};
+      const toolsRequired = new Set();
+      
+      for (const task of parsed.tasks) {
+        task.state = 'pending';
+        tasksByTool[task.tool.toolName] = (tasksByTool[task.tool.toolName] || 0) + 1;
+        toolsRequired.add(task.tool.toolName);
+      }
+      
+      const taskList = {
+        generatedAt: new Date().toISOString(),
+        modelUsed: response.model || llmClient.model,
+        sessionId,
+        tasks: parsed.tasks,
+        summary: {
+          totalTasks: parsed.tasks.length,
+          tasksByState,
+          tasksByTool,
+          toolsRequired: Array.from(toolsRequired),
+          estimatedTotalMinutes: parsed.tasks.reduce(
+            (sum, t) => sum + (t.effort?.estimatedMinutes || 0), 0
+          )
+        },
+        tokenUsage: response.usage
+      };
+      
+      // Update session
+      const updatedSession = sessionManager.setTaskList(sessionId, taskList);
+      
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          state: updatedSession.state,
+          taskList
+        }
+      });
+    }
+  };
+}
+
+/**
+ * Create tool route handlers
+ */
+function createToolRoutes(toolRouter) {
+  return {
+    async list() {
+      return jsonResponse({
+        success: true,
+        data: toolRouter.getManifest()
+      });
+    },
+
+    async get(ctx) {
+      const tool = toolRouter.getTool(ctx.params.name);
+      
+      if (!tool) {
+        throw new (require('../lib/errors.js').ToolNotFoundError)(ctx.params.name);
+      }
+      
+      return jsonResponse({
+        success: true,
+        data: tool.schema
+      });
+    }
+  };
+}
+
+// Use dynamic import for prompts to avoid circular dependency
+function require(path) {
+  // This is a workaround for synchronous requires in async context
+  // In production, these would be proper imports at the top
+  return {
+    '../prompts/templates.js': {
+      buildEvaluationPrompt: (...args) => {
+        const mod = import('../prompts/templates.js');
+        return mod.then(m => m.buildEvaluationPrompt(...args));
+      },
+      buildTaskGenerationPrompt: (...args) => {
+        const mod = import('../prompts/templates.js');
+        return mod.then(m => m.buildTaskGenerationPrompt(...args));
+      },
+      parseJsonResponse: (content) => {
+        // Inline implementation
+        let jsonStr = content.trim();
+        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
+        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
+        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
+        return JSON.parse(jsonStr.trim());
+      },
+      validateEvaluationResponse: (response) => {
+        const errors = [];
+        if (!response.executionOrder || !Array.isArray(response.executionOrder)) {
+          errors.push('Missing or invalid executionOrder array');
+        }
+        if (!response.inferredDependencies || !Array.isArray(response.inferredDependencies)) {
+          errors.push('Missing or invalid inferredDependencies array');
+        }
+        if (!response.reasoning || typeof response.reasoning !== 'string') {
+          errors.push('Missing or invalid reasoning string');
+        }
+        return { valid: errors.length === 0, errors };
+      },
+      validateTaskGenerationResponse: (response) => {
+        const errors = [];
+        if (!response.tasks || !Array.isArray(response.tasks)) {
+          errors.push('Missing or invalid tasks array');
+        }
+        return { valid: errors.length === 0, errors };
+      }
+    },
+    '../lib/errors.js': {
+      ToolNotFoundError: class extends Error {
+        constructor(name) {
+          super(`Tool not found: ${name}`);
+          this.statusCode = 404;
+          this.code = 'TOOL_NOT_FOUND';
+        }
+        toJSON() {
+          return {
+            success: false,
+            error: { code: this.code, message: this.message }
+          };
+        }
+      },
+      ToolBindingError: class extends Error {
+        constructor(unboundTasks, availableTools) {
+          super('One or more tasks could not be bound to available tools');
+          this.statusCode = 422;
+          this.code = 'TOOL_BINDING_FAILED';
+          this.unboundTasks = unboundTasks;
+          this.availableTools = availableTools;
+        }
+        toJSON() {
+          return {
+            success: false,
+            error: {
+              code: this.code,
+              message: this.message,
+              details: {
+                unboundTasks: this.unboundTasks,
+                availableTools: this.availableTools
+              }
+            }
+          };
+        }
+      }
+    }
+  }[path];
+}
+
+export default { Router, createApiHandler, jsonResponse, errorResponse };

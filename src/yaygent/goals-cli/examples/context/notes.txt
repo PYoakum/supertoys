@@ -1,0 +1,27 @@
+Project Notes
+=============
+
+Development Timeline:
+- Week 1: Database setup and basic login
+- Week 2: Session management and logout
+- Week 3: Rate limiting and security hardening
+- Week 4: Testing and documentation
+
+Team Decisions:
+- Using Bun for performance and simplicity
+- SQLite chosen for zero-configuration deployment
+- No external auth providers for MVP
+
+Open Questions:
+- Password reset flow (defer to Phase 2?)
+- Two-factor authentication (future enhancement)
+- OAuth integration (not in scope)
+
+Dependencies:
+- Bun >= 1.0.0
+- No external npm packages for core functionality
+
+Testing Strategy:
+- Unit tests for all auth functions
+- Integration tests for API endpoints
+- Load testing for rate limiting

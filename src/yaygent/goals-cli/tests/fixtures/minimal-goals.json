@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "goals": [
+    {
+      "id": "minimal-goal",
+      "objective": "A minimal goal with just required fields present"
+    }
+  ]
+}

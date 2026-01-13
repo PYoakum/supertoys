@@ -1,7 +1,7 @@
 {
-  "name": "v86-vm-emulator",
+  "name": "js-vm",
   "version": "1.0.0",
-  "description": "Single page application for running virtual machines with v86 emulator",
+  "description": "SPA for running VMs with v86 emulator",
   "main": "server.js",
   "type": "module",
   "scripts": {

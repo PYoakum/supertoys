@@ -14,7 +14,7 @@ try {
 
 export async function serveFile(filePath, request) {
   try {
-    const file = Bun.file(filePath);
+                                                                                           
     const fileSize = file.size;
 
     // Get the Range header if present

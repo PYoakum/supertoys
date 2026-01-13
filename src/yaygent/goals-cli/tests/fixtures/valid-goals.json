@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Test Goals",
+    "description": "Goals for testing"
+  },
+  "goals": [
+    {
+      "id": "goal-one",
+      "objective": "This is the first test goal with sufficient length",
+      "priority": 1,
+      "criteria": {
+        "success": ["Criterion 1", "Criterion 2"],
+        "validation": "automated"
+      }
+    },
+    {
+      "id": "goal-two",
+      "objective": "This is the second test goal that depends on the first",
+      "priority": 2,
+      "dependencies": ["goal-one"]
+    }
+  ],
+  "globalContext": {
+    "environment": "test"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "goals-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for goal-driven AI workflows with context management",
+  "type": "module",
+  "main": "goals-cli.js",
+  "bin": {
+    "goals-cli": "./goals-cli.js"
+  },
+  "scripts": {
+    "start": "bun goals-cli.js",
+    "test": "bun test",
+    "lint": "bunx eslint lib/*.js"
+  },
+  "keywords": [
+    "goals",
+    "ai",
+    "workflow",
+    "context",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {}
+}

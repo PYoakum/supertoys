@@ -1,0 +1,25 @@
+{
+  "name": "output-eval",
+  "version": "1.0.0",
+  "description": "Post-completion analysis and evaluation service for session outputs",
+  "type": "module",
+  "main": "output-eval.js",
+  "bin": {
+    "output-eval": "./output-eval.js"
+  },
+  "scripts": {
+    "start": "node output-eval.js",
+    "test": "node validate.js"
+  },
+  "keywords": [
+    "evaluation",
+    "analysis",
+    "llm",
+    "goals"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
