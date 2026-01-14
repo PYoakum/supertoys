@@ -8,9 +8,9 @@ import {
   buildEvaluationPrompt,
   buildTaskGenerationPrompt,
   parseJsonResponse,
-  validateEvaluationResponse,
-  validateTaskGenerationResponse
+  validateEvaluationResponse
 } from '../prompts/templates.js';
+import { parseTaskToml, validateTaskTomlResponse } from '../lib/toml-parser.js';
 import { LLMLogger } from '../lib/llm-logger.js';
 
 /**
@@ -564,11 +564,11 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
           totalTokenUsage.totalTokens += response.usage.totalTokens || 0;
         }
 
-        // Parse response
-        const parsed = parseJsonResponse(response.content);
+        // Parse TOML response
+        const parsed = parseTaskToml(response.content);
 
         // Validate
-        const validation = validateTaskGenerationResponse(parsed);
+        const validation = validateTaskTomlResponse(parsed);
         if (!validation.valid) {
           throw new ValidationError(
             `Invalid LLM response for goal ${goalId}: ${validation.errors.join(', ')}`,

@@ -77,6 +77,8 @@ Respond with JSON in this exact format:
 
 /**
  * Build the task generation prompt for a SINGLE goal (batched approach)
+ * Uses TOML format for resilience to truncation - partial output still parses.
+ *
  * @param {Object} params
  * @param {Object} params.goal - Single goal to generate tasks for
  * @param {number} params.goalIndex - Index of this goal in execution order
@@ -90,9 +92,11 @@ Respond with JSON in this exact format:
 export function buildTaskGenerationPrompt({ goal, goalIndex, totalGoals, formattedContext, toolManifest, previousTasks = [], taskStartNumber = 1 }) {
   const systemPrompt = `You are an expert task planner. Your task is to convert a high-level goal into concrete, executable tasks that use specific tools from the provided tool manifest.
 
-CRITICAL REQUIREMENT: Every task MUST be bound to exactly one tool from the available tools. If the goal cannot be accomplished with the available tools, you must indicate this explicitly in the "unboundTasks" array.
-
-You must respond with valid JSON matching the specified schema. Do not include any text before or after the JSON.`;
+CRITICAL REQUIREMENTS:
+1. Every task MUST be bound to exactly one tool from the available tools
+2. You MUST respond in TOML format (not JSON) - this is critical for parsing reliability
+3. Use triple quotes (''') for any multi-line content like code
+4. Do not include any text before or after the TOML`;
 
   const goalJson = JSON.stringify({
     id: goal.id,
@@ -105,14 +109,10 @@ You must respond with valid JSON matching the specified schema. Do not include a
 
   // Summarize previous tasks for context (don't include full parameters to save tokens)
   const previousTasksSummary = previousTasks.length > 0
-    ? previousTasks.map(t => ({
-        id: t.id,
-        goalId: t.goalId,
-        title: t.title,
-        toolName: t.tool.toolName,
-        sequenceNumber: t.sequenceNumber
-      }))
-    : [];
+    ? previousTasks.map(t => `  - ${t.id}: ${t.title} (${t.tool.toolName})`).join('\n')
+    : '';
+
+  const toolList = toolManifest.tools.map(t => `  - ${t.name}: ${t.description || 'No description'}`).join('\n');
 
   const userPrompt = `<goal index="${goalIndex + 1}" total="${totalGoals}">
 ${goalJson}
@@ -123,62 +123,59 @@ ${formattedContext}
 </context>
 
 <available_tools>
-${JSON.stringify(toolManifest.tools, null, 2)}
+${toolList}
 </available_tools>
 
-${previousTasksSummary.length > 0 ? `<previous_tasks>
+${previousTasksSummary ? `<previous_tasks>
 These tasks were already generated for previous goals. You may reference their IDs for dependencies:
-${JSON.stringify(previousTasksSummary, null, 2)}
+${previousTasksSummary}
 </previous_tasks>` : ''}
 
 <instructions>
-Generate one or more concrete tasks for THIS GOAL ONLY that:
+Generate tasks for THIS GOAL ONLY in TOML format.
 
-1. ACCOMPLISH THE GOAL: Break down the goal into actionable steps
-2. USE AVAILABLE TOOLS: Each task must use exactly one tool from the manifest
-3. SPECIFY PARAMETERS: Provide complete parameter values for the tool command
-4. REFERENCE DEPENDENCIES: If tasks depend on previous tasks, include the dependency
-5. BE CONCISE: Task titles should be clear and actionable
-6. START SEQUENCE AT ${taskStartNumber}: Task sequence numbers should start at ${taskStartNumber}
+Rules:
+1. Each task uses exactly one tool from the manifest
+2. Task IDs should start at task-${taskStartNumber}
+3. Sequence numbers start at ${taskStartNumber}
+4. Use triple quotes (''') for multi-line content like code
+5. Goal ID for all tasks: "${goal.id}"
 
-For each task, specify:
-- Which tool to use (must match a tool name exactly)
-- The action/method to invoke
-- Complete parameters for the tool
-- Expected output description
+Respond with TOML in this exact format:
 
-If this goal CANNOT be accomplished with the available tools, include it in the "unboundTasks" array with an explanation.
+[[tasks]]
+id = "task-${taskStartNumber}"
+goalId = "${goal.id}"
+sequenceNumber = ${taskStartNumber}
+title = "Concise task title"
+description = "Detailed description of what this task does"
+toolName = "exact_tool_name"
+toolDescription = "What this tool does"
+action = "the_action"
+expectedOutput = "Description of expected result"
+estimatedMinutes = 5
+complexity = "low"
 
-Respond with JSON in this exact format:
-{
-  "tasks": [
-    {
-      "id": "task-${taskStartNumber}",
-      "goalId": "${goal.id}",
-      "sequenceNumber": ${taskStartNumber},
-      "title": "Concise task title",
-      "description": "Detailed description",
-      "dependencies": [
-        { "taskId": "task-id", "type": "completion" }
-      ],
-      "tool": {
-        "toolName": "exact_tool_name",
-        "toolDescription": "What this tool does",
-        "command": {
-          "action": "tool_action",
-          "parameters": { "param1": "value1" },
-          "expectedOutput": "Description of expected result"
-        },
-        "fallbackTool": null
-      },
-      "effort": {
-        "estimatedMinutes": 5,
-        "complexity": "low|medium|high"
-      }
-    }
-  ],
-  "unboundTasks": []
-}
+[tasks.parameters]
+operation = "write"
+path = "path/to/file.js"
+content = '''
+// Your code here
+// Multi-line content uses triple quotes
+'''
+
+# If task has dependencies on previous tasks:
+[[tasks.dependencies]]
+taskId = "task-1"
+type = "completion"
+
+# For additional tasks, repeat [[tasks]] block
+
+# If goal cannot be accomplished with available tools:
+[[unboundTasks]]
+goalId = "${goal.id}"
+taskTitle = "What needs to be done"
+reason = "Why no tool is available"
 </instructions>`;
 
   return { systemPrompt, userPrompt };
