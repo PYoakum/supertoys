@@ -190,34 +190,108 @@ Respond with JSON in this exact format:
  * @returns {Object}
  */
 export function parseJsonResponse(content) {
-  // Try to extract JSON from the response
   let jsonStr = content.trim();
 
-  // Remove markdown code blocks if present
-  if (jsonStr.startsWith('```json')) {
-    jsonStr = jsonStr.slice(7);
-  } else if (jsonStr.startsWith('```')) {
-    jsonStr = jsonStr.slice(3);
+  // Strategy 1: Remove markdown code blocks if present
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim();
   }
 
-  if (jsonStr.endsWith('```')) {
-    jsonStr = jsonStr.slice(0, -3);
+  // Strategy 2: Try to find JSON object directly
+  if (!jsonStr.startsWith('{') && !jsonStr.startsWith('[')) {
+    // Look for first { or [ and last } or ]
+    const firstBrace = jsonStr.indexOf('{');
+    const firstBracket = jsonStr.indexOf('[');
+    let start = -1;
+
+    if (firstBrace >= 0 && firstBracket >= 0) {
+      start = Math.min(firstBrace, firstBracket);
+    } else if (firstBrace >= 0) {
+      start = firstBrace;
+    } else if (firstBracket >= 0) {
+      start = firstBracket;
+    }
+
+    if (start >= 0) {
+      // Find the matching end
+      const isObject = jsonStr[start] === '{';
+      let depth = 0;
+      let inString = false;
+      let escapeNext = false;
+      let end = -1;
+
+      for (let i = start; i < jsonStr.length; i++) {
+        const char = jsonStr[i];
+
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
+        }
+
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+
+        if (inString) continue;
+
+        if (char === '{' || char === '[') {
+          depth++;
+        } else if (char === '}' || char === ']') {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+
+      if (end > start) {
+        jsonStr = jsonStr.slice(start, end + 1);
+      }
+    }
   }
 
   jsonStr = jsonStr.trim();
 
+  // Strategy 3: Try parsing directly
   try {
     return JSON.parse(jsonStr);
-  } catch (err) {
-    // Check if response appears truncated
-    const lastChars = jsonStr.slice(-100);
-    const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
+  } catch (firstErr) {
+    // Strategy 4: Try fixing common issues
+    let fixedStr = jsonStr;
 
-    let errorMsg = `Failed to parse LLM response as JSON: ${err.message}`;
-    if (isTruncated) {
-      errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
+    // Fix trailing commas before } or ]
+    fixedStr = fixedStr.replace(/,(\s*[}\]])/g, '$1');
+
+    // Fix unescaped newlines in strings (common LLM mistake)
+    // This is a simplified fix - replace literal newlines inside strings
+    fixedStr = fixedStr.replace(/("(?:[^"\\]|\\.)*")/g, (match) => {
+      return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+    });
+
+    try {
+      return JSON.parse(fixedStr);
+    } catch (secondErr) {
+      // Check if response appears truncated
+      const lastChars = jsonStr.slice(-100);
+      const firstChars = jsonStr.slice(0, 100);
+      const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
+
+      let errorMsg = `Failed to parse LLM response as JSON: ${firstErr.message}`;
+      if (isTruncated) {
+        errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
+      } else {
+        errorMsg += ` (First 100 chars: "${firstChars}")`;
+      }
+      throw new Error(errorMsg);
     }
-    throw new Error(errorMsg);
   }
 }
 
