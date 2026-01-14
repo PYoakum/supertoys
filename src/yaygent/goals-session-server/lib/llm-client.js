@@ -36,7 +36,7 @@ const DEFAULTS = {
   timeout: 120000,
   parameters: {
     temperature: 0.7,
-    maxTokens: 4096
+    maxTokens: 8192
   },
   retry: {
     maxAttempts: 3,
@@ -91,7 +91,7 @@ export class LLMClient {
     return {
       'Content-Type': 'application/json',
       'x-api-key': this.apiKey,
-      'anthropic-version': '2024-01-01',
+      'anthropic-version': '2023-06-01',
       ...this.headers
     };
   }
@@ -107,7 +107,7 @@ export class LLMClient {
    */
   buildRequestBody({ systemPrompt, userPrompt, parameters = {} }) {
     const params = { ...this.parameters, ...parameters };
-    
+
     const body = {
       model: this.model,
       max_tokens: params.maxTokens,
@@ -120,7 +120,7 @@ export class LLMClient {
         }
       ]
     };
-    
+
     return body;
   }
 

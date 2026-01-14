@@ -184,24 +184,32 @@ Respond with JSON in this exact format:
 export function parseJsonResponse(content) {
   // Try to extract JSON from the response
   let jsonStr = content.trim();
-  
+
   // Remove markdown code blocks if present
   if (jsonStr.startsWith('```json')) {
     jsonStr = jsonStr.slice(7);
   } else if (jsonStr.startsWith('```')) {
     jsonStr = jsonStr.slice(3);
   }
-  
+
   if (jsonStr.endsWith('```')) {
     jsonStr = jsonStr.slice(0, -3);
   }
-  
+
   jsonStr = jsonStr.trim();
-  
+
   try {
     return JSON.parse(jsonStr);
   } catch (err) {
-    throw new Error(`Failed to parse LLM response as JSON: ${err.message}`);
+    // Check if response appears truncated
+    const lastChars = jsonStr.slice(-100);
+    const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
+
+    let errorMsg = `Failed to parse LLM response as JSON: ${err.message}`;
+    if (isTruncated) {
+      errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
+    }
+    throw new Error(errorMsg);
   }
 }
 

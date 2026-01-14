@@ -13,7 +13,7 @@ export default {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "anthropic-version": "2024-01-01"
+      "anthropic-version": "2023-06-01"
     },
     timeout: 120000
   },
@@ -43,7 +43,7 @@ export default {
 
   // Output settings
   output: {
-    defaultFormat: "json",
+    defaultFormat: "markdown",
     prettyPrint: true
   },
 

@@ -211,6 +211,48 @@ export class SessionClient {
   }
 
   /**
+   * Execute a tool
+   * @param {string} toolName - Name of the tool to execute
+   * @param {Object} parameters - Tool parameters
+   * @param {string} [sessionId] - Session ID for sandbox isolation
+   * @returns {Promise<Object>}
+   */
+  async executeTool(toolName, parameters, sessionId) {
+    const response = await this.request('POST', '/api/tools/execute', {
+      toolName,
+      parameters,
+      sessionId
+    });
+    return response.data;
+  }
+
+  /**
+   * List sessions ready for execution
+   * @param {Object} [options] - Query options
+   * @param {number} [options.limit=50] - Maximum results
+   * @param {number} [options.offset=0] - Pagination offset
+   * @returns {Promise<Object>}
+   */
+  async listReadySessions(options = {}) {
+    const params = new URLSearchParams();
+    if (options.limit) params.set('limit', options.limit.toString());
+    if (options.offset) params.set('offset', options.offset.toString());
+
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await this.request('GET', `/api/sessions/ready${query}`);
+    return response.data;
+  }
+
+  /**
+   * Get the next session ready for execution
+   * @returns {Promise<Object|null>}
+   */
+  async getNextReadySession() {
+    const result = await this.listReadySessions({ limit: 1 });
+    return result.sessions?.[0] || null;
+  }
+
+  /**
    * Health check
    * @returns {Promise<boolean>}
    */

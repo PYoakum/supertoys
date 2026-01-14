@@ -9,7 +9,7 @@
  * @property {string|null} context - Path to context directory
  * @property {string} config - Path to configuration file
  * @property {string} output - Output destination ('stdout' or file path)
- * @property {string} format - Output format ('json', 'markdown', 'text')
+ * @property {string} format - Output format ('toon', 'json', 'markdown', 'text')
  * @property {boolean} verbose - Enable verbose logging
  * @property {boolean} dryRun - Validate without executing
  * @property {boolean} help - Display help
@@ -26,7 +26,7 @@ const DEFAULTS = {
   context: null,
   config: './configuration.js',
   output: 'stdout',
-  format: 'json',
+  format: 'toon',
   verbose: false,
   dryRun: false,
   help: false,
@@ -104,7 +104,7 @@ export function parseArguments(argv) {
   }
   
   // Validate format option
-  const validFormats = ['json', 'markdown', 'text'];
+  const validFormats = ['toon', 'json', 'markdown', 'text'];
   if (result.format && !validFormats.includes(result.format)) {
     result.errors.push(`Invalid format: ${result.format}. Must be one of: ${validFormats.join(', ')}`);
   }
@@ -162,7 +162,7 @@ Required Arguments:
 Optional Arguments:
   --config, -C <path>     Path to configuration file (default: ./configuration.js)
   --output, -o <path>     Output destination: file path or 'stdout' (default: stdout)
-  --format, -f <format>   Output format: json, markdown, text (default: json)
+  --format, -f <format>   Output format: toon, json, markdown, text (default: toon)
   --verbose, -v           Enable verbose logging to stderr
   --dry-run, -d           Validate inputs without executing
   --help, -h              Display this help message

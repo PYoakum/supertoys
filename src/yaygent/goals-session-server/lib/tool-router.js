@@ -6,6 +6,11 @@
 import { mkdir, writeFile, readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { SandboxManager } from './sandbox-manager.js';
+import { CodeEditorTool } from './code-editor-tool.js';
+import { FileCreateTool } from './file-create-tool.js';
+import { JavaScriptExecuteTool } from './javascript-execute-tool.js';
+import { SQLiteTool } from './sqlite-tool.js';
 
 /**
  * Tool Router Class
@@ -376,16 +381,53 @@ export class NotepadTool {
  * Create and initialize the tool router with default tools
  * @param {Object} [options={}]
  * @param {string} [options.notepadDir='./notes']
+ * @param {string} [options.sandboxDir='./sandbox']
  * @returns {ToolRouter}
  */
 export function createToolRouter(options = {}) {
   const router = new ToolRouter();
-  
+
   // Initialize and register notepad tool
   const notepad = new NotepadTool(options.notepadDir || './notes');
   notepad.registerTools(router);
-  
+
+  // Initialize sandbox manager (shared by code_editor, file_create, javascript_execute)
+  const sandboxManager = new SandboxManager({
+    baseDir: options.sandboxDir || './sandbox',
+    maxFileSize: options.maxFileSize,
+    maxTotalSize: options.maxTotalSize
+  });
+
+  // Initialize and register code editor tool
+  const codeEditor = new CodeEditorTool(sandboxManager);
+  codeEditor.registerTools(router);
+
+  // Initialize and register file create tool
+  const fileCreate = new FileCreateTool(sandboxManager, {
+    allowedStreamHosts: options.allowedStreamHosts || ['*'],
+    maxStreamSize: options.maxStreamSize
+  });
+  fileCreate.registerTools(router);
+
+  // Initialize and register JavaScript execute tool
+  const jsExecute = new JavaScriptExecuteTool(sandboxManager, {
+    nodeEnabled: options.nodeEnabled !== false,
+    bunEnabled: options.bunEnabled !== false,
+    workerdEnabled: options.workerdEnabled !== false
+  });
+  jsExecute.registerTools(router);
+
+  // Initialize and register SQLite tools
+  const sqliteTool = new SQLiteTool(sandboxManager, {
+    maxResultRows: options.maxResultRows || 1000,
+    queryTimeout: options.queryTimeout || 30000
+  });
+  sqliteTool.registerTools(router);
+
+  // Store sandbox manager reference for other tools to use
+  router.sandboxManager = sandboxManager;
+
   return router;
 }
 
-export default { ToolRouter, NotepadTool, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, SandboxManager, createToolRouter };

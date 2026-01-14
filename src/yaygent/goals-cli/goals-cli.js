@@ -6,7 +6,7 @@
  */
 
 import { writeFile } from 'fs/promises';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, basename, extname } from 'path';
 import { existsSync } from 'fs';
 
 import { parseArguments, validateRequiredArgs, getVersion, getHelpText, formatErrors } from './lib/argument-parser.js';
@@ -284,6 +284,41 @@ async function runExecution(args, config, logger) {
 }
 
 /**
+ * Determine the output file path based on format
+ * @param {string} destination - Original output destination
+ * @param {string} formatType - Output format type
+ * @returns {string}
+ */
+function getOutputPath(destination, formatType) {
+  if (destination === 'stdout') {
+    return destination;
+  }
+
+  // Map format types to file extensions
+  const extensionMap = {
+    json: '.json',
+    toon: '.md',
+    markdown: '.md',
+    text: '.txt'
+  };
+
+  const targetExt = extensionMap[formatType] || '.json';
+  const currentExt = extname(destination);
+
+  // If no extension or different extension, update it
+  if (!currentExt) {
+    return destination + targetExt;
+  }
+
+  // For toon format, ensure .md extension
+  if (formatType === 'toon' && currentExt !== '.md') {
+    return destination.slice(0, -currentExt.length) + '.md';
+  }
+
+  return destination;
+}
+
+/**
  * Write output to destination
  * @param {string} output - Output string
  * @param {string} destination - 'stdout' or file path
@@ -348,7 +383,8 @@ async function main(argv) {
     // Format and write output
     const outputFormat = args.format || config.output?.defaultFormat || 'json';
     const formatted = format(result.data, outputFormat, { prettyPrint: config.output?.prettyPrint });
-    await writeOutput(formatted, args.output, logger);
+    const outputPath = getOutputPath(args.output, outputFormat);
+    await writeOutput(formatted, outputPath, logger);
     
     return ExitCodes.SUCCESS;
     

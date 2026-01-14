@@ -1,0 +1,28 @@
+{
+  "name": "goal-keeper",
+  "version": "0.0.1",
+  "description": "Directory watcher service that bridges Goals CLI and Session Server",
+  "type": "module",
+  "main": "goals-keeper.js",
+  "bin": {
+    "goals-keeper": "./goal-keeper.js"
+  },
+  "scripts": {
+    "start": "node goal-keeper.js",
+    "test": "node validate.js"
+  },
+  "keywords": [
+    "goals",
+    "watcher",
+    "integration",
+    "session"
+  ],
+  "author": "Peter Yoakum",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0"
+  }
+}

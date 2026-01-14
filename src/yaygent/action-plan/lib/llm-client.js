@@ -35,7 +35,7 @@ export class LLMClient {
     return {
       'Content-Type': 'application/json',
       'x-api-key': this.apiKey,
-      'anthropic-version': '2024-01-01'
+      'anthropic-version': '2023-06-01'
     };
   }
 

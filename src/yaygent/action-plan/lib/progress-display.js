@@ -105,10 +105,22 @@ Status: Running
    * Print completion summary
    * @param {Object} metrics
    * @param {string} bundlePath
+   * @param {Object} [evalResult] - Output-eval result
    */
-  printCompletion(metrics, bundlePath) {
+  printCompletion(metrics, bundlePath, evalResult = null) {
     const duration = ((Date.now() - this.startTime) / 1000).toFixed(1);
-    
+
+    let evalStatus = '';
+    if (evalResult) {
+      if (evalResult.background) {
+        evalStatus = `\n  📊 Evaluation: Running in background (PID: ${evalResult.pid})`;
+      } else if (evalResult.success) {
+        evalStatus = `\n  📊 Evaluation: Complete (${(evalResult.durationMs / 1000).toFixed(1)}s)`;
+      } else {
+        evalStatus = `\n  ⚠️  Evaluation: Failed - ${evalResult.error || 'Unknown error'}`;
+      }
+    }
+
     console.log(`
 ══════════════════════════════════════════════════════════════════════
 Execution Complete!
@@ -116,7 +128,7 @@ Execution Complete!
 Summary:
   ${metrics.failedCount === 0 ? '✅' : '❌'} Tasks Completed: ${metrics.completedCount}/${metrics.totalTasks}
   ⏱️  Total Duration: ${duration}s
-  ${bundlePath ? `📁 Bundle Created: ${bundlePath}` : ''}
+  ${bundlePath ? `📁 Bundle Created: ${bundlePath}` : ''}${evalStatus}
 
 ══════════════════════════════════════════════════════════════════════
 `);

@@ -3,7 +3,14 @@
  * @module api/router
  */
 
-import { ServerError, ValidationError } from '../lib/errors.js';
+import { ServerError, ValidationError, ToolBindingError, ToolNotFoundError } from '../lib/errors.js';
+import {
+  buildEvaluationPrompt,
+  buildTaskGenerationPrompt,
+  parseJsonResponse,
+  validateEvaluationResponse,
+  validateTaskGenerationResponse
+} from '../prompts/templates.js';
 
 /**
  * Simple router for HTTP request handling
@@ -200,6 +207,7 @@ export function createApiHandler(services) {
   // Sessions
   router.post('/api/sessions', sessionRoutes.create);
   router.get('/api/sessions', sessionRoutes.list);
+  router.get('/api/sessions/ready', sessionRoutes.listReady);
   router.get('/api/sessions/:id', sessionRoutes.get);
   router.delete('/api/sessions/:id', sessionRoutes.delete);
 
@@ -212,6 +220,7 @@ export function createApiHandler(services) {
   // Tools
   router.get('/api/tools', toolRoutes.list);
   router.get('/api/tools/:name', toolRoutes.get);
+  router.post('/api/tools/execute', toolRoutes.execute);
 
   // Health
   router.get('/health', async () => {
@@ -328,10 +337,43 @@ function createSessionRoutes(sessionManager) {
         sortBy: ctx.query.sortBy || 'createdAt',
         sortOrder: ctx.query.sortOrder || 'desc'
       });
-      
+
       return jsonResponse({
         success: true,
         data: result
+      });
+    },
+
+    async listReady(ctx) {
+      // Get sessions that are ready for action-plan execution (state = GENERATED)
+      const result = sessionManager.listSessions({
+        state: 'GENERATED',
+        limit: parseInt(ctx.query.limit, 10) || 50,
+        offset: parseInt(ctx.query.offset, 10) || 0,
+        sortBy: ctx.query.sortBy || 'createdAt',
+        sortOrder: ctx.query.sortOrder || 'asc'  // Oldest first by default
+      });
+
+      // Enrich with task count info
+      const enrichedSessions = result.sessions.map(s => {
+        try {
+          const fullSession = sessionManager.getSession(s.id);
+          return {
+            ...s,
+            tasksCount: fullSession.taskList?.tasks?.length || 0,
+            tasksByState: fullSession.taskList?.summary?.tasksByState || {}
+          };
+        } catch {
+          return s;
+        }
+      });
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessions: enrichedSessions,
+          pagination: result.pagination
+        }
       });
     },
 
@@ -379,12 +421,6 @@ function createSessionRoutes(sessionManager) {
  * Create evaluate route handlers
  */
 function createEvaluateRoutes(sessionManager, llmClient) {
-  const { 
-    buildEvaluationPrompt, 
-    parseJsonResponse, 
-    validateEvaluationResponse 
-  } = require('../prompts/templates.js');
-  
   return {
     async evaluate(ctx) {
       const { sessionId, options = {} } = ctx.body || {};
@@ -450,13 +486,6 @@ function createEvaluateRoutes(sessionManager, llmClient) {
  * Create task list route handlers
  */
 function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
-  const { 
-    buildTaskGenerationPrompt, 
-    parseJsonResponse, 
-    validateTaskGenerationResponse 
-  } = require('../prompts/templates.js');
-  const { ToolBindingError } = require('../lib/errors.js');
-  
   return {
     async generate(ctx) {
       const { sessionId, options = {} } = ctx.body || {};
@@ -576,100 +605,68 @@ function createToolRoutes(toolRouter) {
 
     async get(ctx) {
       const tool = toolRouter.getTool(ctx.params.name);
-      
+
       if (!tool) {
-        throw new (require('../lib/errors.js').ToolNotFoundError)(ctx.params.name);
+        throw new ToolNotFoundError(ctx.params.name);
       }
-      
+
       return jsonResponse({
         success: true,
         data: tool.schema
       });
+    },
+
+    async execute(ctx) {
+      const { toolName, parameters = {}, sessionId } = ctx.body || {};
+
+      if (!toolName) {
+        throw new ValidationError('toolName is required', 'toolName');
+      }
+
+      if (!toolRouter.hasTool(toolName)) {
+        throw new ToolNotFoundError(toolName);
+      }
+
+      const startTime = Date.now();
+
+      try {
+        // Execute the tool with sessionId for sandbox isolation
+        const result = await toolRouter.executeTool(toolName, {
+          ...parameters,
+          sessionId
+        });
+
+        const durationMs = Date.now() - startTime;
+
+        return jsonResponse({
+          success: true,
+          data: {
+            toolName,
+            parameters,
+            result,
+            durationMs,
+            executedAt: new Date().toISOString()
+          }
+        });
+      } catch (err) {
+        const durationMs = Date.now() - startTime;
+
+        return jsonResponse({
+          success: false,
+          data: {
+            toolName,
+            parameters,
+            error: {
+              message: err.message,
+              code: err.code
+            },
+            durationMs,
+            executedAt: new Date().toISOString()
+          }
+        });
+      }
     }
   };
-}
-
-// Use dynamic import for prompts to avoid circular dependency
-function require(path) {
-  // This is a workaround for synchronous requires in async context
-  // In production, these would be proper imports at the top
-  return {
-    '../prompts/templates.js': {
-      buildEvaluationPrompt: (...args) => {
-        const mod = import('../prompts/templates.js');
-        return mod.then(m => m.buildEvaluationPrompt(...args));
-      },
-      buildTaskGenerationPrompt: (...args) => {
-        const mod = import('../prompts/templates.js');
-        return mod.then(m => m.buildTaskGenerationPrompt(...args));
-      },
-      parseJsonResponse: (content) => {
-        // Inline implementation
-        let jsonStr = content.trim();
-        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
-        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
-        if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
-        return JSON.parse(jsonStr.trim());
-      },
-      validateEvaluationResponse: (response) => {
-        const errors = [];
-        if (!response.executionOrder || !Array.isArray(response.executionOrder)) {
-          errors.push('Missing or invalid executionOrder array');
-        }
-        if (!response.inferredDependencies || !Array.isArray(response.inferredDependencies)) {
-          errors.push('Missing or invalid inferredDependencies array');
-        }
-        if (!response.reasoning || typeof response.reasoning !== 'string') {
-          errors.push('Missing or invalid reasoning string');
-        }
-        return { valid: errors.length === 0, errors };
-      },
-      validateTaskGenerationResponse: (response) => {
-        const errors = [];
-        if (!response.tasks || !Array.isArray(response.tasks)) {
-          errors.push('Missing or invalid tasks array');
-        }
-        return { valid: errors.length === 0, errors };
-      }
-    },
-    '../lib/errors.js': {
-      ToolNotFoundError: class extends Error {
-        constructor(name) {
-          super(`Tool not found: ${name}`);
-          this.statusCode = 404;
-          this.code = 'TOOL_NOT_FOUND';
-        }
-        toJSON() {
-          return {
-            success: false,
-            error: { code: this.code, message: this.message }
-          };
-        }
-      },
-      ToolBindingError: class extends Error {
-        constructor(unboundTasks, availableTools) {
-          super('One or more tasks could not be bound to available tools');
-          this.statusCode = 422;
-          this.code = 'TOOL_BINDING_FAILED';
-          this.unboundTasks = unboundTasks;
-          this.availableTools = availableTools;
-        }
-        toJSON() {
-          return {
-            success: false,
-            error: {
-              code: this.code,
-              message: this.message,
-              details: {
-                unboundTasks: this.unboundTasks,
-                availableTools: this.availableTools
-              }
-            }
-          };
-        }
-      }
-    }
-  }[path];
 }
 
 export default { Router, createApiHandler, jsonResponse, errorResponse };

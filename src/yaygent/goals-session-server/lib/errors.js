@@ -169,6 +169,86 @@ export class RateLimitedError extends ServerError {
 }
 
 /**
+ * Path traversal error - attempted to access path outside sandbox
+ * @extends ServerError
+ */
+export class PathTraversalError extends ServerError {
+  constructor(path) {
+    super(
+      `Path traversal detected: ${path}`,
+      'PATH_TRAVERSAL',
+      403,
+      { path }
+    );
+    this.name = 'PathTraversalError';
+  }
+}
+
+/**
+ * File exists error - file already exists when creating
+ * @extends ServerError
+ */
+export class FileExistsError extends ServerError {
+  constructor(path) {
+    super(
+      `File already exists: ${path}`,
+      'FILE_EXISTS',
+      409,
+      { path }
+    );
+    this.name = 'FileExistsError';
+  }
+}
+
+/**
+ * File not found error
+ * @extends ServerError
+ */
+export class FileNotFoundError extends ServerError {
+  constructor(path) {
+    super(
+      `File not found: ${path}`,
+      'FILE_NOT_FOUND',
+      404,
+      { path }
+    );
+    this.name = 'FileNotFoundError';
+  }
+}
+
+/**
+ * File size exceeded error
+ * @extends ServerError
+ */
+export class FileSizeExceededError extends ServerError {
+  constructor(size, maxSize) {
+    super(
+      `File size ${size} bytes exceeds maximum ${maxSize} bytes`,
+      'FILE_SIZE_EXCEEDED',
+      413,
+      { size, maxSize }
+    );
+    this.name = 'FileSizeExceededError';
+  }
+}
+
+/**
+ * Sandbox quota exceeded error
+ * @extends ServerError
+ */
+export class SandboxQuotaExceededError extends ServerError {
+  constructor(currentSize, requestedSize, maxSize) {
+    super(
+      `Sandbox quota exceeded. Current: ${currentSize}, Requested: ${requestedSize}, Max: ${maxSize}`,
+      'SANDBOX_QUOTA_EXCEEDED',
+      507,
+      { currentSize, requestedSize, maxSize }
+    );
+    this.name = 'SandboxQuotaExceededError';
+  }
+}
+
+/**
  * Error codes enum
  * @readonly
  * @enum {string}
@@ -183,6 +263,11 @@ export const ErrorCodes = {
   LLM_ERROR: 'LLM_ERROR',
   LLM_UNAVAILABLE: 'LLM_UNAVAILABLE',
   LLM_RATE_LIMITED: 'LLM_RATE_LIMITED',
+  PATH_TRAVERSAL: 'PATH_TRAVERSAL',
+  FILE_EXISTS: 'FILE_EXISTS',
+  FILE_NOT_FOUND: 'FILE_NOT_FOUND',
+  FILE_SIZE_EXCEEDED: 'FILE_SIZE_EXCEEDED',
+  SANDBOX_QUOTA_EXCEEDED: 'SANDBOX_QUOTA_EXCEEDED',
   INTERNAL_ERROR: 'INTERNAL_ERROR'
 };
 
@@ -216,6 +301,11 @@ export default {
   LLMError,
   LLMUnavailableError,
   RateLimitedError,
+  PathTraversalError,
+  FileExistsError,
+  FileNotFoundError,
+  FileSizeExceededError,
+  SandboxQuotaExceededError,
   ErrorCodes,
   createErrorResponse
 };

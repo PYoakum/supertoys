@@ -22,7 +22,7 @@ export default {
     model: process.env.ACTION_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
     parameters: {
       temperature: 0.3,
-      maxTokens: 4096
+      maxTokens: 8192
     },
     timeout: parseInt(process.env.ACTION_LLM_TIMEOUT, 10) || 120000
   },
@@ -34,7 +34,7 @@ export default {
     model: process.env.EVAL_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
     parameters: {
       temperature: 0.1,
-      maxTokens: 2048
+      maxTokens: 4096
     },
     timeout: parseInt(process.env.EVAL_LLM_TIMEOUT, 10) || 60000
   },
@@ -59,5 +59,20 @@ export default {
     level: process.env.LOG_LEVEL || 'info',
     format: 'text',
     includeTimestamps: true
+  },
+
+  // Output Evaluation integration
+  outputEval: {
+    enabled: process.env.OUTPUT_EVAL_ENABLED !== 'false',
+    // Path to output-eval executable (relative to this config or absolute)
+    executablePath: process.env.OUTPUT_EVAL_PATH || '../output-eval/output-eval.js',
+    // Output directory for evaluation reports
+    outputDir: process.env.OUTPUT_EVAL_OUTPUT || './evaluation-output',
+    // Whether to run output-eval in the background or wait for completion
+    runInBackground: process.env.OUTPUT_EVAL_BACKGROUND === 'true',
+    // Additional CLI arguments to pass to output-eval
+    additionalArgs: process.env.OUTPUT_EVAL_ARGS ? process.env.OUTPUT_EVAL_ARGS.split(' ') : [],
+    // Timeout for output-eval execution (only applies when not running in background)
+    timeoutMs: parseInt(process.env.OUTPUT_EVAL_TIMEOUT, 10) || 180000  // 3 minutes
   }
 };

@@ -208,6 +208,8 @@ export class PromptClient {
     // Build messages array (works for most chat-based APIs)
     const messages = [];
     
+    // Default LLM: Anthropic;
+    // comment out body.system & uncomment the array.push for ChatGPT
     if (payload.systemPrompt) {
       body.system = payload.systemPrompt
       /*

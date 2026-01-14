@@ -24,5 +24,7 @@
   "engines": {
     "bun": ">=1.0.0"
   },
-  "devDependencies": {}
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0"
+  }
 }

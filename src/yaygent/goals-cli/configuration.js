@@ -79,9 +79,9 @@ export default {
 
   // Output configuration (optional)
   output: {
-    // Default output format: "json", "markdown", or "text"
-    defaultFormat: "json",
-    
+    // Default output format: "json", "markdown", "text", or "toon"
+    defaultFormat: "toon",
+
     // Pretty-print JSON output
     prettyPrint: true
   },

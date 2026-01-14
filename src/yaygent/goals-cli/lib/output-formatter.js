@@ -3,6 +3,8 @@
  * @module output-formatter
  */
 
+import { encode as toonEncode } from '@toon-format/toon';
+
 /**
  * @typedef {Object} FormatOptions
  * @property {boolean} [prettyPrint=true] - Whether to pretty-print JSON
@@ -68,16 +70,80 @@ const formatters = {
     if (typeof data === 'string') {
       return data;
     }
-    
+
     if (data.response?.content) {
       return data.response.content;
     }
-    
+
     if (data.goals) {
       return formatGoalsAsText(data);
     }
-    
+
     return formatGenericAsText(data);
+  },
+
+  /**
+   * Format data as TOON (Token-Oriented Object Notation)
+   * Produces a markdown file with TOON-encoded content
+   * @param {*} data - Data to format
+   * @param {FormatOptions} options - Format options
+   * @returns {string}
+   */
+  toon: (data, options = {}) => {
+    const lines = [];
+
+    // Extract goals definition from full result object if needed
+    // The full result has: { success, session, goals, context, response }
+    // We only want to encode the goals definition for goal-keeper consumption
+    let goalsData = data;
+    let sessionInfo = null;
+
+    if (data.goals && data.response) {
+      // This is a full execution result - extract just the goals
+      goalsData = data.goals;
+      sessionInfo = data.session;
+    }
+
+    // Add markdown header
+    lines.push('# Goals Definition');
+    lines.push('');
+    lines.push('> This file contains goals in TOON format.');
+    lines.push('> TOON (Token-Oriented Object Notation) is a compact, human-readable encoding.');
+    lines.push('');
+
+    // Add session info if present
+    if (sessionInfo) {
+      lines.push('## Session');
+      lines.push('');
+      lines.push('```toon');
+      lines.push(toonEncode(sessionInfo));
+      lines.push('```');
+      lines.push('');
+    }
+
+    // Add metadata section if present
+    if (goalsData.metadata) {
+      lines.push('## Metadata');
+      lines.push('');
+      lines.push('```toon');
+      lines.push(toonEncode(goalsData.metadata));
+      lines.push('```');
+      lines.push('');
+    }
+
+    // Add main TOON content (goals definition)
+    lines.push('## Content');
+    lines.push('');
+    lines.push('```toon');
+    lines.push(toonEncode(goalsData));
+    lines.push('```');
+    lines.push('');
+
+    // Add generation timestamp
+    lines.push('---');
+    lines.push(`Generated: ${new Date().toISOString()}`);
+
+    return lines.join('\n');
   }
 };
 

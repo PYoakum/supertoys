@@ -20,12 +20,13 @@ import {
   parseJsonResponse,
   validateEvaluationResponse 
 } from './prompts/templates.js';
-import { 
-  TaskExecutionError, 
+import {
+  TaskExecutionError,
   TaskEvaluationError,
   SessionInvalidStateError,
-  ConfigurationError 
+  ConfigurationError
 } from './lib/errors.js';
+import { OutputEvalRunner } from './lib/output-eval-runner.js';
 
 /**
  * Parse command line arguments
@@ -34,11 +35,15 @@ import {
 function parseArguments() {
   const options = {
     session: { type: 'string', short: 's' },
+    next: { type: 'boolean', short: 'n', default: false },
+    list: { type: 'boolean', short: 'l', default: false },
     config: { type: 'string', short: 'c' },
     output: { type: 'string', short: 'o' },
     'dry-run': { type: 'boolean', short: 'd', default: false },
     verbose: { type: 'boolean', short: 'v', default: false },
     'no-bundle': { type: 'boolean', default: false },
+    'no-eval': { type: 'boolean', default: false },
+    'eval-background': { type: 'boolean', default: false },
     resume: { type: 'boolean', short: 'r', default: false },
     help: { type: 'boolean', short: 'h', default: false },
     version: { type: 'boolean', short: 'V', default: false }
@@ -61,14 +66,20 @@ function showHelp() {
 Action Plan Service v1.0.0
 
 Usage: action-plan --session <sessionId> [options]
+       action-plan --next [options]
+       action-plan --list
 
 Options:
-  -s, --session <id>   Session ID to process (required)
+  -s, --session <id>   Session ID to process
+  -n, --next           Process the next ready session automatically
+  -l, --list           List sessions ready for execution
   -c, --config <path>  Configuration file path
   -o, --output <path>  Output directory (default: ./output)
   -d, --dry-run        Validate without executing
   -v, --verbose        Enable verbose logging
   --no-bundle          Skip bundle generation
+  --no-eval            Skip automatic output-eval invocation
+  --eval-background    Run output-eval in background
   -r, --resume         Resume from last checkpoint
   -h, --help           Show this help
   -V, --version        Show version
@@ -83,6 +94,8 @@ Examples:
   action-plan -s 550e8400-e29b-41d4-a716-446655440000
   action-plan -s 550e8400... -o ./my-output -v
   action-plan -s 550e8400... --dry-run
+  action-plan --next              # Process next ready session
+  action-plan --list              # List ready sessions
 `);
 }
 
@@ -94,46 +107,23 @@ function showVersion() {
 }
 
 /**
- * Simulate tool execution (since we don't have direct access to Tool Router)
- * In a real implementation, this would call the session server's tool endpoint
- * @param {string} toolName
- * @param {Object} parameters
+ * Execute a tool via the session server's tool registry
+ * @param {SessionClient} sessionClient - Session client instance
+ * @param {string} sessionId - Session ID for sandbox isolation
+ * @param {string} toolName - Name of the tool to execute
+ * @param {Object} parameters - Tool parameters
  * @returns {Promise<Object>}
  */
-async function simulateToolExecution(toolName, parameters) {
-  // Simulate notepad tool operations
-  const startTime = Date.now();
-  
-  // In a real scenario, this would make an API call to execute the tool
-  // For now, we simulate the response
-  let result;
-  
-  switch (toolName) {
-    case 'notepad_create':
-      result = `Successfully created note: ${parameters.filename}`;
-      break;
-    case 'notepad_write':
-      result = `Successfully wrote to note: ${parameters.filename}`;
-      break;
-    case 'notepad_read':
-      result = `Content of ${parameters.filename}: (simulated content)`;
-      break;
-    case 'notepad_list':
-      result = 'Available notes: (simulated list)';
-      break;
-    case 'notepad_delete':
-      result = `Successfully deleted note: ${parameters.filename}`;
-      break;
-    default:
-      result = `Executed tool ${toolName} with parameters: ${JSON.stringify(parameters)}`;
-  }
-  
+async function executeToolViaServer(sessionClient, sessionId, toolName, parameters) {
+  const result = await sessionClient.executeTool(toolName, parameters, sessionId);
+
   return {
     toolName,
     parameters,
-    result,
-    success: true,
-    durationMs: Date.now() - startTime
+    result: result.result,
+    success: result.error ? false : true,
+    error: result.error,
+    durationMs: result.durationMs
   };
 }
 
@@ -145,9 +135,11 @@ async function simulateToolExecution(toolName, parameters) {
  * @param {LLMClient} actionLlm
  * @param {Object} toolManifest
  * @param {Object[]} previousOutputs
+ * @param {SessionClient} sessionClient - Session client for tool execution
+ * @param {string} sessionId - Session ID for sandbox isolation
  * @returns {Promise<Object>}
  */
-async function executeTask(task, goal, context, actionLlm, toolManifest, previousOutputs) {
+async function executeTask(task, goal, context, actionLlm, toolManifest, previousOutputs, sessionClient, sessionId) {
   // Build action prompt
   const { systemPrompt, userPrompt } = buildActionPrompt({
     task,
@@ -162,16 +154,23 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
 
   // Parse tool use from response
   const toolUse = parseToolUse(response.content);
-  
+
   const toolInvocations = [];
-  
+
   if (toolUse) {
-    // Execute the tool (simulated)
-    const toolResult = await simulateToolExecution(toolUse.toolName, toolUse.parameters);
+    // Execute the tool via session server
+    const toolResult = await executeToolViaServer(
+      sessionClient,
+      sessionId,
+      toolUse.toolName,
+      toolUse.parameters
+    );
     toolInvocations.push(toolResult);
   } else {
     // No tool use detected, use the task's predefined parameters
-    const toolResult = await simulateToolExecution(
+    const toolResult = await executeToolViaServer(
+      sessionClient,
+      sessionId,
       task.tool.toolName,
       task.tool.command.parameters
     );
@@ -180,7 +179,7 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
 
   return {
     taskId: task.id,
-    success: true,
+    success: toolInvocations.every(t => t.success),
     output: response.content,
     toolInvocations,
     reasoning: response.content.split('</tool_use>')[1]?.trim() || 'Task executed',
@@ -251,30 +250,97 @@ async function main(args) {
     process.exit(0);
   }
 
+  // Initialize clients early for --list and --next
+  const sessionClient = new SessionClient(config.sessionServer);
+
+  // Handle --list mode
+  if (args.list) {
+    console.log('Fetching sessions ready for execution...\n');
+
+    const healthy = await sessionClient.healthCheck();
+    if (!healthy) {
+      console.error('Cannot connect to session server');
+      process.exit(4);
+    }
+
+    const result = await sessionClient.listReadySessions({ limit: 20 });
+
+    if (result.sessions.length === 0) {
+      console.log('No sessions ready for execution.');
+    } else {
+      console.log('Sessions ready for execution:');
+      console.log('─'.repeat(80));
+      for (const session of result.sessions) {
+        console.log(`  ${session.id}`);
+        console.log(`    State: ${session.state}`);
+        console.log(`    Goals: ${session.goalsCount}`);
+        console.log(`    Tasks: ${session.tasksCount || 'N/A'}`);
+        console.log(`    Created: ${session.createdAt}`);
+        console.log('');
+      }
+      console.log(`Total: ${result.pagination.total} session(s) ready`);
+    }
+    process.exit(0);
+  }
+
+  // Handle --next mode: automatically pick the next ready session
+  let sessionId = args.session;
+
+  if (args.next) {
+    console.log('Looking for next ready session...');
+
+    const healthy = await sessionClient.healthCheck();
+    if (!healthy) {
+      console.error('Cannot connect to session server');
+      process.exit(4);
+    }
+
+    const nextSession = await sessionClient.getNextReadySession();
+
+    if (!nextSession) {
+      console.log('No sessions ready for execution.');
+      process.exit(0);
+    }
+
+    sessionId = nextSession.id;
+    console.log(`Found ready session: ${sessionId}`);
+  }
+
   // Validate required arguments
-  if (!args.session) {
-    console.error('Error: --session is required');
+  if (!sessionId) {
+    console.error('Error: --session or --next is required');
     showHelp();
     process.exit(2);
   }
 
   // Initialize display
   const display = new ProgressDisplay({ verbose: args.verbose });
-  display.printHeader(args.session);
+  display.printHeader(sessionId);
 
   // Validate configuration
   if (!config.actionLlm.apiKey) {
     throw new ConfigurationError('LLM API key is required. Set LLM_API_KEY environment variable.', 'actionLlm.apiKey');
   }
 
-  // Initialize clients
-  const sessionClient = new SessionClient(config.sessionServer);
+  // Initialize remaining clients (sessionClient already initialized above)
   const actionLlm = new LLMClient(config.actionLlm);
   const evalLlm = new LLMClient(config.evaluationLlm);
-  
+
   const outputDir = args.output || config.output.baseDir;
-  const outputWriter = new OutputWriter(outputDir, args.session);
+  const outputWriter = new OutputWriter(outputDir, sessionId);
   const bundleGenerator = new BundleGenerator(outputDir);
+
+  // Initialize OutputEvalRunner
+  const outputEvalEnabled = !args['no-eval'] && config.outputEval?.enabled !== false;
+  const outputEvalRunner = new OutputEvalRunner({
+    ...config.outputEval,
+    enabled: outputEvalEnabled,
+    runInBackground: args['eval-background'] || config.outputEval?.runInBackground
+  }, {
+    info: (msg) => display.info(msg),
+    error: (msg) => display.error(msg),
+    debug: (msg, data) => args.verbose && console.log(`[DEBUG] ${msg}`, data || '')
+  });
 
   // Check session server connectivity
   display.info('Connecting to session server...');
@@ -286,11 +352,11 @@ async function main(args) {
 
   // Get session
   display.info('Loading session...');
-  const session = await sessionClient.getSession(args.session, { includeContext: true });
+  const session = await sessionClient.getSession(sessionId, { includeContext: true });
 
   // Validate session state
   if (session.state !== 'GENERATED') {
-    throw new SessionInvalidStateError(args.session, session.state, 'GENERATED');
+    throw new SessionInvalidStateError(sessionId, session.state, 'GENERATED');
   }
 
   if (!session.taskList || !session.taskList.tasks || session.taskList.tasks.length === 0) {
@@ -302,7 +368,7 @@ async function main(args) {
   const toolManifest = await sessionClient.getToolManifest();
 
   // Initialize queue manager
-  const queueManager = new QueueManager(args.session, session.taskList.tasks);
+  const queueManager = new QueueManager(sessionId, session.taskList.tasks);
   
   display.printQueueStatus(queueManager.getMetrics());
 
@@ -370,7 +436,9 @@ async function main(args) {
         session.context,
         actionLlm,
         toolManifest,
-        previousOutputs
+        previousOutputs,
+        sessionClient,
+        sessionId
       );
 
       const executionDuration = (Date.now() - taskStartTime) / 1000;
@@ -449,7 +517,7 @@ async function main(args) {
   const metrics = queueManager.getMetrics();
   
   await outputWriter.writeExecutionLog({
-    sessionId: args.session,
+    sessionId: sessionId,
     startedAt: metrics.startedAt,
     completedAt: new Date().toISOString(),
     finalStatus: queueManager.getStatus(),
@@ -463,7 +531,7 @@ async function main(args) {
 
   // Write summary
   await outputWriter.writeSummary({
-    sessionId: args.session,
+    sessionId: sessionId,
     startedAt: metrics.startedAt,
     completedAt: new Date().toISOString(),
     totalDurationMs: Date.now() - new Date(metrics.startedAt).getTime(),
@@ -480,18 +548,36 @@ async function main(args) {
 
   // Generate bundle if successful
   let bundlePath = null;
-  
+  let evalResult = null;
+
   if (queueManager.isSuccessful() && !args['no-bundle']) {
     display.info('Generating bundle...');
-    
+
     const bundleResult = await bundleGenerator.generateBundle({
-      sessionId: args.session,
+      sessionId: sessionId,
       session,
       queueState: queueManager.getState(),
       executionOutputDir: outputWriter.getOutputDir()
     });
-    
+
     bundlePath = bundleResult.path;
+
+    // Auto-invoke output-eval if enabled and bundle was generated
+    if (bundlePath && outputEvalEnabled) {
+      display.info('Invoking output-eval...');
+
+      evalResult = await outputEvalRunner.run(bundlePath, {
+        verbose: args.verbose
+      });
+
+      if (evalResult.background) {
+        display.info(`Output-eval started in background (PID: ${evalResult.pid})`);
+      } else if (evalResult.success) {
+        display.info(`Output-eval completed (${(evalResult.durationMs / 1000).toFixed(1)}s)`);
+      } else {
+        display.error(`Output-eval failed: ${evalResult.error || `Exit code ${evalResult.exitCode}`}`);
+      }
+    }
   }
 
   // Print completion
@@ -499,7 +585,7 @@ async function main(args) {
     display.printAbort();
     process.exit(10);
   } else if (queueManager.isSuccessful()) {
-    display.printCompletion(metrics, bundlePath);
+    display.printCompletion(metrics, bundlePath, evalResult);
     process.exit(0);
   } else {
     const failedTask = queueManager.getState().failedTasks[0];

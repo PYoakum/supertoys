@@ -34,7 +34,7 @@ async function main() {
   // Test 2: Goal Manager Validation
   console.log('\nTest 2: Goal Manager Validation');
   try {
-    const manager = new GoalManager('./test/fixtures/valid-goals.json');
+    const manager = new GoalManager('./tests/fixtures/valid-goals.json');
     const validDef = {
       version: '1.0',
       goals: [
@@ -56,7 +56,7 @@ async function main() {
   // Test 3: Goal Manager Invalid Detection
   console.log('\nTest 3: Invalid Goal Detection');
   try {
-    const manager = new GoalManager('./test/fixtures/valid-goals.json');
+    const manager = new GoalManager('./tests/fixtures/valid-goals.json');
     const invalidDef = {
       version: '1.0',
       goals: [
@@ -78,7 +78,7 @@ async function main() {
   // Test 4: Goal Loading
   console.log('\nTest 4: Goal Loading');
   try {
-    const manager = new GoalManager('./test/fixtures/valid-goals.json');
+    const manager = new GoalManager('./tests/fixtures/valid-goals.json');
     const goals = await manager.load();
     if (goals.goals && goals.goals.length > 0) {
       console.log(`  ✓ Loaded ${goals.goals.length} goals successfully`);
@@ -94,7 +94,7 @@ async function main() {
   // Test 5: Context Loading
   console.log('\nTest 5: Context Loading');
   try {
-    const loader = new ContextLoader('./test/fixtures/context');
+    const loader = new ContextLoader('./tests/fixtures/context');
     const bundle = await loader.load();
     if (bundle.files && bundle.files.length > 0) {
       console.log(`  ✓ Loaded ${bundle.files.length} context files successfully`);
@@ -110,7 +110,7 @@ async function main() {
   // Test 6: Context Formatting
   console.log('\nTest 6: Context Formatting');
   try {
-    const loader = new ContextLoader('./test/fixtures/context');
+    const loader = new ContextLoader('./tests/fixtures/context');
     await loader.load();
     
     const xml = loader.getFormattedContext('xml');
