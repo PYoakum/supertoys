@@ -264,62 +264,90 @@ export function parseJsonResponse(content) {
   try {
     return JSON.parse(jsonStr);
   } catch (firstErr) {
-    // Strategy 4: Try fixing common issues
-    let fixedStr = jsonStr;
-
-    // Fix trailing commas before } or ]
-    fixedStr = fixedStr.replace(/,(\s*[}\]])/g, '$1');
-
-    // Fix invalid escape sequences in strings
-    // Valid JSON escapes: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
-    // LLMs often output code with regex escapes like \s, \d, \w which are invalid in JSON
-    fixedStr = fixedStr.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
-      // Within each string, fix invalid escapes by double-escaping the backslash
-      return match.replace(/\\([^"\\\/bfnrtu])/g, '\\\\$1');
-    });
-
-    // Fix unescaped newlines/tabs in strings (common LLM mistake)
-    fixedStr = fixedStr.replace(/"[^"]*"/g, (match) => {
-      // Only process if there are actual newlines/tabs (not already escaped ones)
-      if (match.includes('\n') || match.includes('\r') || match.includes('\t')) {
-        return match
-          .replace(/(?<!\\)\n/g, '\\n')
-          .replace(/(?<!\\)\r/g, '\\r')
-          .replace(/(?<!\\)\t/g, '\\t');
-      }
-      return match;
-    });
+    // Strategy 4: Fix invalid escape sequences character by character
+    const fixedStr = fixEscapeSequences(jsonStr);
 
     try {
       return JSON.parse(fixedStr);
     } catch (secondErr) {
-      // Strategy 5: More aggressive fix - escape ALL backslashes that might be problematic
-      let aggressiveFixStr = jsonStr;
+      // Check if response appears truncated
+      const lastChars = jsonStr.slice(-100);
+      const firstChars = jsonStr.slice(0, 100);
+      const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
 
-      // Replace all backslashes not followed by valid JSON escape chars
-      aggressiveFixStr = aggressiveFixStr.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-
-      // Fix trailing commas
-      aggressiveFixStr = aggressiveFixStr.replace(/,(\s*[}\]])/g, '$1');
-
-      try {
-        return JSON.parse(aggressiveFixStr);
-      } catch (thirdErr) {
-        // Check if response appears truncated
-        const lastChars = jsonStr.slice(-100);
-        const firstChars = jsonStr.slice(0, 100);
-        const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
-
-        let errorMsg = `Failed to parse LLM response as JSON: ${firstErr.message}`;
-        if (isTruncated) {
-          errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
-        } else {
-          errorMsg += ` (First 100 chars: "${firstChars}")`;
-        }
-        throw new Error(errorMsg);
+      let errorMsg = `Failed to parse LLM response as JSON: ${firstErr.message}`;
+      if (isTruncated) {
+        errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
+      } else {
+        errorMsg += ` (First 100 chars: "${firstChars}")`;
       }
+      throw new Error(errorMsg);
     }
   }
+}
+
+/**
+ * Fix invalid JSON escape sequences character by character
+ * @param {string} str - JSON string to fix
+ * @returns {string} - Fixed JSON string
+ */
+function fixEscapeSequences(str) {
+  const validEscapeChars = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
+  const result = [];
+  let i = 0;
+
+  while (i < str.length) {
+    const char = str[i];
+
+    if (char === '\\') {
+      const nextChar = str[i + 1];
+
+      if (nextChar === undefined) {
+        // Backslash at end of string - escape it
+        result.push('\\\\');
+        i++;
+      } else if (validEscapeChars.has(nextChar)) {
+        // Valid escape sequence - keep as is
+        if (nextChar === 'u') {
+          // Unicode escape - need 4 hex digits
+          const hex = str.slice(i + 2, i + 6);
+          if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+            result.push(str.slice(i, i + 6));
+            i += 6;
+          } else {
+            // Invalid unicode escape - double the backslash
+            result.push('\\\\');
+            i++;
+          }
+        } else {
+          result.push('\\', nextChar);
+          i += 2;
+        }
+      } else {
+        // Invalid escape sequence - double the backslash
+        result.push('\\\\');
+        i++;
+      }
+    } else if (char === '\n') {
+      // Literal newline - escape it
+      result.push('\\n');
+      i++;
+    } else if (char === '\r') {
+      // Literal carriage return - escape it
+      result.push('\\r');
+      i++;
+    } else if (char === '\t') {
+      // Literal tab - escape it
+      result.push('\\t');
+      i++;
+    } else {
+      result.push(char);
+      i++;
+    }
+  }
+
+  // Also fix trailing commas
+  return result.join('').replace(/,(\s*[}\]])/g, '$1');
 }
 
 /**
