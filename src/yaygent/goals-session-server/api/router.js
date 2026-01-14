@@ -489,96 +489,147 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
   return {
     async generate(ctx) {
       const { sessionId, options = {} } = ctx.body || {};
-      
+
       if (!sessionId) {
         throw new ValidationError('sessionId is required', 'sessionId');
       }
-      
+
       const session = sessionManager.getSession(sessionId);
       const toolManifest = toolRouter.getManifest();
-      
-      // Build prompt
-      const { systemPrompt, userPrompt } = buildTaskGenerationPrompt({
-        goals: session.goals,
-        executionOrder: session.goals.executionOrder,
-        formattedContext: session.context.formattedContent,
-        toolManifest
-      });
-      
-      // Send to LLM
-      const response = await llmClient.send({
-        systemPrompt,
-        userPrompt,
-        parameters: options
-      });
-      
-      // Parse response
-      const parsed = parseJsonResponse(response.content);
-      
-      // Validate
-      const validation = validateTaskGenerationResponse(parsed);
-      if (!validation.valid) {
-        throw new ValidationError(
-          `Invalid LLM response: ${validation.errors.join(', ')}`,
-          'llmResponse'
-        );
+      const executionOrder = session.goals.executionOrder || session.goals.items.map(g => g.id);
+
+      // Build goal map for lookup
+      const goalMap = new Map();
+      for (const goal of session.goals.items) {
+        goalMap.set(goal.id, goal);
       }
-      
-      // Check for unbound tasks
-      if (parsed.unboundTasks && parsed.unboundTasks.length > 0) {
-        throw new ToolBindingError(
-          parsed.unboundTasks,
-          toolManifest.tools.map(t => t.name)
-        );
-      }
-      
-      // Validate tool bindings
-      for (const task of parsed.tasks) {
-        if (!toolRouter.hasTool(task.tool.toolName)) {
-          throw new ToolBindingError(
-            [{
+
+      // Process goals one at a time (batched approach)
+      const allTasks = [];
+      const allUnboundTasks = [];
+      let taskStartNumber = 1;
+      let totalTokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+      console.log(`[TaskGen] Starting batched task generation for ${executionOrder.length} goals`);
+
+      for (let i = 0; i < executionOrder.length; i++) {
+        const goalId = executionOrder[i];
+        const goal = goalMap.get(goalId);
+
+        if (!goal) {
+          console.warn(`[TaskGen] Goal not found: ${goalId}, skipping`);
+          continue;
+        }
+
+        console.log(`[TaskGen] Processing goal ${i + 1}/${executionOrder.length}: ${goal.objective.slice(0, 50)}...`);
+
+        // Build prompt for this single goal
+        const { systemPrompt, userPrompt } = buildTaskGenerationPrompt({
+          goal,
+          goalIndex: i,
+          totalGoals: executionOrder.length,
+          formattedContext: session.context.formattedContent,
+          toolManifest,
+          previousTasks: allTasks,
+          taskStartNumber
+        });
+
+        // Send to LLM
+        const response = await llmClient.send({
+          systemPrompt,
+          userPrompt,
+          parameters: options
+        });
+
+        // Accumulate token usage
+        if (response.usage) {
+          totalTokenUsage.inputTokens += response.usage.inputTokens || 0;
+          totalTokenUsage.outputTokens += response.usage.outputTokens || 0;
+          totalTokenUsage.totalTokens += response.usage.totalTokens || 0;
+        }
+
+        // Parse response
+        const parsed = parseJsonResponse(response.content);
+
+        // Validate
+        const validation = validateTaskGenerationResponse(parsed);
+        if (!validation.valid) {
+          throw new ValidationError(
+            `Invalid LLM response for goal ${goalId}: ${validation.errors.join(', ')}`,
+            'llmResponse'
+          );
+        }
+
+        // Collect unbound tasks
+        if (parsed.unboundTasks && parsed.unboundTasks.length > 0) {
+          allUnboundTasks.push(...parsed.unboundTasks);
+        }
+
+        // Validate tool bindings for this goal's tasks
+        for (const task of parsed.tasks) {
+          if (!toolRouter.hasTool(task.tool.toolName)) {
+            allUnboundTasks.push({
               goalId: task.goalId,
               taskTitle: task.title,
               taskDescription: task.description,
               reason: `Tool '${task.tool.toolName}' not found in manifest`,
               suggestedTools: []
-            }],
-            toolManifest.tools.map(t => t.name)
-          );
+            });
+            continue;
+          }
+
+          // Add to all tasks
+          allTasks.push(task);
         }
+
+        // Update task start number for next goal
+        taskStartNumber = allTasks.length + 1;
+
+        console.log(`[TaskGen] Generated ${parsed.tasks.length} tasks for goal ${goalId}`);
       }
-      
-      // Build task list
-      const tasksByState = { pending: parsed.tasks.length };
+
+      // Check for unbound tasks after all goals processed
+      if (allUnboundTasks.length > 0) {
+        throw new ToolBindingError(
+          allUnboundTasks,
+          toolManifest.tools.map(t => t.name)
+        );
+      }
+
+      // Build task list from accumulated tasks
+      const tasksByState = { pending: allTasks.length };
       const tasksByTool = {};
       const toolsRequired = new Set();
-      
-      for (const task of parsed.tasks) {
+
+      for (const task of allTasks) {
         task.state = 'pending';
         tasksByTool[task.tool.toolName] = (tasksByTool[task.tool.toolName] || 0) + 1;
         toolsRequired.add(task.tool.toolName);
       }
-      
+
       const taskList = {
         generatedAt: new Date().toISOString(),
-        modelUsed: response.model || llmClient.model,
+        modelUsed: llmClient.model,
         sessionId,
-        tasks: parsed.tasks,
+        tasks: allTasks,
         summary: {
-          totalTasks: parsed.tasks.length,
+          totalTasks: allTasks.length,
           tasksByState,
           tasksByTool,
           toolsRequired: Array.from(toolsRequired),
-          estimatedTotalMinutes: parsed.tasks.reduce(
+          estimatedTotalMinutes: allTasks.reduce(
             (sum, t) => sum + (t.effort?.estimatedMinutes || 0), 0
-          )
+          ),
+          goalsProcessed: executionOrder.length
         },
-        tokenUsage: response.usage
+        tokenUsage: totalTokenUsage
       };
-      
+
+      console.log(`[TaskGen] Completed: ${allTasks.length} tasks from ${executionOrder.length} goals`);
+
       // Update session
       const updatedSession = sessionManager.setTaskList(sessionId, taskList);
-      
+
       return jsonResponse({
         success: true,
         data: {

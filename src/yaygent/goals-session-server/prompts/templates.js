@@ -76,37 +76,47 @@ Respond with JSON in this exact format:
 }
 
 /**
- * Build the task generation prompt
+ * Build the task generation prompt for a SINGLE goal (batched approach)
  * @param {Object} params
- * @param {Object} params.goals - Evaluated goals
- * @param {string[]} params.executionOrder - Goal execution order
+ * @param {Object} params.goal - Single goal to generate tasks for
+ * @param {number} params.goalIndex - Index of this goal in execution order
+ * @param {number} params.totalGoals - Total number of goals
  * @param {string} params.formattedContext - Formatted context
  * @param {Object} params.toolManifest - Available tools
+ * @param {Object[]} params.previousTasks - Tasks generated for previous goals
+ * @param {number} params.taskStartNumber - Starting sequence number for tasks
  * @returns {{systemPrompt: string, userPrompt: string}}
  */
-export function buildTaskGenerationPrompt({ goals, executionOrder, formattedContext, toolManifest }) {
-  const systemPrompt = `You are an expert task planner. Your task is to convert high-level goals into concrete, executable tasks that use specific tools from the provided tool manifest.
+export function buildTaskGenerationPrompt({ goal, goalIndex, totalGoals, formattedContext, toolManifest, previousTasks = [], taskStartNumber = 1 }) {
+  const systemPrompt = `You are an expert task planner. Your task is to convert a high-level goal into concrete, executable tasks that use specific tools from the provided tool manifest.
 
-CRITICAL REQUIREMENT: Every task MUST be bound to exactly one tool from the available tools. If a task cannot be accomplished with the available tools, you must indicate this explicitly in the "unboundTasks" array.
+CRITICAL REQUIREMENT: Every task MUST be bound to exactly one tool from the available tools. If the goal cannot be accomplished with the available tools, you must indicate this explicitly in the "unboundTasks" array.
 
 You must respond with valid JSON matching the specified schema. Do not include any text before or after the JSON.`;
 
-  const goalsJson = JSON.stringify(goals.items.map(g => ({
-    id: g.id,
-    objective: g.objective,
-    priority: g.priority,
-    criteria: g.criteria,
-    constraints: g.constraints,
-    executionIndex: g.executionIndex
-  })), null, 2);
+  const goalJson = JSON.stringify({
+    id: goal.id,
+    objective: goal.objective,
+    priority: goal.priority,
+    criteria: goal.criteria,
+    constraints: goal.constraints,
+    executionIndex: goal.executionIndex
+  }, null, 2);
 
-  const userPrompt = `<goals>
-${goalsJson}
-</goals>
+  // Summarize previous tasks for context (don't include full parameters to save tokens)
+  const previousTasksSummary = previousTasks.length > 0
+    ? previousTasks.map(t => ({
+        id: t.id,
+        goalId: t.goalId,
+        title: t.title,
+        toolName: t.tool.toolName,
+        sequenceNumber: t.sequenceNumber
+      }))
+    : [];
 
-<execution_order>
-${JSON.stringify(executionOrder)}
-</execution_order>
+  const userPrompt = `<goal index="${goalIndex + 1}" total="${totalGoals}">
+${goalJson}
+</goal>
 
 <context>
 ${formattedContext}
@@ -116,14 +126,20 @@ ${formattedContext}
 ${JSON.stringify(toolManifest.tools, null, 2)}
 </available_tools>
 
+${previousTasksSummary.length > 0 ? `<previous_tasks>
+These tasks were already generated for previous goals. You may reference their IDs for dependencies:
+${JSON.stringify(previousTasksSummary, null, 2)}
+</previous_tasks>` : ''}
+
 <instructions>
-For each goal in execution order, generate one or more concrete tasks that:
+Generate one or more concrete tasks for THIS GOAL ONLY that:
 
 1. ACCOMPLISH THE GOAL: Break down the goal into actionable steps
 2. USE AVAILABLE TOOLS: Each task must use exactly one tool from the manifest
 3. SPECIFY PARAMETERS: Provide complete parameter values for the tool command
-4. MAINTAIN ORDER: Tasks must respect the goal execution order and dependencies
+4. REFERENCE DEPENDENCIES: If tasks depend on previous tasks, include the dependency
 5. BE CONCISE: Task titles should be clear and actionable
+6. START SEQUENCE AT ${taskStartNumber}: Task sequence numbers should start at ${taskStartNumber}
 
 For each task, specify:
 - Which tool to use (must match a tool name exactly)
@@ -131,15 +147,15 @@ For each task, specify:
 - Complete parameters for the tool
 - Expected output description
 
-If a goal CANNOT be accomplished with the available tools, include it in the "unboundTasks" array with an explanation.
+If this goal CANNOT be accomplished with the available tools, include it in the "unboundTasks" array with an explanation.
 
 Respond with JSON in this exact format:
 {
   "tasks": [
     {
-      "id": "task-1",
-      "goalId": "associated-goal-id",
-      "sequenceNumber": 1,
+      "id": "task-${taskStartNumber}",
+      "goalId": "${goal.id}",
+      "sequenceNumber": ${taskStartNumber},
       "title": "Concise task title",
       "description": "Detailed description",
       "dependencies": [
@@ -161,15 +177,7 @@ Respond with JSON in this exact format:
       }
     }
   ],
-  "unboundTasks": [
-    {
-      "goalId": "goal-id",
-      "taskTitle": "What needs to be done",
-      "taskDescription": "Detailed description",
-      "reason": "Why no tool is available",
-      "suggestedTools": ["Tool type that would be needed"]
-    }
-  ]
+  "unboundTasks": []
 }
 </instructions>`;
 
