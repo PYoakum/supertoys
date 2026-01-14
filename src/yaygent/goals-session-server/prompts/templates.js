@@ -270,27 +270,54 @@ export function parseJsonResponse(content) {
     // Fix trailing commas before } or ]
     fixedStr = fixedStr.replace(/,(\s*[}\]])/g, '$1');
 
-    // Fix unescaped newlines in strings (common LLM mistake)
-    // This is a simplified fix - replace literal newlines inside strings
-    fixedStr = fixedStr.replace(/("(?:[^"\\]|\\.)*")/g, (match) => {
-      return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+    // Fix invalid escape sequences in strings
+    // Valid JSON escapes: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
+    // LLMs often output code with regex escapes like \s, \d, \w which are invalid in JSON
+    fixedStr = fixedStr.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
+      // Within each string, fix invalid escapes by double-escaping the backslash
+      return match.replace(/\\([^"\\\/bfnrtu])/g, '\\\\$1');
+    });
+
+    // Fix unescaped newlines/tabs in strings (common LLM mistake)
+    fixedStr = fixedStr.replace(/"[^"]*"/g, (match) => {
+      // Only process if there are actual newlines/tabs (not already escaped ones)
+      if (match.includes('\n') || match.includes('\r') || match.includes('\t')) {
+        return match
+          .replace(/(?<!\\)\n/g, '\\n')
+          .replace(/(?<!\\)\r/g, '\\r')
+          .replace(/(?<!\\)\t/g, '\\t');
+      }
+      return match;
     });
 
     try {
       return JSON.parse(fixedStr);
     } catch (secondErr) {
-      // Check if response appears truncated
-      const lastChars = jsonStr.slice(-100);
-      const firstChars = jsonStr.slice(0, 100);
-      const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
+      // Strategy 5: More aggressive fix - escape ALL backslashes that might be problematic
+      let aggressiveFixStr = jsonStr;
 
-      let errorMsg = `Failed to parse LLM response as JSON: ${firstErr.message}`;
-      if (isTruncated) {
-        errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
-      } else {
-        errorMsg += ` (First 100 chars: "${firstChars}")`;
+      // Replace all backslashes not followed by valid JSON escape chars
+      aggressiveFixStr = aggressiveFixStr.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+
+      // Fix trailing commas
+      aggressiveFixStr = aggressiveFixStr.replace(/,(\s*[}\]])/g, '$1');
+
+      try {
+        return JSON.parse(aggressiveFixStr);
+      } catch (thirdErr) {
+        // Check if response appears truncated
+        const lastChars = jsonStr.slice(-100);
+        const firstChars = jsonStr.slice(0, 100);
+        const isTruncated = !jsonStr.endsWith('}') && !jsonStr.endsWith(']');
+
+        let errorMsg = `Failed to parse LLM response as JSON: ${firstErr.message}`;
+        if (isTruncated) {
+          errorMsg += ` (Response appears truncated. Last 100 chars: "${lastChars}"). Try increasing maxTokens.`;
+        } else {
+          errorMsg += ` (First 100 chars: "${firstChars}")`;
+        }
+        throw new Error(errorMsg);
       }
-      throw new Error(errorMsg);
     }
   }
 }
