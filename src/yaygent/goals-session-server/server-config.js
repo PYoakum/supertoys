@@ -37,11 +37,11 @@ export default {
     parameters: {
       evaluation: {
         temperature: 0.3,
-        maxTokens: 4096
+        maxTokens: 8192
       },
       taskGeneration: {
         temperature: 0.2,
-        maxTokens: 8192
+        maxTokens: 16384
       }
     }
   },
