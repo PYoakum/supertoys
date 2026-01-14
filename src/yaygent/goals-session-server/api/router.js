@@ -11,6 +11,7 @@ import {
   validateEvaluationResponse,
   validateTaskGenerationResponse
 } from '../prompts/templates.js';
+import { LLMLogger } from '../lib/llm-logger.js';
 
 /**
  * Simple router for HTTP request handling
@@ -195,6 +196,17 @@ export function errorResponse(error) {
 export function createApiHandler(services) {
   const router = new Router();
   const { sessionManager, toolRouter, llmClient, config } = services;
+
+  // Initialize LLM logger
+  const llmLogger = new LLMLogger({
+    baseDir: config.logging?.llmLogDir || './llm-logs',
+    enabled: config.logging?.llmLogging !== false
+  });
+
+  // Attach logger to LLM client
+  if (llmClient) {
+    llmClient.setLogger(llmLogger);
+  }
 
   // Import route handlers
   const sessionRoutes = createSessionRoutes(sessionManager);
@@ -436,12 +448,14 @@ function createEvaluateRoutes(sessionManager, llmClient) {
         goals: session.goals,
         formattedContext: session.context.formattedContent
       });
-      
+
       // Send to LLM
       const response = await llmClient.send({
         systemPrompt,
         userPrompt,
-        parameters: options
+        parameters: options,
+        sessionId,
+        operation: 'evaluation'
       });
       
       // Parse response
@@ -538,7 +552,9 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
         const response = await llmClient.send({
           systemPrompt,
           userPrompt,
-          parameters: options
+          parameters: options,
+          sessionId,
+          operation: `taskGen-goal-${i + 1}`
         });
 
         // Accumulate token usage

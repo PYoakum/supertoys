@@ -62,24 +62,35 @@ export class LLMClient {
 
     /** @type {string} */
     this.endpoint = config.endpoint;
-    
+
     /** @type {string} */
     this.apiKey = config.apiKey;
-    
+
     /** @type {string|undefined} */
     this.model = config.model;
-    
+
     /** @type {LLMParameters} */
     this.parameters = { ...DEFAULTS.parameters, ...config.parameters };
-    
+
     /** @type {RetryConfig} */
     this.retry = { ...DEFAULTS.retry, ...config.retry };
-    
+
     /** @type {number} */
     this.timeout = config.timeout || DEFAULTS.timeout;
-    
+
     /** @type {Object} */
     this.headers = config.headers || {};
+
+    /** @type {Object|null} */
+    this.logger = null;
+  }
+
+  /**
+   * Set the logger instance
+   * @param {Object} logger - LLMLogger instance
+   */
+  setLogger(logger) {
+    this.logger = logger;
   }
 
   /**
@@ -187,38 +198,51 @@ export class LLMClient {
    * @param {string} options.systemPrompt - System prompt
    * @param {string} options.userPrompt - User prompt
    * @param {Object} [options.parameters] - Override parameters
+   * @param {string} [options.sessionId] - Session ID for logging
+   * @param {string} [options.operation] - Operation name for logging
    * @returns {Promise<Object>}
    */
-  async send({ systemPrompt, userPrompt, parameters }) {
+  async send({ systemPrompt, userPrompt, parameters, sessionId, operation }) {
     const headers = this.buildHeaders();
     const body = this.buildRequestBody({ systemPrompt, userPrompt, parameters });
-    
+
+    // Log the request if logger is available
+    let requestNum = 0;
+    if (this.logger && sessionId) {
+      this.logger.logRequest(sessionId, operation || 'unknown', {
+        systemPrompt,
+        userPrompt,
+        parameters
+      });
+      requestNum = this.logger.getRequestCount(sessionId);
+    }
+
     let lastError;
-    
+
     for (let attempt = 1; attempt <= this.retry.maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-        
+
         const response = await fetch(this.endpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
           signal: controller.signal
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         // Handle errors
         if (!response.ok) {
           const errorBody = await response.text().catch(() => 'Unable to read error');
-          
+
           if (response.status === 429) {
             const retryAfter = response.headers.get('retry-after');
             lastError = new RateLimitedError(retryAfter);
-            
+
             if (attempt < this.retry.maxAttempts) {
-              const delay = retryAfter 
+              const delay = retryAfter
                 ? parseInt(retryAfter, 10) * 1000
                 : this.retry.backoffMs * Math.pow(this.retry.backoffMultiplier, attempt - 1);
               await this.sleep(delay);
@@ -226,10 +250,10 @@ export class LLMClient {
             }
             throw lastError;
           }
-          
+
           if (response.status >= 500) {
             lastError = new LLMUnavailableError(`LLM service error: ${response.status}`);
-            
+
             if (attempt < this.retry.maxAttempts) {
               const delay = this.retry.backoffMs * Math.pow(this.retry.backoffMultiplier, attempt - 1);
               await this.sleep(delay);
@@ -237,20 +261,27 @@ export class LLMClient {
             }
             throw lastError;
           }
-          
+
           throw new LLMError(
             `LLM request failed: ${response.status} ${response.statusText}`,
             { statusCode: response.status, body: errorBody }
           );
         }
-        
+
         const responseData = await response.json();
-        return this.parseResponse(responseData);
-        
+        const parsed = this.parseResponse(responseData);
+
+        // Log the response if logger is available
+        if (this.logger && sessionId) {
+          this.logger.logResponse(sessionId, operation || 'unknown', requestNum, parsed);
+        }
+
+        return parsed;
+
       } catch (err) {
         if (err.name === 'AbortError') {
           lastError = new LLMError(`Request timeout after ${this.timeout}ms`);
-          
+
           if (attempt < this.retry.maxAttempts) {
             const delay = this.retry.backoffMs * Math.pow(this.retry.backoffMultiplier, attempt - 1);
             await this.sleep(delay);
@@ -258,15 +289,15 @@ export class LLMClient {
           }
           throw lastError;
         }
-        
+
         if (err instanceof LLMError || err instanceof LLMUnavailableError || err instanceof RateLimitedError) {
           throw err;
         }
-        
+
         // Connection errors
         if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
           lastError = new LLMUnavailableError(`Cannot connect to LLM: ${err.message}`);
-          
+
           if (attempt < this.retry.maxAttempts) {
             const delay = this.retry.backoffMs * Math.pow(this.retry.backoffMultiplier, attempt - 1);
             await this.sleep(delay);
@@ -274,11 +305,11 @@ export class LLMClient {
           }
           throw lastError;
         }
-        
+
         throw new LLMError(`Unexpected error: ${err.message}`, { originalError: err.message });
       }
     }
-    
+
     throw lastError || new LLMError('Request failed after all retry attempts');
   }
 
