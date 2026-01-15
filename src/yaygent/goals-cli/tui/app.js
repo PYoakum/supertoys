@@ -122,7 +122,13 @@ export class App {
 
     // Start input handling
     this.input.start();
-    this.input.on((evt) => this._handleEvent(evt));
+    this.input.on((evt) => {
+      // Debug: log events to stderr
+      if (process.env.DEBUG_TUI) {
+        process.stderr.write(`[TUI] Event: ${JSON.stringify(evt)}\n`);
+      }
+      this._handleEvent(evt);
+    });
 
     // Handle resize
     if (process.stdout.on) {
