@@ -524,7 +524,7 @@ export class ExecuteTabScreen {
                            (task.tool?.toolName || task.tool?.name || '?');
             const deps = task.dependencies || [];
             const depStr = deps.length > 0
-              ? ` ← depends on: ${deps.map(d => (d.taskId || d).slice(0, 8)).join(', ')}`
+              ? ` ← depends on: ${deps.map(d => String(d.taskId || d).slice(0, 8)).join(', ')}`
               : '';
             this.logViewer.addLine('debug', `  ${idx + 1}. [${toolStr}] ${(task.title || '').slice(0, 40)}${depStr}`);
           });
@@ -535,7 +535,7 @@ export class ExecuteTabScreen {
           if (cycles.length > 0) {
             this.logViewer.addLine('error', `⚠ Circular dependencies detected!`);
             cycles.forEach(cycle => {
-              this.logViewer.addLine('error', `  Cycle: ${cycle.map(id => id.slice(0, 8)).join(' → ')}`);
+              this.logViewer.addLine('error', `  Cycle: ${cycle.map(id => String(id).slice(0, 8)).join(' → ')}`);
             });
           }
         }
@@ -663,7 +663,7 @@ export class ExecuteTabScreen {
             const depState = depGoal?.status?.state || 'unknown';
             const satisfied = depState === 'completed';
             const arrow = satisfied ? '✓→' : '⊘→';
-            this.logViewer.addLine('debug', `   ${arrow} ${depId.slice(0, 8)}... (${depState})`);
+            this.logViewer.addLine('debug', `   ${arrow} ${String(depId).slice(0, 8)}... (${depState})`);
           });
         }
       });
@@ -682,7 +682,7 @@ export class ExecuteTabScreen {
       if (cycles.length > 0) {
         this.logViewer.addLine('error', `⚠ CIRCULAR DEPENDENCIES DETECTED:`);
         cycles.forEach(cycle => {
-          this.logViewer.addLine('error', `  ${cycle.map(id => id.slice(0, 8)).join(' → ')}`);
+          this.logViewer.addLine('error', `  ${cycle.map(id => String(id).slice(0, 8)).join(' → ')}`);
         });
         this.logViewer.addLine('info', '');
       }
@@ -707,7 +707,7 @@ export class ExecuteTabScreen {
             const satisfied = depState === 'completed';
             const arrow = satisfied ? '✓→' : '⊘→';
             const depType = dep.type || 'completion';
-            this.logViewer.addLine('debug', `   ${arrow} ${depId.slice(0, 12)}... [${depType}] (${depState})`);
+            this.logViewer.addLine('debug', `   ${arrow} ${String(depId).slice(0, 12)}... [${depType}] (${depState})`);
           });
         }
       });
@@ -732,7 +732,7 @@ export class ExecuteTabScreen {
               const depTask = tasks.find(t2 => t2.id === depId);
               return !depTask || depTask.state !== 'completed';
             })
-            .map(d => (d.taskId || d).slice(0, 8));
+            .map(d => String(d.taskId || d).slice(0, 8));
           this.logViewer.addLine('warn', `  ${t.id.slice(0, 8)}... waiting on: ${waitingOn.join(', ')}`);
         });
       }
