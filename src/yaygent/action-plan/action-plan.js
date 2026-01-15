@@ -502,7 +502,14 @@ async function main(args) {
 
       // Evaluate task
       const evaluation = await evaluateTask(task, goal, executionResult, evalLlm);
-      display.printEvaluationResult(evaluation.success);
+      display.printEvaluationResult(evaluation.success, evaluation);
+
+      // In verbose mode, show tool results for debugging
+      if (args.verbose && executionResult.toolInvocations) {
+        for (const toolResult of executionResult.toolInvocations) {
+          display.printToolResult(toolResult);
+        }
+      }
 
       // Write evaluation
       await outputWriter.writeEvaluation(task, evaluation);

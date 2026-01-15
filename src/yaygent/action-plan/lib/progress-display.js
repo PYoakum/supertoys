@@ -70,12 +70,52 @@ Status: Running
   /**
    * Print evaluation result
    * @param {boolean} success
+   * @param {Object} [evaluation] - Full evaluation result for verbose output
    */
-  printEvaluationResult(success) {
+  printEvaluationResult(success, evaluation = null) {
     if (success) {
       console.log(`      ✅ Evaluation passed`);
     } else {
       console.log(`      ❌ Evaluation failed`);
+      // Always show reason summary for failures
+      if (evaluation?.reason?.summary) {
+        console.log(`      Reason: ${evaluation.reason.summary}`);
+      }
+      // Show more details in verbose mode
+      if (this.verbose && evaluation) {
+        if (evaluation.reason?.details) {
+          console.log(`      Details: ${evaluation.reason.details}`);
+        }
+        if (evaluation.issues && evaluation.issues.length > 0) {
+          console.log(`      Issues:`);
+          evaluation.issues.forEach(issue => {
+            console.log(`        - ${issue}`);
+          });
+        }
+        if (evaluation.criteriaUnmatched && evaluation.criteriaUnmatched.length > 0) {
+          console.log(`      Unmet criteria:`);
+          evaluation.criteriaUnmatched.forEach(c => {
+            console.log(`        - ${c}`);
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Print tool invocation result (for debugging)
+   * @param {Object} toolResult
+   */
+  printToolResult(toolResult) {
+    if (!this.verbose) return;
+    console.log(`      Tool result:`);
+    console.log(`        Success: ${toolResult.success}`);
+    if (toolResult.error) {
+      console.log(`        Error: ${toolResult.error}`);
+    }
+    if (toolResult.result) {
+      const resultStr = JSON.stringify(toolResult.result).slice(0, 200);
+      console.log(`        Result: ${resultStr}${resultStr.length >= 200 ? '...' : ''}`);
     }
   }
 
