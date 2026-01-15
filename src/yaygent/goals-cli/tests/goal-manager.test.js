@@ -9,15 +9,15 @@ import { GoalsFileError } from "../lib/errors.js";
 describe("GoalManager", () => {
   describe("constructor", () => {
     test("should create instance with path", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
-      expect(manager.goalsPath).toBe("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
+      expect(manager.goalsPath).toBe("./tests/fixtures/valid-goals.json");
       expect(manager.loaded).toBe(false);
     });
   });
 
   describe("load()", () => {
     test("should load valid goals file", async () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       const goals = await manager.load();
       
       expect(goals).toBeDefined();
@@ -27,7 +27,7 @@ describe("GoalManager", () => {
     });
 
     test("should throw for non-existent file", async () => {
-      const manager = new GoalManager("./test/fixtures/non-existent.json");
+      const manager = new GoalManager("./tests/fixtures/non-existent.json");
       
       await expect(manager.load()).rejects.toThrow(GoalsFileError);
     });
@@ -38,7 +38,7 @@ describe("GoalManager", () => {
     });
 
     test("should apply default values", async () => {
-      const manager = new GoalManager("./test/fixtures/minimal-goals.json");
+      const manager = new GoalManager("./tests/fixtures/minimal-goals.json");
       const goals = await manager.load();
       
       expect(goals.goals[0].priority).toBe(5);
@@ -49,7 +49,7 @@ describe("GoalManager", () => {
 
   describe("getGoals()", () => {
     test("should return all goals after loading", async () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       await manager.load();
       
       const goals = manager.getGoals();
@@ -57,7 +57,7 @@ describe("GoalManager", () => {
     });
 
     test("should throw if not loaded", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       expect(() => manager.getGoals()).toThrow("Goals not loaded");
     });
@@ -65,7 +65,7 @@ describe("GoalManager", () => {
 
   describe("getGoal()", () => {
     test("should return specific goal by ID", async () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       await manager.load();
       
       const goal = manager.getGoal("goal-one");
@@ -74,7 +74,7 @@ describe("GoalManager", () => {
     });
 
     test("should return undefined for non-existent ID", async () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       await manager.load();
       
       const goal = manager.getGoal("non-existent");
@@ -84,7 +84,7 @@ describe("GoalManager", () => {
 
   describe("validate()", () => {
     test("should validate correct definition", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -101,7 +101,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject missing version", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         goals: [{ id: "test", objective: "test objective here" }]
@@ -112,7 +112,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject empty goals array", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -124,7 +124,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject invalid goal ID format", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -141,7 +141,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject short objective", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -158,7 +158,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject duplicate goal IDs", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -173,7 +173,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject self-dependency", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -191,7 +191,7 @@ describe("GoalManager", () => {
     });
 
     test("should reject dependency on non-existent goal", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -209,7 +209,7 @@ describe("GoalManager", () => {
     });
 
     test("should detect circular dependencies", () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       
       const result = manager.validate({
         version: "1.0",
@@ -234,7 +234,7 @@ describe("GoalManager", () => {
 
   describe("getGoalsByPriority()", () => {
     test("should return goals sorted by priority", async () => {
-      const manager = new GoalManager("./test/fixtures/valid-goals.json");
+      const manager = new GoalManager("./tests/fixtures/valid-goals.json");
       await manager.load();
       
       const sorted = manager.getGoalsByPriority();

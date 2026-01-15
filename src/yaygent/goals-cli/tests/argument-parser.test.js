@@ -64,10 +64,10 @@ describe("Argument Parser", () => {
 
     test("should use default values", () => {
       const args = parseArguments([]);
-      
+
       expect(args.config).toBe("./configuration.js");
       expect(args.output).toBe("stdout");
-      expect(args.format).toBe("json");
+      expect(args.format).toBe("toon");
       expect(args.verbose).toBe(false);
       expect(args.dryRun).toBe(false);
     });

@@ -9,14 +9,14 @@ import { ContextError } from "../lib/errors.js";
 describe("ContextLoader", () => {
   describe("constructor", () => {
     test("should create instance with path and default options", () => {
-      const loader = new ContextLoader("./test/fixtures/context");
-      expect(loader.contextPath).toBe("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
+      expect(loader.contextPath).toBe("./tests/fixtures/context");
       expect(loader.options.recursive).toBe(true);
       expect(loader.loaded).toBe(false);
     });
 
     test("should accept custom options", () => {
-      const loader = new ContextLoader("./test/fixtures/context", {
+      const loader = new ContextLoader("./tests/fixtures/context", {
         recursive: false,
         extensions: [".md", ".txt"]
       });
@@ -27,7 +27,7 @@ describe("ContextLoader", () => {
 
   describe("load()", () => {
     test("should load files from directory", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       const bundle = await loader.load();
       
       expect(bundle).toBeDefined();
@@ -37,13 +37,13 @@ describe("ContextLoader", () => {
     });
 
     test("should throw for non-existent directory", async () => {
-      const loader = new ContextLoader("./test/fixtures/non-existent");
+      const loader = new ContextLoader("./tests/fixtures/non-existent");
       
       await expect(loader.load()).rejects.toThrow(ContextError);
     });
 
     test("should include file metadata", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       const bundle = await loader.load();
       
       const file = bundle.files[0];
@@ -57,7 +57,7 @@ describe("ContextLoader", () => {
 
   describe("getFormattedContext()", () => {
     test("should format as XML", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       const xml = loader.getFormattedContext("xml");
@@ -67,7 +67,7 @@ describe("ContextLoader", () => {
     });
 
     test("should format as Markdown", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       const md = loader.getFormattedContext("markdown");
@@ -77,7 +77,7 @@ describe("ContextLoader", () => {
     });
 
     test("should format as JSON", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       const json = loader.getFormattedContext("json");
@@ -87,14 +87,14 @@ describe("ContextLoader", () => {
     });
 
     test("should throw for unknown format", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       expect(() => loader.getFormattedContext("unknown")).toThrow("Unknown format");
     });
 
     test("should throw if not loaded", () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       
       expect(() => loader.getFormattedContext("xml")).toThrow("not loaded");
     });
@@ -102,7 +102,7 @@ describe("ContextLoader", () => {
 
   describe("getMetadata()", () => {
     test("should return metadata after loading", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       const metadata = loader.getMetadata();
@@ -114,7 +114,7 @@ describe("ContextLoader", () => {
 
   describe("getFilesByExtension()", () => {
     test("should filter files by extension", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       const mdFiles = loader.getFilesByExtension(".md");
@@ -124,7 +124,7 @@ describe("ContextLoader", () => {
     });
 
     test("should accept extension without dot", async () => {
-      const loader = new ContextLoader("./test/fixtures/context");
+      const loader = new ContextLoader("./tests/fixtures/context");
       await loader.load();
       
       const mdFiles = loader.getFilesByExtension("md");
