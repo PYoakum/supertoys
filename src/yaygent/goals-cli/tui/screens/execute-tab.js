@@ -63,7 +63,7 @@ export class ExecuteTabScreen {
     });
 
     this.sessionsMenu = new Menu({ title: 'Sessions', items: [] });
-    this.logViewer = new LogViewer({ maxLines: 200 });
+    this.logViewer = new LogViewer({ maxLines: 500 });  // Increased for verbose dependency output
     this.progressBar = new ProgressBar({ width: 40 });
 
     // State
@@ -186,7 +186,7 @@ export class ExecuteTabScreen {
       case 'sessions':
         return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
-        return '[E] Execute  [T] Edit Tasks  [K] Kill  [Esc] Back';
+        return '[E] Execute  [T] Edit Tasks  [G] Dep Graph  [K] Kill  [Esc] Back';
       case 'edit-tasks':
         return '[Ctrl+S] Save  [Esc] Cancel';
       case 'running':
@@ -463,25 +463,93 @@ export class ExecuteTabScreen {
 
     try {
       // Step 1: Evaluate the session
-      this.logViewer.addLine('info', 'Step 1/2: Evaluating session...');
+      this.logViewer.addLine('info', '── Step 1/2: Evaluating dependencies ──');
       const evalResponse = await this.sessionClient.evaluate(sessionId);
       const evalResult = evalResponse.data || evalResponse;
 
       if (evalResult.evaluation) {
         this.logViewer.addLine('success', `Evaluation complete. State: ${evalResult.state}`);
+
+        // Show execution order
+        const order = evalResult.evaluation.executionOrder || [];
+        if (order.length > 0) {
+          this.logViewer.addLine('info', `Execution order (${order.length} goals):`);
+          order.forEach((goalId, idx) => {
+            this.logViewer.addLine('debug', `  ${idx + 1}. ${goalId.slice(0, 8)}...`);
+          });
+        }
+
+        // Show inferred dependencies
+        const deps = evalResult.evaluation.inferredDependencies || [];
+        if (deps.length > 0) {
+          this.logViewer.addLine('info', `Inferred dependencies (${deps.length}):`);
+          deps.forEach(dep => {
+            const type = dep.type || 'unknown';
+            this.logViewer.addLine('debug', `  ${dep.goalId.slice(0, 8)} → ${dep.dependsOn.slice(0, 8)} [${type}]`);
+          });
+        }
+
+        // Show warnings (including circular dependencies)
+        const warnings = evalResult.evaluation.warnings || [];
+        if (warnings.length > 0) {
+          this.logViewer.addLine('warn', `Warnings (${warnings.length}):`);
+          warnings.forEach(w => {
+            const goalInfo = w.goalId ? ` (${w.goalId.slice(0, 8)})` : '';
+            this.logViewer.addLine('warn', `  [${w.code}]${goalInfo}: ${w.message}`);
+          });
+        }
+
+        // Show reasoning
+        if (evalResult.evaluation.reasoning) {
+          this.logViewer.addLine('info', `Reasoning: ${evalResult.evaluation.reasoning.slice(0, 200)}...`);
+        }
       } else {
         this.logViewer.addLine('warn', 'Evaluation returned no data');
       }
 
       // Step 2: Generate task list
-      this.logViewer.addLine('info', 'Step 2/2: Generating task list...');
+      this.logViewer.addLine('info', '── Step 2/2: Generating tasks ──');
       const taskResponse = await this.sessionClient.generateTaskList(sessionId);
       const taskResult = taskResponse.data || taskResponse;
 
       if (taskResult.taskList) {
-        const taskCount = taskResult.taskList.tasks?.length || 0;
-        this.logViewer.addLine('success', `Generated ${taskCount} tasks. State: ${taskResult.state}`);
-        this.logViewer.addLine('info', 'Session is ready for execution');
+        const tasks = taskResult.taskList.tasks || [];
+        this.logViewer.addLine('success', `Generated ${tasks.length} tasks. State: ${taskResult.state}`);
+
+        // Show task summary with dependencies
+        if (tasks.length > 0) {
+          this.logViewer.addLine('info', 'Task breakdown:');
+          tasks.forEach((task, idx) => {
+            const toolStr = typeof task.tool === 'string' ? task.tool :
+                           (task.tool?.toolName || task.tool?.name || '?');
+            const deps = task.dependencies || [];
+            const depStr = deps.length > 0
+              ? ` ← depends on: ${deps.map(d => (d.taskId || d).slice(0, 8)).join(', ')}`
+              : '';
+            this.logViewer.addLine('debug', `  ${idx + 1}. [${toolStr}] ${(task.title || '').slice(0, 40)}${depStr}`);
+          });
+
+          // Check for potential circular dependencies in tasks
+          const depGraph = this._buildTaskDepGraph(tasks);
+          const cycles = this._detectCycles(depGraph);
+          if (cycles.length > 0) {
+            this.logViewer.addLine('error', `⚠ Circular dependencies detected!`);
+            cycles.forEach(cycle => {
+              this.logViewer.addLine('error', `  Cycle: ${cycle.map(id => id.slice(0, 8)).join(' → ')}`);
+            });
+          }
+        }
+
+        // Show unbound tasks (tasks that couldn't be mapped to tools)
+        const unbound = taskResult.taskList.unboundTasks || [];
+        if (unbound.length > 0) {
+          this.logViewer.addLine('warn', `Unbound tasks (${unbound.length}):`);
+          unbound.forEach(ut => {
+            this.logViewer.addLine('warn', `  ${ut.taskTitle}: ${ut.reason}`);
+          });
+        }
+
+        this.logViewer.addLine('success', 'Session is ready for execution');
       } else {
         this.logViewer.addLine('warn', 'Task generation returned no data');
       }
@@ -495,7 +563,183 @@ export class ExecuteTabScreen {
       if (err.message.includes('LLM') || err.message.includes('API')) {
         this.logViewer.addLine('info', 'Hint: Is LLM_API_KEY set on the server?');
       }
+      if (err.message.includes('circular') || err.message.includes('blocked')) {
+        this.logViewer.addLine('info', 'Hint: Check goal dependencies for cycles');
+      }
     }
+  }
+
+  /**
+   * Build a dependency graph from tasks
+   * @param {Object[]} tasks
+   * @returns {Map<string, string[]>}
+   * @private
+   */
+  _buildTaskDepGraph(tasks) {
+    const graph = new Map();
+    for (const task of tasks) {
+      const deps = (task.dependencies || []).map(d => d.taskId || d);
+      graph.set(task.id, deps);
+    }
+    return graph;
+  }
+
+  /**
+   * Detect cycles in a dependency graph using DFS
+   * @param {Map<string, string[]>} graph
+   * @returns {string[][]} Array of cycles found
+   * @private
+   */
+  _detectCycles(graph) {
+    const cycles = [];
+    const visited = new Set();
+    const recStack = new Set();
+    const path = [];
+
+    const dfs = (node) => {
+      if (recStack.has(node)) {
+        // Found a cycle - extract it from path
+        const cycleStart = path.indexOf(node);
+        if (cycleStart >= 0) {
+          cycles.push([...path.slice(cycleStart), node]);
+        }
+        return;
+      }
+      if (visited.has(node)) return;
+
+      visited.add(node);
+      recStack.add(node);
+      path.push(node);
+
+      const deps = graph.get(node) || [];
+      for (const dep of deps) {
+        dfs(dep);
+      }
+
+      path.pop();
+      recStack.delete(node);
+    };
+
+    for (const node of graph.keys()) {
+      if (!visited.has(node)) {
+        dfs(node);
+      }
+    }
+
+    return cycles;
+  }
+
+  /**
+   * Show dependency graph in the log viewer
+   * @private
+   */
+  _showDependencyGraph() {
+    if (!this.selectedSession) {
+      this.logViewer.addLine('warn', 'No session selected');
+      return;
+    }
+
+    this.logViewer.clear();
+    this.logViewer.addLine('info', '═══ Dependency Graph ═══');
+
+    // Show goal dependencies
+    const goals = this.selectedSession.goals?.items || [];
+    if (goals.length > 0) {
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '── Goals ──');
+      goals.forEach((goal, idx) => {
+        const state = goal.status?.state || 'pending';
+        const stateIcon = state === 'completed' ? '✓' :
+                         state === 'blocked' ? '⊘' :
+                         state === 'in_progress' ? '▶' : '○';
+        this.logViewer.addLine('info', `${stateIcon} ${idx + 1}. ${goal.id.slice(0, 8)}... [${state}]`);
+        this.logViewer.addLine('debug', `   ${(goal.objective || '').slice(0, 60)}`);
+
+        // Show dependencies
+        const allDeps = goal.dependencies?.allDependencies || [];
+        if (allDeps.length > 0) {
+          allDeps.forEach(depId => {
+            const depGoal = goals.find(g => g.id === depId);
+            const depState = depGoal?.status?.state || 'unknown';
+            const satisfied = depState === 'completed';
+            const arrow = satisfied ? '✓→' : '⊘→';
+            this.logViewer.addLine('debug', `   ${arrow} ${depId.slice(0, 8)}... (${depState})`);
+          });
+        }
+      });
+    }
+
+    // Show task dependencies
+    const tasks = this.selectedSession.taskList?.tasks || [];
+    if (tasks.length > 0) {
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '── Tasks ──');
+
+      // Build dependency graph and detect cycles
+      const depGraph = this._buildTaskDepGraph(tasks);
+      const cycles = this._detectCycles(depGraph);
+
+      if (cycles.length > 0) {
+        this.logViewer.addLine('error', `⚠ CIRCULAR DEPENDENCIES DETECTED:`);
+        cycles.forEach(cycle => {
+          this.logViewer.addLine('error', `  ${cycle.map(id => id.slice(0, 8)).join(' → ')}`);
+        });
+        this.logViewer.addLine('info', '');
+      }
+
+      // Show each task with its dependencies
+      tasks.forEach((task, idx) => {
+        const state = task.state || 'pending';
+        const stateIcon = state === 'completed' ? '✓' :
+                         state === 'running' ? '▶' :
+                         state === 'failed' ? '✗' : '○';
+        const toolStr = typeof task.tool === 'string' ? task.tool :
+                       (task.tool?.toolName || task.tool?.name || '?');
+
+        this.logViewer.addLine('info', `${stateIcon} ${idx + 1}. ${task.id.slice(0, 12)}... [${toolStr}]`);
+
+        const deps = task.dependencies || [];
+        if (deps.length > 0) {
+          deps.forEach(dep => {
+            const depId = dep.taskId || dep;
+            const depTask = tasks.find(t => t.id === depId);
+            const depState = depTask?.state || 'unknown';
+            const satisfied = depState === 'completed';
+            const arrow = satisfied ? '✓→' : '⊘→';
+            const depType = dep.type || 'completion';
+            this.logViewer.addLine('debug', `   ${arrow} ${depId.slice(0, 12)}... [${depType}] (${depState})`);
+          });
+        }
+      });
+
+      // Show blocked tasks summary
+      const blockedTasks = tasks.filter(t => {
+        const deps = t.dependencies || [];
+        return deps.some(d => {
+          const depId = d.taskId || d;
+          const depTask = tasks.find(t2 => t2.id === depId);
+          return !depTask || depTask.state !== 'completed';
+        }) && t.state !== 'completed';
+      });
+
+      if (blockedTasks.length > 0) {
+        this.logViewer.addLine('info', '');
+        this.logViewer.addLine('warn', `Blocked tasks: ${blockedTasks.length}`);
+        blockedTasks.forEach(t => {
+          const waitingOn = (t.dependencies || [])
+            .filter(d => {
+              const depId = d.taskId || d;
+              const depTask = tasks.find(t2 => t2.id === depId);
+              return !depTask || depTask.state !== 'completed';
+            })
+            .map(d => (d.taskId || d).slice(0, 8));
+          this.logViewer.addLine('warn', `  ${t.id.slice(0, 8)}... waiting on: ${waitingOn.join(', ')}`);
+        });
+      }
+    }
+
+    this.logViewer.addLine('info', '');
+    this.logViewer.addLine('info', 'Legend: ✓=completed ○=pending ▶=running ⊘=blocked ✗=failed');
   }
 
   /**
@@ -855,6 +1099,9 @@ export class ExecuteTabScreen {
             this.logViewer.addLine('warn', 'No tasks to edit. Run "Prepare Session" first.');
           }
           break;
+        case 'g':
+          this._showDependencyGraph();
+          break;
         case 'k':
           if (this.selectedSession) {
             const sessionId = this.selectedSession.id;
@@ -1188,35 +1435,67 @@ export class ExecuteTabScreen {
         screen.drawText(x + w - scrollInfo.length - 2, line - 1, scrollInfo, styles.dim);
       }
 
+      // Check for circular dependencies
+      const depGraph = this._buildTaskDepGraph(tasks);
+      const cycles = this._detectCycles(depGraph);
+      const cycleTaskIds = new Set(cycles.flat());
+
       // Render visible tasks
       for (let i = 0; i < maxTasks && line < y + h - 1; i++) {
         const taskIndex = i + this.taskScrollOffset;
         if (taskIndex >= tasks.length) break;
 
         const task = tasks[taskIndex];
-        const stateIcon = task.state === 'completed' ? '✓' :
+
+        // Check if this task is blocked
+        const deps = task.dependencies || [];
+        const isBlocked = deps.some(d => {
+          const depId = d.taskId || d;
+          const depTask = tasks.find(t => t.id === depId);
+          return !depTask || depTask.state !== 'completed';
+        });
+        const inCycle = cycleTaskIds.has(task.id);
+
+        const stateIcon = inCycle ? '⟳' :
+                         task.state === 'completed' ? '✓' :
                          task.state === 'running' ? '▶' :
-                         task.state === 'failed' ? '✗' : '○';
-        const stateStyle = task.state === 'completed' ? styles.success :
+                         task.state === 'failed' ? '✗' :
+                         isBlocked ? '⊘' : '○';
+        const stateStyle = inCycle ? styles.error :
+                          task.state === 'completed' ? styles.success :
                           task.state === 'failed' ? styles.error :
-                          task.state === 'running' ? styles.accent : styles.dim;
+                          task.state === 'running' ? styles.accent :
+                          isBlocked ? styles.warning : styles.dim;
 
         const taskNum = String(taskIndex + 1).padStart(2, ' ');
         // Handle tool - might be string or object with name property
         const toolStr = typeof task.tool === 'string' ? task.tool :
-                       (task.tool?.name || task.tool?.tool || '');
+                       (task.tool?.toolName || task.tool?.name || task.tool?.tool || '');
         const toolName = toolStr ? `[${toolStr}]` : '';
         // Handle description - might be string or object with text/description property
         const descStr = typeof task.description === 'string' ? task.description :
                        (task.description?.text || task.description?.description ||
                         (typeof task.objective === 'string' ? task.objective :
                         (task.objective?.text || task.objective?.objective || '')));
-        const description = (descStr || '(no description)').slice(0, w - 20);
+
+        // Add dependency indicator
+        const depIndicator = deps.length > 0 ? ` (←${deps.length})` : '';
+        const maxDescLen = w - 20 - toolName.length - depIndicator.length;
+        const description = (descStr || '(no description)').slice(0, maxDescLen);
 
         screen.drawText(x + 2, line, `${taskNum}. ${stateIcon}`, stateStyle);
         screen.drawText(x + 8, line, toolName, styles.accent);
         screen.drawText(x + 8 + toolName.length + 1, line, description, styles.normal);
+        if (deps.length > 0) {
+          screen.drawText(x + 8 + toolName.length + 1 + description.length, line, depIndicator, styles.dim);
+        }
         line++;
+      }
+
+      // Show cycle warning at bottom if detected
+      if (cycles.length > 0 && line < y + h - 1) {
+        line++;
+        screen.drawText(x + 2, line, `⚠ ${cycles.length} circular dep(s) - press [G] for details`, styles.error);
       }
     } else {
       screen.drawText(x + 2, line++, '(No tasks - run "Prepare Session" first)', styles.dim);

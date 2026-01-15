@@ -31,24 +31,59 @@ export class ActionPlanRunner {
   /**
    * Parse log line to extract level and message
    * @param {string} line
-   * @returns {{level: string, message: string}}
+   * @returns {{level: string, message: string, metadata?: Object}}
    * @private
    */
   _parseLogLine(line) {
-    // Try to extract level markers
-    if (line.includes('[ERROR]') || line.includes('Error:')) {
-      return { level: 'error', message: line };
+    const result = { level: 'info', message: line };
+
+    // Check for circular dependency errors (high priority)
+    if (line.includes('circular') || line.includes('Circular')) {
+      result.level = 'error';
+      result.metadata = { type: 'circular_dependency' };
+      return result;
+    }
+
+    // Check for blocked queue
+    if (line.includes('blocked') || line.includes('Blocked')) {
+      result.level = 'warn';
+      result.metadata = { type: 'blocked' };
+      return result;
+    }
+
+    // Check for dependency-related messages
+    if (line.includes('depends on') || line.includes('dependency') || line.includes('waiting')) {
+      result.level = 'debug';
+      result.metadata = { type: 'dependency' };
+      return result;
+    }
+
+    // Standard level markers
+    if (line.includes('[ERROR]') || line.includes('Error:') || line.includes('FATAL')) {
+      result.level = 'error';
+      return result;
     }
     if (line.includes('[WARN]') || line.includes('Warning:')) {
-      return { level: 'warn', message: line };
+      result.level = 'warn';
+      return result;
     }
     if (line.includes('[DEBUG]')) {
-      return { level: 'debug', message: line };
+      result.level = 'debug';
+      return result;
     }
     if (line.includes('✓') || line.includes('SUCCESS') || line.includes('Complete')) {
-      return { level: 'success', message: line };
+      result.level = 'success';
+      return result;
     }
-    return { level: 'info', message: line };
+
+    // Task progress markers
+    if (line.match(/Task \d+\/\d+/) || line.match(/\[\d+\/\d+\]/)) {
+      result.level = 'info';
+      result.metadata = { type: 'progress' };
+      return result;
+    }
+
+    return result;
   }
 
   /**
