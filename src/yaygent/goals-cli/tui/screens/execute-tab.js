@@ -1202,8 +1202,16 @@ export class ExecuteTabScreen {
                           task.state === 'running' ? styles.accent : styles.dim;
 
         const taskNum = String(taskIndex + 1).padStart(2, ' ');
-        const toolName = task.tool ? `[${task.tool}]` : '';
-        const description = (task.description || task.objective || '(no description)').slice(0, w - 20);
+        // Handle tool - might be string or object with name property
+        const toolStr = typeof task.tool === 'string' ? task.tool :
+                       (task.tool?.name || task.tool?.tool || '');
+        const toolName = toolStr ? `[${toolStr}]` : '';
+        // Handle description - might be string or object with text/description property
+        const descStr = typeof task.description === 'string' ? task.description :
+                       (task.description?.text || task.description?.description ||
+                        (typeof task.objective === 'string' ? task.objective :
+                        (task.objective?.text || task.objective?.objective || '')));
+        const description = (descStr || '(no description)').slice(0, w - 20);
 
         screen.drawText(x + 2, line, `${taskNum}. ${stateIcon}`, stateStyle);
         screen.drawText(x + 8, line, toolName, styles.accent);
