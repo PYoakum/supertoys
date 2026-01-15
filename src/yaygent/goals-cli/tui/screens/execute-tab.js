@@ -236,26 +236,31 @@ export class ExecuteTabScreen {
     }
 
     const sessionId = this.state.sessionId;
+    this.logViewer.addLine('info', `Preparing session: ${sessionId.slice(0, 8)}...`);
 
     try {
       // Step 1: Evaluate the session
-      this.logViewer.addLine('info', 'Evaluating session...');
+      this.logViewer.addLine('info', 'Step 1/2: Evaluating session...');
       const evalResponse = await this.sessionClient.evaluate(sessionId);
       const evalResult = evalResponse.data || evalResponse;
 
       if (evalResult.evaluation) {
-        this.logViewer.addLine('success', 'Evaluation complete');
+        this.logViewer.addLine('success', `Evaluation complete. State: ${evalResult.state}`);
+      } else {
+        this.logViewer.addLine('warn', 'Evaluation returned no data');
       }
 
       // Step 2: Generate task list
-      this.logViewer.addLine('info', 'Generating task list...');
+      this.logViewer.addLine('info', 'Step 2/2: Generating task list...');
       const taskResponse = await this.sessionClient.generateTaskList(sessionId);
       const taskResult = taskResponse.data || taskResponse;
 
       if (taskResult.taskList) {
         const taskCount = taskResult.taskList.tasks?.length || 0;
-        this.logViewer.addLine('success', `Generated ${taskCount} tasks`);
+        this.logViewer.addLine('success', `Generated ${taskCount} tasks. State: ${taskResult.state}`);
         this.logViewer.addLine('info', 'Session is ready for execution');
+      } else {
+        this.logViewer.addLine('warn', 'Task generation returned no data');
       }
 
       // Refresh sessions list
@@ -263,6 +268,10 @@ export class ExecuteTabScreen {
 
     } catch (err) {
       this.logViewer.addLine('error', `Preparation failed: ${err.message}`);
+      // Show more details if available
+      if (err.message.includes('LLM') || err.message.includes('API')) {
+        this.logViewer.addLine('info', 'Hint: Is LLM_API_KEY set on the server?');
+      }
     }
   }
 
