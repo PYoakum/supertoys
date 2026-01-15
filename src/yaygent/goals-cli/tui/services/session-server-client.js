@@ -129,19 +129,21 @@ export class SessionServerClient {
   /**
    * Run evaluation on session
    * @param {string} sessionId
+   * @param {Object} [options={}]
    * @returns {Promise<Object>}
    */
-  async evaluate(sessionId) {
-    return this._request('POST', `/api/sessions/${sessionId}/evaluate`);
+  async evaluate(sessionId, options = {}) {
+    return this._request('POST', '/api/evaluate', { sessionId, options });
   }
 
   /**
    * Generate task list for session
    * @param {string} sessionId
+   * @param {Object} [options={}]
    * @returns {Promise<{tasks: Array}>}
    */
-  async generateTaskList(sessionId) {
-    return this._request('POST', `/api/sessions/${sessionId}/tasks`);
+  async generateTaskList(sessionId, options = {}) {
+    return this._request('POST', '/api/tasklist/generate', { sessionId, options });
   }
 
   /**
