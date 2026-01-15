@@ -247,6 +247,12 @@ export class ExecuteTabScreen {
       return;
     }
 
+    // Warn if no API key
+    if (!this.envVars.LLM_API_KEY) {
+      this.logViewer.addLine('warn', 'Starting server WITHOUT API key - LLM features will be unavailable!');
+      this.logViewer.addLine('info', 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY, then restart server.');
+    }
+
     this.logViewer.addLine('info', 'Starting session server...');
 
     // Build environment for server
@@ -432,6 +438,14 @@ export class ExecuteTabScreen {
    * @private
    */
   async _prepareSession() {
+    // Check for API key first
+    if (!this.envVars.LLM_API_KEY) {
+      this.logViewer.addLine('error', 'No API key configured!');
+      this.logViewer.addLine('warn', `Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment, then restart.`);
+      this.logViewer.addLine('info', 'Or configure in Environment Config menu.');
+      return;
+    }
+
     if (!this.state.sessionId) {
       this.logViewer.addLine('error', 'No session selected. Create a session first.');
       return;
@@ -532,6 +546,13 @@ export class ExecuteTabScreen {
    * @private
    */
   async _runNextSession() {
+    // Check for API key first
+    if (!this.envVars.LLM_API_KEY) {
+      this.logViewer.addLine('error', 'No API key configured!');
+      this.logViewer.addLine('warn', 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment, then restart.');
+      return;
+    }
+
     if (this.actionRunner.isRunning()) {
       this.logViewer.addLine('warn', 'Execution already in progress');
       return;
