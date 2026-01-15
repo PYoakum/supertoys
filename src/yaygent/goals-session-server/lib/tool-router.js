@@ -11,6 +11,9 @@ import { CodeEditorTool } from './code-editor-tool.js';
 import { FileCreateTool } from './file-create-tool.js';
 import { JavaScriptExecuteTool } from './javascript-execute-tool.js';
 import { SQLiteTool } from './sqlite-tool.js';
+import { HttpRequestTool } from './http-request-tool.js';
+import { TcpConnectTool } from './tcp-connect-tool.js';
+import { BrowserRequestTool } from './browser-request-tool.js';
 
 /**
  * Tool Router Class
@@ -382,6 +385,15 @@ export class NotepadTool {
  * @param {Object} [options={}]
  * @param {string} [options.notepadDir='./notes']
  * @param {string} [options.sandboxDir='./sandbox']
+ * @param {string[]} [options.httpAllowedHosts=[]] - Allowed hosts for http_request
+ * @param {number} [options.httpTimeout=30000] - Default timeout for http_request
+ * @param {number} [options.httpMaxResponseSize] - Max response size for http_request
+ * @param {string[]} [options.tcpAllowedHosts=[]] - Allowed hosts for tcp_connect
+ * @param {number[]} [options.tcpAllowedPorts=[]] - Allowed ports for tcp_connect
+ * @param {number} [options.tcpTimeout=10000] - Default timeout for tcp_connect
+ * @param {string[]} [options.browserAllowedHosts=[]] - Allowed hosts for browser_request
+ * @param {number} [options.browserTimeout=30000] - Default timeout for browser_request
+ * @param {boolean} [options.browserHeadless=true] - Run browser in headless mode
  * @returns {ToolRouter}
  */
 export function createToolRouter(options = {}) {
@@ -424,10 +436,34 @@ export function createToolRouter(options = {}) {
   });
   sqliteTool.registerTools(router);
 
+  // Initialize and register HTTP request tool
+  const httpRequest = new HttpRequestTool({
+    allowedHosts: options.httpAllowedHosts || [],
+    defaultTimeout: options.httpTimeout || 30000,
+    maxResponseSize: options.httpMaxResponseSize || 10 * 1024 * 1024
+  });
+  httpRequest.registerTools(router);
+
+  // Initialize and register TCP connect tool
+  const tcpConnect = new TcpConnectTool({
+    allowedHosts: options.tcpAllowedHosts || [],
+    allowedPorts: options.tcpAllowedPorts || [],
+    defaultTimeout: options.tcpTimeout || 10000
+  });
+  tcpConnect.registerTools(router);
+
+  // Initialize and register browser request tool
+  const browserRequest = new BrowserRequestTool({
+    allowedHosts: options.browserAllowedHosts || [],
+    defaultTimeout: options.browserTimeout || 30000,
+    headless: options.browserHeadless !== false
+  });
+  browserRequest.registerTools(router);
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, SandboxManager, createToolRouter };
