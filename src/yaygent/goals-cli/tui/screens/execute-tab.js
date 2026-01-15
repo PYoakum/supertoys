@@ -47,6 +47,7 @@ export class ExecuteTabScreen {
       title: 'Actions',
       items: [
         'Start Server',
+        'Kill Server',
         'Create Session',
         'Prepare Session',
         'List Sessions',
@@ -216,12 +217,13 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Update the server menu item based on server state
+   * Update the server menu items based on server state
    * @private
    */
   _updateServerMenuItem() {
     const items = this.dashboardMenu.items.slice();
     items[0] = this.serverRunning ? 'Stop Server' : 'Start Server';
+    items[1] = this.serverRunning ? 'Kill Server' : '(Kill Server)';
     this.dashboardMenu.setItems(items);
   }
 
@@ -725,26 +727,29 @@ export class ExecuteTabScreen {
       case 0: // Start/Stop Server
         this._toggleServer();
         break;
-      case 1: // Create Session
+      case 1: // Kill Server
+        this._killServer();
+        break;
+      case 2: // Create Session
         this._createSession();
         break;
-      case 2: // Prepare Session (Evaluate + Generate Tasks)
+      case 3: // Prepare Session (Evaluate + Generate Tasks)
         this._prepareSession();
         break;
-      case 3: // List Sessions
+      case 4: // List Sessions
         this._loadSessions();
         this.mode = 'sessions';
         break;
-      case 4: // Run Next Session
+      case 5: // Run Next Session
         this._runNextSession();
         break;
-      case 5: // Kill Session
+      case 6: // Kill Session
         this._killCurrentSession();
         break;
-      case 6: // Environment Config
+      case 7: // Environment Config
         this.mode = 'config';
         break;
-      case 7: // Refresh Status
+      case 8: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;
