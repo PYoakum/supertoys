@@ -98,7 +98,9 @@ export class ActionPlanRunner {
     };
 
     return new Promise((resolve, reject) => {
-      const proc = spawn('node', [this.cliPath, ...args], {
+      // Use bun if available, otherwise node
+      const runtime = typeof Bun !== 'undefined' ? 'bun' : 'node';
+      const proc = spawn(runtime, [this.cliPath, ...args], {
         env,
         cwd: process.cwd(),
         stdio: ['ignore', 'pipe', 'pipe']
@@ -208,7 +210,9 @@ export class ActionPlanRunner {
     };
 
     return new Promise((resolve, reject) => {
-      const proc = spawn('node', [this.cliPath, ...args], {
+      // Use bun if available, otherwise node
+      const runtime = typeof Bun !== 'undefined' ? 'bun' : 'node';
+      const proc = spawn(runtime, [this.cliPath, ...args], {
         env,
         cwd: process.cwd(),
         stdio: ['ignore', 'pipe', 'pipe']
@@ -276,7 +280,9 @@ export class ActionPlanRunner {
     const args = ['--list'];
 
     return new Promise((resolve, reject) => {
-      const proc = spawn('node', [this.cliPath, ...args], {
+      // Use bun if available, otherwise node
+      const runtime = typeof Bun !== 'undefined' ? 'bun' : 'node';
+      const proc = spawn(runtime, [this.cliPath, ...args], {
         env: { ...process.env, ...this.env },
         cwd: process.cwd(),
         stdio: ['ignore', 'pipe', 'pipe']
