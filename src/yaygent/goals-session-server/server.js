@@ -31,20 +31,15 @@ const logger = {
  */
 function initializeServices() {
   logger.info('Initializing services...');
-  
+
   // Initialize session manager
   const sessionManager = new SessionManager({
     storeOptions: config.session
   });
   logger.info('Session manager initialized');
-  
-  // Initialize tool router
-  const toolRouter = createToolRouter({
-    notepadDir: config.toolRouter.notepadDir
-  });
-  logger.info(`Tool router initialized with ${toolRouter.getAllTools().length} tools`);
-  
-  // Initialize LLM client (if API key is configured)
+
+  // Initialize LLM client first (if API key is configured)
+  // This is needed before tool router so make_goals tool can use it
   let llmClient = null;
   if (config.llm.apiKey) {
     llmClient = new LLMClient({
@@ -62,7 +57,14 @@ function initializeServices() {
     logger.info('LLM client not initialized (no API key configured)');
     logger.info('Set LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY to enable LLM features');
   }
-  
+
+  // Initialize tool router (pass llmClient for make_goals tool)
+  const toolRouter = createToolRouter({
+    notepadDir: config.toolRouter.notepadDir,
+    llmClient: llmClient
+  });
+  logger.info(`Tool router initialized with ${toolRouter.getAllTools().length} tools`);
+
   return { sessionManager, toolRouter, llmClient };
 }
 
@@ -222,6 +224,10 @@ Available endpoints:
   POST   /api/tasklist/generate Generate task list (requires LLM)
   GET    /api/tools             List available tools
   GET    /api/tools/:name       Get tool details
+  POST   /api/tools/execute     Execute a tool
+  GET    /api/sandbox           List all sandboxes
+  GET    /api/sandbox/:id       Get sandbox info
+  DELETE /api/sandbox/:id       Clean up sandbox
   GET    /health                Health check
 
 Environment variables:

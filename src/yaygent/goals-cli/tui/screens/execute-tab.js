@@ -37,7 +37,10 @@ export class ExecuteTabScreen {
     this.editFieldValue = '';         // Current edit buffer
     this.editDepMode = false;         // Editing dependencies (multi-select mode)
     this.editDepSelected = new Set(); // Selected dependency task IDs
-    this.taskFields = ['title', 'description', 'priority', 'sequenceNumber', 'dependencies'];
+    this.editToolMode = false;        // Editing tool selection
+    this.availableTools = [];         // Cached list of available tools from server
+    this.toolNavIndex = 0;            // Navigation index in tool selector
+    this.taskFields = ['title', 'description', 'tool', 'priority', 'sequenceNumber', 'dependencies'];
 
     // Services
     this.sessionClient = new SessionServerClient({
@@ -129,6 +132,10 @@ export class ExecuteTabScreen {
     // Execution options
     this.dryRun = false;
     this.verbose = false;
+    this.cleanSandbox = true;  // Default to cleaning sandbox before execution
+
+    // Sandbox info cache
+    this.sandboxInfo = null;
   }
 
   /**
@@ -187,13 +194,13 @@ export class ExecuteTabScreen {
   getHelpText() {
     switch (this.mode) {
       case 'dashboard':
-        return '[S] Server  [K] Kill Session  [D] Dry-run  [V] Verbose  [Enter] Select';
+        return '[S] Server  [K] Kill Session  [D] Dry-run  [V] Verbose  [X] Clean Sandbox  [Enter] Select';
       case 'sessions':
         return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
-        return '[E] Execute  [T] Edit Tasks  [G] Dep Graph  [K] Kill  [Esc] Back';
+        return '[E] Execute  [C] Clean Sandbox  [T] Edit Tasks  [G] Dep Graph  [K] Kill  [Esc] Back';
       case 'edit-tasks':
-        return '[↑↓] Task  [←→] Field  [Enter] Edit  [D] Deps  [Ctrl+S] Save  [Esc] Back';
+        return '[↑↓] Task  [←→] Field  [Enter] Edit  [T] Tool  [D] Deps  [Ctrl+S] Save  [Esc] Back';
       case 'running':
         return '[Esc] Abort';
       case 'config':
@@ -748,6 +755,63 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Clean sandbox for a session
+   * @param {string} sessionId
+   * @private
+   */
+  async _cleanSandbox(sessionId) {
+    try {
+      // First check if sandbox exists
+      const infoResponse = await this.sessionClient.getSandboxInfo(sessionId);
+      const info = infoResponse.data || infoResponse;
+
+      if (!info.exists || info.size === 0) {
+        this.logViewer.addLine('info', 'Sandbox is already clean (no files)');
+        this.sandboxInfo = info;
+        return;
+      }
+
+      this.logViewer.addLine('info', `Cleaning sandbox (${this._formatBytes(info.size)})...`);
+
+      const response = await this.sessionClient.cleanupSandbox(sessionId);
+      const result = response.data || response;
+
+      this.logViewer.addLine('success', 'Sandbox cleaned successfully');
+      this.sandboxInfo = { exists: false, size: 0 };
+    } catch (err) {
+      this.logViewer.addLine('error', `Failed to clean sandbox: ${err.message}`);
+    }
+  }
+
+  /**
+   * Load sandbox info for selected session
+   * @param {string} sessionId
+   * @private
+   */
+  async _loadSandboxInfo(sessionId) {
+    try {
+      const response = await this.sessionClient.getSandboxInfo(sessionId);
+      this.sandboxInfo = response.data || response;
+    } catch (err) {
+      this.sandboxInfo = null;
+    }
+  }
+
+  /**
+   * Format bytes to human readable
+   * @param {number} bytes
+   * @returns {string}
+   * @private
+   */
+  _formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  /**
    * Execute a session
    * @param {string} sessionId
    * @private
@@ -765,6 +829,23 @@ export class ExecuteTabScreen {
 
     if (this.dryRun) {
       this.logViewer.addLine('warn', 'DRY-RUN MODE - No changes will be made');
+    }
+
+    // Clean sandbox before execution if enabled
+    if (this.cleanSandbox && !this.dryRun) {
+      try {
+        const infoResponse = await this.sessionClient.getSandboxInfo(sessionId);
+        const info = infoResponse.data || infoResponse;
+
+        if (info.exists && info.size > 0) {
+          this.logViewer.addLine('info', `Cleaning sandbox (${this._formatBytes(info.size)})...`);
+          await this.sessionClient.cleanupSandbox(sessionId);
+          this.logViewer.addLine('success', 'Sandbox cleaned');
+        }
+      } catch (err) {
+        this.logViewer.addLine('warn', `Could not clean sandbox: ${err.message}`);
+        // Continue anyway - not fatal
+      }
     }
 
     try {
@@ -964,6 +1045,10 @@ export class ExecuteTabScreen {
           this.verbose = !this.verbose;
           this.logViewer.addLine('info', `Verbose: ${this.verbose ? 'ON' : 'OFF'}`);
           break;
+        case 'x':
+          this.cleanSandbox = !this.cleanSandbox;
+          this.logViewer.addLine('info', `Clean Sandbox: ${this.cleanSandbox ? 'ON' : 'OFF'}`);
+          break;
         case 'k':
           this._killCurrentSession();
           break;
@@ -1054,10 +1139,14 @@ export class ExecuteTabScreen {
   async _selectSession(index) {
     if (index >= 0 && index < this.sessions.length) {
       try {
-        const response = await this.sessionClient.getSession(this.sessions[index].id);
+        const sessionId = this.sessions[index].id;
+        const response = await this.sessionClient.getSession(sessionId);
         // Server returns { success: true, data: { id: "...", state: "...", ... } }
         this.selectedSession = response.data || response;
         this.mode = 'session-detail';
+
+        // Load sandbox info in background
+        this._loadSandboxInfo(sessionId);
       } catch (err) {
         this.logViewer.addLine('error', `Failed to load session: ${err.message}`);
       }
@@ -1097,6 +1186,11 @@ export class ExecuteTabScreen {
             this._executeSession(this.selectedSession.id);
           }
           break;
+        case 'c':
+          if (this.selectedSession) {
+            this._cleanSandbox(this.selectedSession.id);
+          }
+          break;
         case 't':
           if (this.selectedSession?.taskList) {
             this._startEditTasks();
@@ -1124,7 +1218,7 @@ export class ExecuteTabScreen {
    * Start editing tasks in form mode
    * @private
    */
-  _startEditTasks() {
+  async _startEditTasks() {
     if (!this.selectedSession?.taskList) return;
 
     this.mode = 'edit-tasks';
@@ -1134,6 +1228,21 @@ export class ExecuteTabScreen {
     this.editFieldValue = '';
     this.editDepMode = false;
     this.editDepSelected = new Set();
+    this.editToolMode = false;
+    this.toolNavIndex = 0;
+
+    // Fetch available tools if not cached
+    if (this.availableTools.length === 0) {
+      try {
+        const response = await this.sessionClient.getTools();
+        const data = response.data || response;
+        this.availableTools = data.tools || [];
+        this.logViewer.addLine('info', `Loaded ${this.availableTools.length} available tools`);
+      } catch (err) {
+        this.logViewer.addLine('warn', `Could not load tools: ${err.message}`);
+        this.availableTools = [];
+      }
+    }
   }
 
   /**
@@ -1147,6 +1256,12 @@ export class ExecuteTabScreen {
     // Handle dependency selection mode
     if (this.editDepMode) {
       this._handleDepSelectEvent(ctx, evt, tasks);
+      return;
+    }
+
+    // Handle tool selection mode
+    if (this.editToolMode) {
+      this._handleToolSelectEvent(ctx, evt, tasks);
       return;
     }
 
@@ -1189,6 +1304,10 @@ export class ExecuteTabScreen {
           // Quick toggle dependency mode
           this._startDepEdit(tasks);
           return;
+        case 't':
+          // Quick toggle tool selection mode
+          this._startToolEdit(tasks);
+          return;
       }
     }
   }
@@ -1204,6 +1323,11 @@ export class ExecuteTabScreen {
 
     if (field === 'dependencies') {
       this._startDepEdit(tasks);
+      return;
+    }
+
+    if (field === 'tool') {
+      this._startToolEdit(tasks);
       return;
     }
 
@@ -1345,6 +1469,114 @@ export class ExecuteTabScreen {
       taskId,
       type: 'completion'
     }));
+  }
+
+  /**
+   * Start editing tool selection
+   * @param {Object[]} tasks
+   * @private
+   */
+  _startToolEdit(tasks) {
+    if (this.availableTools.length === 0) {
+      this.logViewer.addLine('warn', 'No tools available. Is the server running?');
+      return;
+    }
+
+    const task = tasks[this.editTaskIndex];
+    this.editToolMode = true;
+
+    // Find current tool index in available tools list
+    const currentToolName = this._getToolName(task.tool);
+    this.toolNavIndex = Math.max(0,
+      this.availableTools.findIndex(t => t.name === currentToolName)
+    );
+  }
+
+  /**
+   * Get tool name from task.tool (handles string or object)
+   * @param {string|Object} tool
+   * @returns {string}
+   * @private
+   */
+  _getToolName(tool) {
+    if (typeof tool === 'string') return tool;
+    return tool?.toolName || tool?.name || tool?.tool || '';
+  }
+
+  /**
+   * Handle tool selection events
+   * @param {Object} ctx
+   * @param {Object} evt
+   * @param {Object[]} tasks
+   * @private
+   */
+  _handleToolSelectEvent(ctx, evt, tasks) {
+    const currentTask = tasks[this.editTaskIndex];
+
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'enter':
+          // Apply selected tool and exit
+          this._applyToolEdit(currentTask);
+          this.editToolMode = false;
+          return;
+        case 'esc':
+          // Cancel without applying
+          this.editToolMode = false;
+          return;
+        case 'up':
+          this.toolNavIndex = Math.max(0, this.toolNavIndex - 1);
+          return;
+        case 'down':
+          this.toolNavIndex = Math.min(this.availableTools.length - 1, this.toolNavIndex + 1);
+          return;
+        case 'pageup':
+          this.toolNavIndex = Math.max(0, this.toolNavIndex - 10);
+          return;
+        case 'pagedown':
+          this.toolNavIndex = Math.min(this.availableTools.length - 1, this.toolNavIndex + 10);
+          return;
+        case 'home':
+          this.toolNavIndex = 0;
+          return;
+        case 'end':
+          this.toolNavIndex = this.availableTools.length - 1;
+          return;
+      }
+    }
+
+    // Number keys for quick selection (1-9)
+    if (evt.type === 'text' && /^[1-9]$/.test(evt.text)) {
+      const idx = parseInt(evt.text, 10) - 1;
+      if (idx < this.availableTools.length) {
+        this.toolNavIndex = idx;
+        this._applyToolEdit(currentTask);
+        this.editToolMode = false;
+      }
+    }
+  }
+
+  /**
+   * Apply tool selection to task
+   * @param {Object} task
+   * @private
+   */
+  _applyToolEdit(task) {
+    const selectedTool = this.availableTools[this.toolNavIndex];
+    if (!selectedTool) return;
+
+    // Update task.tool - maintain object structure if it was an object
+    if (typeof task.tool === 'object' && task.tool !== null) {
+      task.tool.toolName = selectedTool.name;
+      task.tool.name = selectedTool.name;
+    } else {
+      task.tool = {
+        toolName: selectedTool.name,
+        name: selectedTool.name
+      };
+    }
+
+    this.logViewer.addLine('info', `Task ${this.editTaskIndex + 1} tool changed to: ${selectedTool.name}`);
   }
 
   /**
@@ -1611,8 +1843,10 @@ export class ExecuteTabScreen {
     const optionsY = statusY + 1;
     const dryRunText = `[D] Dry-run: ${this.dryRun ? 'ON ' : 'OFF'}`;
     const verboseText = `[V] Verbose: ${this.verbose ? 'ON ' : 'OFF'}`;
+    const cleanText = `[X] Clean: ${this.cleanSandbox ? 'ON ' : 'OFF'}`;
     screen.drawText(x + 2, optionsY, dryRunText, this.dryRun ? styles.highlight : styles.dim);
     screen.drawText(x + 20, optionsY, verboseText, this.verbose ? styles.highlight : styles.dim);
+    screen.drawText(x + 38, optionsY, cleanText, this.cleanSandbox ? styles.success : styles.dim);
 
     // Menu on left
     const menuRect = { x: x + 1, y: optionsY + 2, w: Math.floor(w / 2) - 2, h: h - 5 };
@@ -1662,8 +1896,18 @@ export class ExecuteTabScreen {
 
     const goalsCount = session.goals?.items?.length || 0;
     const tasksCount = session.taskList?.tasks?.length || 0;
-    screen.drawText(x + 2, line++, `Goals: ${goalsCount}  |  Tasks: ${tasksCount}`, styles.dim);
-    line++;
+    screen.drawText(x + 2, line, `Goals: ${goalsCount}  |  Tasks: ${tasksCount}`, styles.dim);
+
+    // Sandbox info
+    if (this.sandboxInfo) {
+      const sandboxStr = this.sandboxInfo.exists && this.sandboxInfo.size > 0
+        ? `Sandbox: ${this._formatBytes(this.sandboxInfo.size)} [C] to clean`
+        : 'Sandbox: clean';
+      const sandboxStyle = this.sandboxInfo.exists && this.sandboxInfo.size > 0
+        ? styles.warning : styles.success;
+      screen.drawText(x + 35, line, sandboxStr, sandboxStyle);
+    }
+    line += 2;
 
     // Tasks preview section
     if (session.taskList?.tasks && session.taskList.tasks.length > 0) {
@@ -1773,6 +2017,12 @@ export class ExecuteTabScreen {
       return;
     }
 
+    // Tool selection mode - full screen overlay
+    if (this.editToolMode) {
+      this._renderToolSelector(ctx, rect, tasks);
+      return;
+    }
+
     // Split: task list (left 40%) and task editor (right 60%)
     const leftWidth = Math.floor((w - 2) * 0.4);
     const rightWidth = w - 2 - leftWidth - 1;
@@ -1867,7 +2117,12 @@ export class ExecuteTabScreen {
 
       screen.drawText(x, line, `${prefix} ${this._fieldLabel(field)}:`, labelStyle);
 
-      if (field === 'dependencies') {
+      if (field === 'tool') {
+        // Show current tool and hint
+        const toolName = this._getToolName(task.tool);
+        const toolText = toolName ? `${toolName} - [T] to change` : '(none) - [T] to select';
+        screen.drawText(x + 20, line, toolText, isSelected ? styles.accent : styles.dim);
+      } else if (field === 'dependencies') {
         // Show dependency count and hint
         const deps = task.dependencies || [];
         const depText = deps.length > 0
@@ -1923,6 +2178,7 @@ export class ExecuteTabScreen {
     const labels = {
       title: 'Title',
       description: 'Description',
+      tool: 'Tool',
       priority: 'Priority (1-10)',
       sequenceNumber: 'Sequence #',
       dependencies: 'Dependencies'
@@ -1976,6 +2232,68 @@ export class ExecuteTabScreen {
     // Show selected count
     line = y + h - 2;
     screen.drawText(x + 2, line, `Selected: ${this.editDepSelected.size} task(s)`, styles.accent);
+  }
+
+  /**
+   * Render tool selector overlay
+   * @private
+   */
+  _renderToolSelector(ctx, rect, tasks) {
+    const { screen, styles, charset } = ctx;
+    const { x, y, w, h } = rect;
+
+    const currentTask = tasks[this.editTaskIndex];
+    const currentToolName = this._getToolName(currentTask.tool);
+
+    screen.drawText(x + 2, y + 1, `Select Tool for Task #${this.editTaskIndex + 1}`, styles.accent);
+    screen.drawText(x + 2, y + 2, 'Use [↑↓/PgUp/PgDn] to navigate, [Enter] to select, [Esc] to cancel', styles.dim);
+
+    let line = y + 4;
+
+    // Calculate visible range for scrolling
+    const visibleCount = h - 7;  // Leave space for header, footer, and current tool
+    let startIdx = 0;
+
+    // Scroll to keep selected tool visible
+    if (this.toolNavIndex >= visibleCount) {
+      startIdx = this.toolNavIndex - visibleCount + 1;
+    }
+
+    // Show current tool
+    screen.drawText(x + 2, line++, `Current: ${currentToolName || '(none)'}`, styles.warning);
+    line++;
+
+    // Render tool list
+    for (let i = 0; i < visibleCount && startIdx + i < this.availableTools.length; i++) {
+      const idx = startIdx + i;
+      const tool = this.availableTools[idx];
+      const isSelected = idx === this.toolNavIndex;
+      const isCurrent = tool.name === currentToolName;
+
+      const prefix = isSelected ? '►' : ' ';
+      const marker = isCurrent ? ' ◄' : '';
+      const num = String(idx + 1).padStart(2, ' ');
+
+      // Truncate tool name and description
+      const toolName = tool.name || '(unnamed)';
+      const desc = tool.description ? ` - ${tool.description}` : '';
+      const maxDescLen = w - toolName.length - 12;
+      const truncDesc = desc.slice(0, maxDescLen);
+
+      const style = isSelected ? styles.highlight : (isCurrent ? styles.accent : styles.normal);
+      screen.drawText(x + 2, line, `${prefix}${num}. ${toolName}${truncDesc}${marker}`, style);
+      line++;
+    }
+
+    // Show scroll indicator if needed
+    if (this.availableTools.length > visibleCount) {
+      const scrollInfo = `[${startIdx + 1}-${Math.min(startIdx + visibleCount, this.availableTools.length)}/${this.availableTools.length}]`;
+      screen.drawText(x + w - scrollInfo.length - 2, y + 1, scrollInfo, styles.dim);
+    }
+
+    // Show footer
+    line = y + h - 2;
+    screen.drawText(x + 2, line, `Tools: ${this.availableTools.length} | Use 1-9 for quick select`, styles.dim);
   }
 
   /**

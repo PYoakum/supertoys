@@ -324,6 +324,19 @@ export class JavaScriptExecuteTool {
     // Node.js / Bun wrapper
     return `
 // Auto-generated execution wrapper
+import { createRequire as __createRequire } from 'module';
+import { fileURLToPath as __fileURLToPath } from 'url';
+import { dirname as __dirname } from 'path';
+
+// Provide require() for CommonJS compatibility in ES modules
+const __filename = __fileURLToPath(import.meta.url);
+const __dirnameVal = __dirname(__filename);
+const require = __createRequire(import.meta.url);
+
+// Make __dirname and __filename available (CommonJS compatibility)
+globalThis.__filename = __filename;
+globalThis.__dirname = __dirnameVal;
+
 const __startTime = Date.now();
 const __consoleLogs = [];
 const __originalConsole = { ...console };
@@ -342,16 +355,14 @@ const __originalConsole = { ...console };
 
 // Module restriction (basic)
 ${permissions.denyModules?.length ? `
-const __originalRequire = typeof require !== 'undefined' ? require : null;
 const __deniedModules = ${JSON.stringify(permissions.denyModules)};
-if (__originalRequire) {
-  globalThis.require = (id) => {
-    if (__deniedModules.some(m => id === m || id.startsWith(m + '/'))) {
-      throw new Error('Module not allowed: ' + id);
-    }
-    return __originalRequire(id);
-  };
-}
+const __originalRequire = require;
+globalThis.require = (id) => {
+  if (__deniedModules.some(m => id === m || id.startsWith(m + '/'))) {
+    throw new Error('Module not allowed: ' + id);
+  }
+  return __originalRequire(id);
+};
 ` : ''}
 
 // User code execution

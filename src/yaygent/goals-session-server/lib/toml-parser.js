@@ -205,16 +205,27 @@ function setNestedValue(obj, path, value) {
  * @returns {Object} - Formatted task
  */
 function finalizeTask(raw) {
+  // Filter out dependencies without a valid taskId - these are malformed
+  const validDeps = (raw.dependencies || [])
+    .filter(d => d.taskId && typeof d.taskId === 'string' && d.taskId.trim() !== '')
+    .map(d => ({
+      taskId: d.taskId.trim(),
+      type: d.type || 'completion'
+    }));
+
+  // Warn about dropped dependencies
+  const droppedCount = (raw.dependencies || []).length - validDeps.length;
+  if (droppedCount > 0) {
+    console.warn(`[WARN] Task ${raw.id}: Dropped ${droppedCount} dependency(s) without valid taskId`);
+  }
+
   return {
     id: raw.id,
     goalId: raw.goalId,
     sequenceNumber: raw.sequenceNumber || 0,
     title: raw.title || '',
     description: raw.description || '',
-    dependencies: (raw.dependencies || []).map(d => ({
-      taskId: d.taskId,
-      type: d.type || 'completion'
-    })),
+    dependencies: validDeps,
     tool: {
       toolName: raw.toolName,
       toolDescription: raw.toolDescription || '',

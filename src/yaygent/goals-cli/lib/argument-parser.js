@@ -62,6 +62,9 @@ const DEFAULTS = {
   aiEditIncludeContext: false,
   preview: false,
   tui: false,
+  // TUI options
+  theme: null,
+  serverUrl: null,
   errors: []
 };
 
@@ -98,7 +101,9 @@ const ARG_DEFINITIONS = {
   '--ai-edit-include-context': { alias: null, type: 'boolean', key: 'aiEditIncludeContext' },
   '--preview': { alias: null, type: 'boolean', key: 'preview' },
   // TUI mode
-  '--tui': { alias: '-t', type: 'boolean', key: 'tui' }
+  '--tui': { alias: '-t', type: 'boolean', key: 'tui' },
+  '--theme': { alias: '-T', type: 'string', key: 'theme' },
+  '--server-url': { alias: '-s', type: 'string', key: 'serverUrl' }
 };
 
 /**
@@ -337,6 +342,17 @@ AI Edit Command:
     --exclude <glob>          Skip matching paths (can repeat)
     --ai-edit-include-context Include context fields in editing
     --preview                 Show proposed edits without applying
+
+TUI Command:
+  bun goals-cli.js tui [options]            Launch the full tabbed TUI
+
+  TUI Options:
+    --theme, -T <path>        Path to TOML theme file for custom colors
+    --server-url, -s <url>    Session server URL (default: http://localhost:3000)
+
+  Built-in themes: default, dark, matrix
+  Theme path can be a built-in name or path to custom .toml file
+  Example: bun goals-cli.js tui --theme matrix
 
 Legacy Arguments:
   --goals, -g <path>      Path to the goals JSON file

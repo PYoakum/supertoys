@@ -1,0 +1,49 @@
+# Matrix Theme for Goals CLI TUI
+#
+# Green on black, hacker aesthetic
+
+[meta]
+name = "Matrix"
+description = "Green on black hacker theme"
+author = "Goals CLI"
+
+[ui.backgrounds]
+normal = "black"
+panel = "black"
+selected = "green"
+header = "black"
+footer = "black"
+error = "red"
+success = "green"
+
+[ui.foregrounds]
+normal = "green"
+bright = "light_green"
+dim = "dark_gray"
+selected = "black"
+title = "light_green"
+accent = "light_green"
+error = "light_red"
+success = "light_green"
+warning = "yellow"
+highlight = "light_green"
+
+[ui.borders]
+normal = "green"
+active = "light_green"
+dim = "dark_gray"
+
+[styles.header]
+fg = "fg_title"
+bg = "bg_header"
+bold = true
+
+[styles.selected]
+fg = "fg_selected"
+bg = "bg_selected"
+bold = true
+
+[styles.accent]
+fg = "fg_accent"
+bg = "bg_panel"
+bold = true

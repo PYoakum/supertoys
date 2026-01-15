@@ -73,9 +73,13 @@ src/webedit/documents
 src/yaygent/goal-keeper/goals-inbox
 src/yaygent/goal-keeper/goals-inbox/*
 
-# default director for LLM Logs
+# default directory for LLM Logs
 src/yaygent/goals-session-server/llm-logs
 src/yaygent/goals-session-server/llm-logs/*
+src/yaygent/goals-cli/llm-logs
+
+# evaluation output
+src/yaygent/goals-cli/evaluation-output
 
 src/yaygent/goals-cli/scratch-pad
 

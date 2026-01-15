@@ -151,6 +151,7 @@ function parseArguments() {
     list: { type: 'boolean', short: 'l', default: false },
     config: { type: 'string', short: 'c' },
     output: { type: 'string', short: 'o' },
+    clean: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', short: 'd', default: false },
     verbose: { type: 'boolean', short: 'v', default: false },
     'no-bundle': { type: 'boolean', default: false },
@@ -187,6 +188,7 @@ Options:
   -l, --list           List sessions ready for execution
   -c, --config <path>  Configuration file path
   -o, --output <path>  Output directory (default: ./output)
+  --clean              Clean sandbox before execution (removes files from previous runs)
   -d, --dry-run        Validate without executing
   -v, --verbose        Enable verbose logging
   --no-bundle          Skip bundle generation
@@ -523,6 +525,23 @@ async function main(args) {
   // Get session
   display.info('Loading session...');
   const session = await sessionClient.getSession(sessionId, { includeContext: true });
+
+  // Clean sandbox if requested
+  if (args.clean) {
+    display.info('Cleaning sandbox from previous runs...');
+    try {
+      const sandboxInfo = await sessionClient.getSandboxInfo(sessionId);
+      if (sandboxInfo.exists) {
+        await sessionClient.cleanupSandbox(sessionId);
+        display.info(`Sandbox cleaned (was ${sandboxInfo.size} bytes)`);
+      } else {
+        display.info('Sandbox is already clean');
+      }
+    } catch (err) {
+      display.error(`Failed to clean sandbox: ${err.message}`);
+      // Continue anyway - this shouldn't be a fatal error
+    }
+  }
 
   // Validate session state
   if (session.state !== 'GENERATED') {

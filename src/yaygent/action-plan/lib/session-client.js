@@ -264,6 +264,26 @@ export class SessionClient {
       return false;
     }
   }
+
+  /**
+   * Clean up sandbox for a session (removes all files from previous runs)
+   * @param {string} sessionId
+   * @returns {Promise<Object>}
+   */
+  async cleanupSandbox(sessionId) {
+    const response = await this.request('DELETE', `/api/sandbox/${sessionId}`);
+    return response.data;
+  }
+
+  /**
+   * Get sandbox info for a session
+   * @param {string} sessionId
+   * @returns {Promise<Object>}
+   */
+  async getSandboxInfo(sessionId) {
+    const response = await this.request('GET', `/api/sandbox/${sessionId}`);
+    return response.data;
+  }
 }
 
 export default SessionClient;

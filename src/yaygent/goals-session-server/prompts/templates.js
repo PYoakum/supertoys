@@ -164,10 +164,11 @@ content = '''
 // Multi-line content uses triple quotes
 '''
 
-# If task has dependencies on previous tasks:
-[[tasks.dependencies]]
-taskId = "task-1"
-type = "completion"
+# ONLY if this task depends on a PREVIOUS task (from earlier goals):
+# [[tasks.dependencies]]
+# taskId = "task-1"  # REQUIRED: must reference an actual previous task ID
+# type = "completion"
+# NOTE: Do NOT add dependencies if there are no previous tasks or if the task is independent
 
 # For additional tasks, repeat [[tasks]] block
 

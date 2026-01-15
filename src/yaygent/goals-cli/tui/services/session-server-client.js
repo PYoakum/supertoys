@@ -197,6 +197,49 @@ export class SessionServerClient {
   async getStatus() {
     return this._request('GET', '/api/status');
   }
+
+  /**
+   * Get sandbox info for a session
+   * @param {string} sessionId
+   * @returns {Promise<{sessionId: string, path: string, size: number, exists: boolean}>}
+   */
+  async getSandboxInfo(sessionId) {
+    return this._request('GET', `/api/sandbox/${sessionId}`);
+  }
+
+  /**
+   * Clean up sandbox for a session (removes all files)
+   * @param {string} sessionId
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  async cleanupSandbox(sessionId) {
+    return this._request('DELETE', `/api/sandbox/${sessionId}`);
+  }
+
+  /**
+   * List all sandboxes with stats
+   * @returns {Promise<Object>}
+   */
+  async listSandboxes() {
+    return this._request('GET', '/api/sandbox');
+  }
+
+  /**
+   * Get available tools manifest
+   * @returns {Promise<{serverName: string, serverVersion: string, tools: Array, toolCount: number}>}
+   */
+  async getTools() {
+    return this._request('GET', '/api/tools');
+  }
+
+  /**
+   * Get a specific tool schema
+   * @param {string} toolName
+   * @returns {Promise<Object>}
+   */
+  async getTool(toolName) {
+    return this._request('GET', `/api/tools/${toolName}`);
+  }
 }
 
 export default SessionServerClient;

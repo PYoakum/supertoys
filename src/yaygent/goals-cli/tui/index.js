@@ -12,6 +12,7 @@ import { Input, stop, isStopped, keyEvent, textEvent } from './input.js';
 import { ANSI, writeStdout, getTerminalSize } from './ansi.js';
 import { CGA, UI, C, STYLES, fg, bg, styleToSgr } from './colors.js';
 import { ASCII, CharMapper, createCharMapper } from './charset.js';
+import { loadThemeStyles, loadTheme, listBuiltInThemes, getDefaultThemePath } from './theme-loader.js';
 
 // Components
 import { Menu } from './components/menu.js';
@@ -63,6 +64,12 @@ export {
   ASCII,
   CharMapper,
   createCharMapper,
+
+  // Theming
+  loadThemeStyles,
+  loadTheme,
+  listBuiltInThemes,
+  getDefaultThemePath,
 
   // Components
   Menu,
@@ -162,11 +169,12 @@ export function previewAiEditsTui(edits, options = {}) {
  * @param {string} [options.contextPath] - Context directory path
  * @param {string} [options.serverUrl='http://localhost:3000'] - Session server URL
  * @param {string} [options.outputDir='./output'] - Output directory
+ * @param {string} [options.themePath] - Path to TOML theme file
  * @returns {Promise<void>}
  */
 export function runMainTui(options = {}) {
   return new Promise((resolve) => {
-    const app = new App();
+    const app = new App({ themePath: options.themePath });
 
     // Create main screen
     const mainScreen = new MainTuiScreen({

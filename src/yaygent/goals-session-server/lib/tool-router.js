@@ -14,6 +14,10 @@ import { SQLiteTool } from './sqlite-tool.js';
 import { HttpRequestTool } from './http-request-tool.js';
 import { TcpConnectTool } from './tcp-connect-tool.js';
 import { BrowserRequestTool } from './browser-request-tool.js';
+import { MakeGoalsTool } from './make-goals-tool.js';
+import { BashCommandTool } from './bash-command-tool.js';
+import { PythonRunnerTool } from './python-runner-tool.js';
+import { NetToolsTool } from './net-tools-tool.js';
 
 /**
  * Tool Router Class
@@ -394,6 +398,19 @@ export class NotepadTool {
  * @param {string[]} [options.browserAllowedHosts=[]] - Allowed hosts for browser_request
  * @param {number} [options.browserTimeout=30000] - Default timeout for browser_request
  * @param {boolean} [options.browserHeadless=true] - Run browser in headless mode
+ * @param {import('./llm-client.js').LLMClient} [options.llmClient] - LLM client for make_goals tool
+ * @param {number} [options.makeGoalsMaxTokens=8192] - Max tokens for make_goals LLM response
+ * @param {number} [options.makeGoalsTemperature=0.3] - Temperature for make_goals LLM
+ * @param {boolean} [options.bashEnabled=true] - Enable bash_command tool
+ * @param {boolean} [options.bashAllowSudo=false] - Allow sudo in bash commands
+ * @param {string[]} [options.bashAllowedCommands] - Allowlist of bash commands (null = all)
+ * @param {boolean} [options.pythonEnabled=true] - Enable python_runner tool
+ * @param {string} [options.pythonPath='python3'] - Path to Python executable
+ * @param {string[]} [options.pythonAllowedPackages] - Allowlist of pip packages (null = all)
+ * @param {boolean} [options.netToolsEnabled=true] - Enable net_tools tool
+ * @param {string[]} [options.netToolsAllowedHosts=[]] - Allowed hosts for network tools
+ * @param {boolean} [options.netToolsAllowAllHosts=false] - Allow all hosts for network tools
+ * @param {boolean} [options.netToolsCaptureEnabled=false] - Enable packet capture
  * @returns {ToolRouter}
  */
 export function createToolRouter(options = {}) {
@@ -460,10 +477,47 @@ export function createToolRouter(options = {}) {
   });
   browserRequest.registerTools(router);
 
+  // Initialize and register make_goals tool (requires llmClient)
+  if (options.llmClient) {
+    const makeGoals = new MakeGoalsTool(options.llmClient, sandboxManager, {
+      maxTokens: options.makeGoalsMaxTokens || 8192,
+      temperature: options.makeGoalsTemperature || 0.3
+    });
+    makeGoals.registerTools(router);
+  }
+
+  // Initialize and register bash_command tool
+  if (options.bashEnabled !== false) {
+    const bashCommand = new BashCommandTool(sandboxManager, {
+      allowSudo: options.bashAllowSudo === true,
+      allowedCommands: options.bashAllowedCommands || null
+    });
+    bashCommand.registerTools(router);
+  }
+
+  // Initialize and register python_runner tool
+  if (options.pythonEnabled !== false) {
+    const pythonRunner = new PythonRunnerTool(sandboxManager, {
+      pythonPath: options.pythonPath || 'python3',
+      pipPackages: options.pythonAllowedPackages || []
+    });
+    pythonRunner.registerTools(router);
+  }
+
+  // Initialize and register net_tools tool
+  if (options.netToolsEnabled !== false) {
+    const netTools = new NetToolsTool(sandboxManager, {
+      allowedHosts: options.netToolsAllowedHosts || [],
+      allowAllHosts: options.netToolsAllowAllHosts === true,
+      captureEnabled: options.netToolsCaptureEnabled === true
+    });
+    netTools.registerTools(router);
+  }
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, SandboxManager, createToolRouter };

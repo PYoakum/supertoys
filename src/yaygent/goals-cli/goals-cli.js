@@ -42,7 +42,8 @@ import {
   AiEditPreviewScreen,
   ANSI,
   writeStdout,
-  runMainTui
+  runMainTui,
+  getDefaultThemePath
 } from './tui/index.js';
 
 /**
@@ -790,6 +791,31 @@ async function cmdBrowse(args, logger) {
 }
 
 /**
+ * Resolve theme path from name or path
+ * @param {string} theme - Theme name or path
+ * @returns {string|null} Resolved path or null
+ */
+function resolveThemePath(theme) {
+  if (!theme) return null;
+
+  // Check if it's a path (contains / or \ or ends with .toml)
+  if (theme.includes('/') || theme.includes('\\') || theme.endsWith('.toml')) {
+    return resolve(theme);
+  }
+
+  // Treat as built-in theme name
+  const themesDir = dirname(getDefaultThemePath());
+  const themePath = resolve(themesDir, `${theme}.toml`);
+
+  if (existsSync(themePath)) {
+    return themePath;
+  }
+
+  // Not found - return as-is and let theme loader handle error
+  return theme;
+}
+
+/**
  * Handle the tui command (full tabbed TUI)
  * @param {Object} args - Parsed arguments
  * @param {Logger} logger - Logger
@@ -798,12 +824,19 @@ async function cmdBrowse(args, logger) {
 async function cmdTui(args, logger) {
   logger.debug('Starting tabbed TUI...');
 
+  // Resolve theme path
+  const themePath = resolveThemePath(args.theme);
+  if (themePath) {
+    logger.debug(`Using theme: ${themePath}`);
+  }
+
   try {
     await runMainTui({
       goalsPath: args.goals || DEFAULT_GOALS_FILE,
       contextPath: args.context,
       serverUrl: args.serverUrl || process.env.SESSION_SERVER_URL || 'http://localhost:3000',
-      outputDir: args.output || process.env.OUTPUT_DIR || './output'
+      outputDir: args.output || process.env.OUTPUT_DIR || './output',
+      themePath
     });
 
     return ExitCodes.SUCCESS;

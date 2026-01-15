@@ -226,6 +226,7 @@ export function createApiHandler(services) {
   const evaluateRoutes = createEvaluateRoutes(sessionManager, llmClient);
   const tasklistRoutes = createTasklistRoutes(sessionManager, toolRouter, llmClient);
   const toolRoutes = createToolRoutes(toolRouter);
+  const sandboxRoutes = createSandboxRoutes(toolRouter);
   const importRoutes = createImportRoutes(sessionManager);
   const aiEditRoutes = createAiEditRoutes(sessionManager, llmClient);
 
@@ -255,6 +256,11 @@ export function createApiHandler(services) {
   router.get('/api/tools', toolRoutes.list);
   router.get('/api/tools/:name', toolRoutes.get);
   router.post('/api/tools/execute', toolRoutes.execute);
+
+  // Sandbox
+  router.delete('/api/sandbox/:sessionId', sandboxRoutes.cleanup);
+  router.get('/api/sandbox/:sessionId', sandboxRoutes.info);
+  router.get('/api/sandbox', sandboxRoutes.list);
 
   // Health
   router.get('/health', async () => {
@@ -1057,6 +1063,87 @@ function createToolRoutes(toolRouter) {
           }
         });
       }
+    }
+  };
+}
+
+/**
+ * Create sandbox route handlers
+ */
+function createSandboxRoutes(toolRouter) {
+  const sandboxManager = toolRouter.sandboxManager;
+
+  return {
+    /**
+     * Clean up a sandbox for a session
+     * DELETE /api/sandbox/:sessionId
+     */
+    async cleanup(ctx) {
+      const { sessionId } = ctx.params;
+
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+
+      if (!sandboxManager) {
+        throw new ValidationError('Sandbox manager not available', 'sandboxManager');
+      }
+
+      await sandboxManager.cleanup(sessionId);
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          message: 'Sandbox cleaned up successfully'
+        }
+      });
+    },
+
+    /**
+     * Get sandbox info for a session
+     * GET /api/sandbox/:sessionId
+     */
+    async info(ctx) {
+      const { sessionId } = ctx.params;
+
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+
+      if (!sandboxManager) {
+        throw new ValidationError('Sandbox manager not available', 'sandboxManager');
+      }
+
+      const size = await sandboxManager.calculateSandboxSize(sessionId);
+      const sandboxPath = sandboxManager.getSandboxPath(sessionId);
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          path: sandboxPath,
+          size,
+          exists: size > 0
+        }
+      });
+    },
+
+    /**
+     * List all sandboxes
+     * GET /api/sandbox
+     */
+    async list() {
+      if (!sandboxManager) {
+        throw new ValidationError('Sandbox manager not available', 'sandboxManager');
+      }
+
+      const stats = await sandboxManager.getStats();
+
+      return jsonResponse({
+        success: true,
+        data: stats
+      });
     }
   };
 }
