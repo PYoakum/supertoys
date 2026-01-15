@@ -3,12 +3,17 @@
  * @module tui/screens/execute-tab
  */
 
+import { spawn } from 'child_process';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { Menu } from '../components/menu.js';
 import { LogViewer } from '../components/log-viewer.js';
 import { ProgressBar } from '../components/progress-bar.js';
 import { SplitPane } from '../components/split-pane.js';
 import { SessionServerClient } from '../services/session-server-client.js';
 import { ActionPlanRunner } from '../services/action-plan-runner.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Execute Tab Screen - Session management and workflow execution
@@ -32,10 +37,16 @@ export class ExecuteTabScreen {
       outputDir: this.state.outputDir || './output'
     });
 
+    // Server management
+    this.serverProcess = null;
+    this.serverRunning = false;
+    this.serverPath = resolve(__dirname, '../../../goals-session-server/server.js');
+
     // Components
     this.dashboardMenu = new Menu({
       title: 'Actions',
       items: [
+        'Start Server',
         'Create Session',
         'Prepare Session',
         'List Sessions',
@@ -86,12 +97,17 @@ export class ExecuteTabScreen {
     const currentProvider = this.providerList[this.selectedProvider];
     const apiKey = this._getApiKeyForProvider(currentProvider);
     this.envVars = {
+      // Server settings
+      SERVER_PORT: process.env.PORT || '3000',
+      SERVER_HOST: process.env.HOST || '0.0.0.0',
       SESSION_SERVER_URL: this.state.serverUrl || 'http://localhost:3000',
+      // LLM settings
       LLM_PROVIDER: currentProvider,
       LLM_API_KEY: apiKey,
       LLM_ENDPOINT: process.env.LLM_ENDPOINT || this.providers[currentProvider].endpoint,
       LLM_MODEL: process.env.LLM_MODEL || this.providers[currentProvider].defaultModel,
       ANTHROPIC_VERSION: process.env.ANTHROPIC_VERSION || '2023-06-01',
+      // Output settings
       OUTPUT_DIR: this.state.outputDir || './output'
     };
     this.envVarKeys = Object.keys(this.envVars);
@@ -160,7 +176,7 @@ export class ExecuteTabScreen {
   getHelpText() {
     switch (this.mode) {
       case 'dashboard':
-        return '[Enter] Select  [D] Dry-run  [V] Verbose';
+        return '[S] Server  [D] Dry-run  [V] Verbose  [Enter] Select';
       case 'sessions':
         return '[Enter] View  [X] Delete  [R] Refresh  [Esc] Back';
       case 'session-detail':
@@ -188,12 +204,149 @@ export class ExecuteTabScreen {
       if (this.state) {
         this.state.serverConnected = true;
       }
+      this._updateServerMenuItem();
     } catch (err) {
       this.serverStatus = { connected: false, uptime: 0 };
       if (this.state) {
         this.state.serverConnected = false;
       }
+      this._updateServerMenuItem();
     }
+  }
+
+  /**
+   * Update the server menu item based on server state
+   * @private
+   */
+  _updateServerMenuItem() {
+    const items = this.dashboardMenu.items.slice();
+    items[0] = this.serverRunning ? 'Stop Server' : 'Start Server';
+    this.dashboardMenu.setItems(items);
+  }
+
+  /**
+   * Toggle server on/off
+   * @private
+   */
+  _toggleServer() {
+    if (this.serverRunning) {
+      this._stopServer();
+    } else {
+      this._startServer();
+    }
+  }
+
+  /**
+   * Start the session server
+   * @private
+   */
+  _startServer() {
+    if (this.serverRunning) {
+      this.logViewer.addLine('warn', 'Server is already running');
+      return;
+    }
+
+    this.logViewer.addLine('info', 'Starting session server...');
+
+    // Build environment for server
+    const env = {
+      ...process.env,
+      PORT: this.envVars.SERVER_PORT,
+      HOST: this.envVars.SERVER_HOST,
+      LLM_PROVIDER: this.envVars.LLM_PROVIDER,
+      LLM_API_KEY: this.envVars.LLM_API_KEY,
+      LLM_ENDPOINT: this.envVars.LLM_ENDPOINT,
+      LLM_MODEL: this.envVars.LLM_MODEL,
+      ANTHROPIC_VERSION: this.envVars.ANTHROPIC_VERSION
+    };
+
+    // Use bun if available, otherwise node
+    const runtime = typeof Bun !== 'undefined' ? 'bun' : 'node';
+
+    try {
+      this.serverProcess = spawn(runtime, [this.serverPath], {
+        env,
+        cwd: process.cwd(),
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      this.serverRunning = true;
+      this._updateServerMenuItem();
+
+      // Handle stdout
+      this.serverProcess.stdout.on('data', (data) => {
+        const lines = data.toString().split('\n').filter(l => l.trim());
+        lines.forEach(line => {
+          // Parse log level from server output
+          if (line.includes('[ERROR]')) {
+            this.logViewer.addLine('error', line);
+          } else if (line.includes('[INFO]')) {
+            this.logViewer.addLine('info', line);
+          } else if (line.includes('[DEBUG]')) {
+            this.logViewer.addLine('debug', line);
+          } else {
+            this.logViewer.addLine('info', line);
+          }
+        });
+      });
+
+      // Handle stderr
+      this.serverProcess.stderr.on('data', (data) => {
+        const lines = data.toString().split('\n').filter(l => l.trim());
+        lines.forEach(line => {
+          this.logViewer.addLine('error', line);
+        });
+      });
+
+      // Handle process exit
+      this.serverProcess.on('close', (code) => {
+        this.serverRunning = false;
+        this.serverProcess = null;
+        this._updateServerMenuItem();
+        if (code === 0) {
+          this.logViewer.addLine('info', 'Server stopped');
+        } else {
+          this.logViewer.addLine('error', `Server exited with code: ${code}`);
+        }
+        this._checkServerStatus();
+      });
+
+      this.serverProcess.on('error', (err) => {
+        this.serverRunning = false;
+        this.serverProcess = null;
+        this._updateServerMenuItem();
+        this.logViewer.addLine('error', `Server error: ${err.message}`);
+      });
+
+      // Update SESSION_SERVER_URL based on port
+      const port = this.envVars.SERVER_PORT;
+      this.envVars.SESSION_SERVER_URL = `http://localhost:${port}`;
+      this.sessionClient = new SessionServerClient({
+        baseUrl: this.envVars.SESSION_SERVER_URL
+      });
+
+      this.logViewer.addLine('success', `Server starting on port ${port}...`);
+
+      // Check status after a short delay
+      setTimeout(() => this._checkServerStatus(), 2000);
+
+    } catch (err) {
+      this.logViewer.addLine('error', `Failed to start server: ${err.message}`);
+    }
+  }
+
+  /**
+   * Stop the session server
+   * @private
+   */
+  _stopServer() {
+    if (!this.serverRunning || !this.serverProcess) {
+      this.logViewer.addLine('warn', 'Server is not running');
+      return;
+    }
+
+    this.logViewer.addLine('info', 'Stopping server...');
+    this.serverProcess.kill('SIGTERM');
   }
 
   /**
@@ -473,6 +626,9 @@ export class ExecuteTabScreen {
 
     if (evt.type === 'text') {
       switch (evt.text.toLowerCase()) {
+        case 's':
+          this._toggleServer();
+          break;
         case 'd':
           this.dryRun = !this.dryRun;
           this.logViewer.addLine('info', `Dry-run: ${this.dryRun ? 'ON' : 'OFF'}`);
@@ -492,23 +648,26 @@ export class ExecuteTabScreen {
    */
   _handleDashboardAction(index) {
     switch (index) {
-      case 0: // Create Session
+      case 0: // Start/Stop Server
+        this._toggleServer();
+        break;
+      case 1: // Create Session
         this._createSession();
         break;
-      case 1: // Prepare Session (Evaluate + Generate Tasks)
+      case 2: // Prepare Session (Evaluate + Generate Tasks)
         this._prepareSession();
         break;
-      case 2: // List Sessions
+      case 3: // List Sessions
         this._loadSessions();
         this.mode = 'sessions';
         break;
-      case 3: // Run Next Session
+      case 4: // Run Next Session
         this._runNextSession();
         break;
-      case 4: // Environment Config
+      case 5: // Environment Config
         this.mode = 'config';
         break;
-      case 5: // Refresh Status
+      case 6: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;
@@ -757,11 +916,17 @@ export class ExecuteTabScreen {
 
     // Status section
     const statusY = y + 1;
-    const statusIcon = this.serverStatus.connected ? '●' : '○';
-    const statusText = this.serverStatus.connected ? 'Connected' : 'Disconnected';
-    const statusStyle = this.serverStatus.connected ? styles.success : styles.error;
+    const connIcon = this.serverStatus.connected ? '●' : '○';
+    const connText = this.serverStatus.connected ? 'Connected' : 'Disconnected';
+    const connStyle = this.serverStatus.connected ? styles.success : styles.error;
 
-    screen.drawText(x + 2, statusY, `Server: ${statusIcon} ${statusText}`, statusStyle);
+    // Show both connection status and local process status
+    const procIcon = this.serverRunning ? '▶' : '■';
+    const procText = this.serverRunning ? 'Running' : 'Stopped';
+    const procStyle = this.serverRunning ? styles.success : styles.dim;
+
+    screen.drawText(x + 2, statusY, `Server: ${connIcon} ${connText}`, connStyle);
+    screen.drawText(x + 28, statusY, `[S] ${procIcon} ${procText}`, procStyle);
 
     // Options section
     const optionsY = statusY + 1;
