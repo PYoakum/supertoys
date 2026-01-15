@@ -103,6 +103,16 @@ export class LogViewer {
   }
 
   /**
+   * Add a log line with specified level
+   * @param {string} level - Log level (debug, info, warn, error, success)
+   * @param {string} message - Log message
+   * @param {*} [data] - Optional data
+   */
+  addLine(level, message, data) {
+    this.addEntry({ level, message, data });
+  }
+
+  /**
    * Clear all entries
    */
   clear() {
