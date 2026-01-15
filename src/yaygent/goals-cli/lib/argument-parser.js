@@ -27,7 +27,7 @@
 /**
  * Valid subcommands
  */
-const SUBCOMMANDS = ['import', 'get', 'set', 'delete', 'list-paths', 'ai-edit', 'run', 'validate'];
+const SUBCOMMANDS = ['import', 'get', 'set', 'delete', 'list-paths', 'ai-edit', 'browse', 'run', 'validate'];
 
 /**
  * Default argument values
@@ -61,6 +61,7 @@ const DEFAULTS = {
   llmBackoffMaxMs: 8000,
   aiEditIncludeContext: false,
   preview: false,
+  tui: false,
   errors: []
 };
 
@@ -95,7 +96,9 @@ const ARG_DEFINITIONS = {
   '--llm-backoff-ms': { alias: null, type: 'number', key: 'llmBackoffMs' },
   '--llm-backoff-max-ms': { alias: null, type: 'number', key: 'llmBackoffMaxMs' },
   '--ai-edit-include-context': { alias: null, type: 'boolean', key: 'aiEditIncludeContext' },
-  '--preview': { alias: null, type: 'boolean', key: 'preview' }
+  '--preview': { alias: null, type: 'boolean', key: 'preview' },
+  // TUI mode
+  '--tui': { alias: '-t', type: 'boolean', key: 'tui' }
 };
 
 /**

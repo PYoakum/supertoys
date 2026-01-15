@@ -36,6 +36,11 @@ import {
   previewAiEdits,
   validateAiEditConfig
 } from './lib/ai-editor.js';
+import {
+  App,
+  GoalsBrowserScreen,
+  AiEditPreviewScreen
+} from './tui/index.js';
 
 /**
  * Logger utility for verbose mode
@@ -718,6 +723,78 @@ async function cmdAiEdit(args, logger) {
 }
 
 /**
+ * Handle the browse command (TUI)
+ * @param {Object} args - Parsed arguments
+ * @param {Logger} logger - Logger
+ * @returns {Promise<number>} Exit code
+ */
+async function cmdBrowse(args, logger) {
+  const goalsPath = args.goals || DEFAULT_GOALS_FILE;
+
+  logger.debug('Starting TUI browser...');
+
+  // Load goals
+  const goals = await loadGoalsFile(goalsPath);
+
+  if (!goals.goals || goals.goals.length === 0) {
+    console.error('No goals found in the file');
+    return ExitCodes.VALIDATION_ERROR;
+  }
+
+  // Create TUI app
+  const app = new App();
+
+  // Create browse screen
+  const screen = new GoalsBrowserScreen({
+    goals,
+    onSelect: (goal, index) => {
+      logger.debug(`Selected goal: ${goal.id}`);
+    },
+    onBack: () => {
+      app.shutdown();
+    }
+  });
+
+  // Start TUI
+  app.mount(screen).start();
+
+  // TUI will handle exit via app.shutdown()
+  return ExitCodes.SUCCESS;
+}
+
+/**
+ * Run AI edit with TUI preview
+ * @param {Object} args - Parsed arguments
+ * @param {Logger} logger - Logger
+ * @param {Map} edits - AI edit results
+ * @param {Object} project - Project metadata
+ * @param {Object[]} goalsList - Goals list
+ * @returns {Promise<Object[]>} Selected edits
+ */
+async function runTuiEditPreview(args, logger, edits, project, goalsList) {
+  // Convert edits to preview format
+  const previews = previewAiEdits(project, goalsList, edits);
+
+  return new Promise((resolve) => {
+    const app = new App();
+
+    const screen = new AiEditPreviewScreen({
+      edits: previews,
+      onApply: (selected) => {
+        app.shutdown();
+        resolve(selected);
+      },
+      onCancel: () => {
+        app.shutdown();
+        resolve([]);
+      }
+    });
+
+    app.mount(screen).start();
+  });
+}
+
+/**
  * Main CLI execution function
  * @param {string[]} argv - Command line arguments
  * @returns {Promise<number>} Exit code
@@ -773,6 +850,9 @@ async function main(argv) {
 
         case 'ai-edit':
           return await cmdAiEdit(args, logger);
+
+        case 'browse':
+          return await cmdBrowse(args, logger);
 
         case 'validate':
           // Treat validate as dry-run
