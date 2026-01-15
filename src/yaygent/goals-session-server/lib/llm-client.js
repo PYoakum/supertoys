@@ -314,6 +314,134 @@ export class LLMClient {
   }
 
   /**
+   * Send a streaming request to the LLM
+   * @param {Object} options
+   * @param {string} options.systemPrompt - System prompt
+   * @param {string} options.userPrompt - User prompt
+   * @param {Object} [options.parameters] - Override parameters
+   * @param {string} [options.protocol='sse'] - Streaming protocol: 'sse' or 'ndjson'
+   * @param {function} [options.onChunk] - Callback for each chunk
+   * @returns {Promise<Object>}
+   */
+  async sendStream({ systemPrompt, userPrompt, parameters, protocol = 'sse', onChunk }) {
+    const headers = this.buildHeaders();
+    const body = this.buildRequestBody({ systemPrompt, userPrompt, parameters });
+    body.stream = true;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const response = await fetch(this.endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => 'Unable to read error');
+        throw new LLMError(
+          `LLM request failed: ${response.status} ${response.statusText}`,
+          { statusCode: response.status, body: errorBody }
+        );
+      }
+
+      // Read streaming response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullContent = '';
+      let usage = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse based on protocol
+        if (protocol === 'sse') {
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+
+                // Extract content delta (Anthropic format)
+                if (parsed.type === 'content_block_delta') {
+                  const delta = parsed.delta?.text || '';
+                  fullContent += delta;
+                  if (onChunk) onChunk(delta);
+                }
+
+                // Extract usage (Anthropic format)
+                if (parsed.type === 'message_delta' && parsed.usage) {
+                  usage = {
+                    inputTokens: parsed.usage.input_tokens,
+                    outputTokens: parsed.usage.output_tokens,
+                    totalTokens: (parsed.usage.input_tokens || 0) + (parsed.usage.output_tokens || 0)
+                  };
+                }
+              } catch {
+                // Skip unparseable chunks
+              }
+            }
+          }
+        } else if (protocol === 'ndjson') {
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (parsed.content) {
+                fullContent += parsed.content;
+                if (onChunk) onChunk(parsed.content);
+              }
+            } catch {
+              // Skip unparseable chunks
+            }
+          }
+        }
+      }
+
+      // Flush remaining buffer
+      buffer += decoder.decode();
+
+      return {
+        content: fullContent,
+        usage,
+        model: this.model,
+        stopReason: 'end_turn'
+      };
+
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        throw new LLMError(`Request timeout after ${this.timeout}ms`);
+      }
+
+      if (err instanceof LLMError) {
+        throw err;
+      }
+
+      throw new LLMError(`Streaming error: ${err.message}`, { originalError: err.message });
+    }
+  }
+
+  /**
    * Test connectivity
    * @returns {Promise<boolean>}
    */
@@ -321,12 +449,12 @@ export class LLMClient {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       await fetch(this.endpoint, {
         method: 'HEAD',
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
       return true;
     } catch {

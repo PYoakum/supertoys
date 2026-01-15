@@ -12,6 +12,19 @@ import {
 } from '../prompts/templates.js';
 import { parseTaskToml, validateTaskTomlResponse } from '../lib/toml-parser.js';
 import { LLMLogger } from '../lib/llm-logger.js';
+import {
+  loadObjectFromFile,
+  loadObjectFromUrl,
+  coerceConfigToProjectGoals,
+  mergeGoals,
+  validateGoalsStructure
+} from '../lib/config-loader.js';
+import {
+  getByPath,
+  setByPath,
+  collectContentStringPaths,
+  shouldIncludePath
+} from '../lib/path-utils.js';
 
 /**
  * Simple router for HTTP request handling
@@ -213,15 +226,23 @@ export function createApiHandler(services) {
   const evaluateRoutes = createEvaluateRoutes(sessionManager, llmClient);
   const tasklistRoutes = createTasklistRoutes(sessionManager, toolRouter, llmClient);
   const toolRoutes = createToolRoutes(toolRouter);
+  const importRoutes = createImportRoutes(sessionManager);
+  const aiEditRoutes = createAiEditRoutes(sessionManager, llmClient);
 
   // Register routes
-  
+
   // Sessions
   router.post('/api/sessions', sessionRoutes.create);
   router.get('/api/sessions', sessionRoutes.list);
   router.get('/api/sessions/ready', sessionRoutes.listReady);
   router.get('/api/sessions/:id', sessionRoutes.get);
   router.delete('/api/sessions/:id', sessionRoutes.delete);
+
+  // Import
+  router.post('/api/sessions/import', importRoutes.importGoals);
+
+  // AI Edit
+  router.post('/api/ai-edit', aiEditRoutes.edit);
 
   // Evaluation
   router.post('/api/evaluate', evaluateRoutes.evaluate);
@@ -417,12 +438,264 @@ function createSessionRoutes(sessionManager) {
 
     async delete(ctx) {
       sessionManager.deleteSession(ctx.params.id);
-      
+
       return jsonResponse({
         success: true,
         data: {
           deleted: true,
           sessionId: ctx.params.id
+        }
+      });
+    }
+  };
+}
+
+/**
+ * Create import route handlers
+ */
+function createImportRoutes(sessionManager) {
+  return {
+    /**
+     * Import goals from file or URL
+     * POST /api/sessions/import
+     * Body: { source: "file" | "url", path: string, context?: Object, options?: { replace?: boolean } }
+     */
+    async importGoals(ctx) {
+      const { source, path, context, options = {} } = ctx.body || {};
+
+      if (!source) {
+        throw new ValidationError('source is required (file or url)', 'source');
+      }
+      if (!path) {
+        throw new ValidationError('path is required', 'path');
+      }
+
+      // Load from source
+      let imported;
+      try {
+        if (source === 'file') {
+          imported = await loadObjectFromFile(path);
+        } else if (source === 'url') {
+          imported = await loadObjectFromUrl(path);
+        } else {
+          throw new ValidationError('source must be "file" or "url"', 'source');
+        }
+      } catch (err) {
+        throw new ValidationError(`Failed to load from ${source}: ${err.message}`, 'path');
+      }
+
+      // Coerce to standard format
+      const { project, goals: importedGoals } = coerceConfigToProjectGoals(imported);
+
+      // Validate imported goals
+      const validation = validateGoalsStructure({ version: project.version || '1.0', goals: importedGoals });
+      if (!validation.valid) {
+        throw new ValidationError(
+          `Imported goals are invalid: ${validation.errors.join('; ')}`,
+          'goals'
+        );
+      }
+
+      // Build context if not provided
+      const sessionContext = context || {
+        files: [],
+        formattedContent: '',
+        metadata: { source: source === 'file' ? path : 'url', importedAt: new Date().toISOString() }
+      };
+
+      // Create session with imported goals
+      const goalsDefinition = {
+        version: project.version || '1.0',
+        goals: importedGoals,
+        metadata: project.metadata,
+        globalContext: project.globalContext
+      };
+
+      const session = sessionManager.createSession({
+        goals: goalsDefinition,
+        context: sessionContext,
+        metadata: {
+          sourceIp: ctx.ip,
+          userAgent: ctx.userAgent,
+          importSource: source,
+          importPath: path
+        }
+      });
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId: session.id,
+          state: session.state,
+          importedGoals: importedGoals.length,
+          source,
+          path,
+          links: {
+            self: `/api/sessions/${session.id}`,
+            evaluate: '/api/evaluate'
+          }
+        }
+      }, 201);
+    }
+  };
+}
+
+/**
+ * Create AI edit route handlers
+ */
+function createAiEditRoutes(sessionManager, llmClient) {
+  const AI_EDIT_SYSTEM_PROMPT = `You are an expert at improving goal definitions for clarity and actionability.
+
+For each input text, provide an enhanced version that is:
+- More specific and measurable
+- Clearer in intent and expected outcome
+- Better structured for task decomposition
+- Free of ambiguity and vague language
+
+Maintain the original meaning and intent. Do not add new requirements.
+Keep improvements concise - similar length to the original when possible.
+
+Respond with a JSON array of objects, each with "path" and "text" fields:
+[
+  {"path": "goals[0].objective", "text": "Enhanced text here"},
+  {"path": "goals[0].criteria.success[0]", "text": "Enhanced criterion"}
+]
+
+Only include items that you've actually improved. Skip items that are already well-written.`;
+
+  return {
+    /**
+     * AI-edit goals content
+     * POST /api/ai-edit
+     * Body: { sessionId: string, options?: { include?: string[], exclude?: string[], preview?: boolean } }
+     */
+    async edit(ctx) {
+      if (!llmClient) {
+        throw new ValidationError('LLM client not configured', 'llmClient');
+      }
+
+      const { sessionId, options = {} } = ctx.body || {};
+
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+
+      const session = sessionManager.getSession(sessionId);
+      const { include = [], exclude = [], preview = false, batchSize = 10 } = options;
+
+      // Get goals from session
+      const goals = session.goals.items || [];
+      const project = { metadata: session.goals.metadata };
+
+      // Collect editable paths
+      const allPaths = collectContentStringPaths(project, goals, { includeContext: false });
+
+      // Filter paths
+      const filteredPaths = allPaths.filter(p =>
+        shouldIncludePath(p, include.length > 0 ? include : null, exclude)
+      );
+
+      if (filteredPaths.length === 0) {
+        return jsonResponse({
+          success: true,
+          data: {
+            sessionId,
+            edited: 0,
+            message: 'No matching paths found to edit'
+          }
+        });
+      }
+
+      // Collect candidates with their text
+      const wrapper = { project, goals };
+      const candidates = filteredPaths
+        .map(path => ({ path, text: getByPath(wrapper, path) }))
+        .filter(c => typeof c.text === 'string' && c.text.trim().length > 0);
+
+      // Build prompt
+      const userPrompt = `Please improve the following goal-related text items:
+
+${JSON.stringify(candidates.map(c => ({ path: c.path, text: c.text })), null, 2)}
+
+Respond with a JSON array of improved items. Only include items you've actually changed.`;
+
+      // Send to LLM
+      const response = await llmClient.send({
+        systemPrompt: AI_EDIT_SYSTEM_PROMPT,
+        userPrompt,
+        parameters: { temperature: 0.3, maxTokens: 4096 },
+        sessionId,
+        operation: 'ai-edit'
+      });
+
+      // Parse response
+      let edits = [];
+      try {
+        const match = response.content.match(/\[[\s\S]*\]/);
+        if (match) {
+          edits = JSON.parse(match[0]);
+        }
+      } catch (err) {
+        throw new ValidationError(`Failed to parse AI edit response: ${err.message}`, 'llmResponse');
+      }
+
+      // Preview mode - don't apply edits
+      if (preview) {
+        const previews = edits.map(edit => {
+          const original = getByPath(wrapper, edit.path);
+          return {
+            path: edit.path,
+            before: original,
+            after: edit.text
+          };
+        });
+
+        return jsonResponse({
+          success: true,
+          data: {
+            sessionId,
+            preview: true,
+            edits: previews,
+            totalCandidates: candidates.length,
+            proposedEdits: edits.length
+          }
+        });
+      }
+
+      // Apply edits
+      const appliedEdits = [];
+      for (const edit of edits) {
+        if (edit.path && edit.text) {
+          try {
+            setByPath(wrapper, edit.path, edit.text);
+            appliedEdits.push(edit.path);
+          } catch (err) {
+            console.error(`Failed to apply edit at ${edit.path}: ${err.message}`);
+          }
+        }
+      }
+
+      // Update session goals
+      if (appliedEdits.length > 0) {
+        sessionManager.store.update(sessionId, {
+          goals: {
+            ...session.goals,
+            items: wrapper.goals,
+            metadata: {
+              ...session.goals.metadata,
+              lastAiEdit: new Date().toISOString()
+            }
+          }
+        });
+      }
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          edited: appliedEdits.length,
+          paths: appliedEdits,
+          tokenUsage: response.usage
         }
       });
     }
