@@ -111,7 +111,8 @@ export class QueueManager {
     }
     
     return task.dependencies.every(dep => {
-      const depTask = this.state.allTasks.find(t => t.id === dep.taskId);
+      const depId = dep.taskId || dep;
+      const depTask = this.state.allTasks.find(t => t.id === depId);
       return depTask && depTask.state === 'completed';
     });
   }
@@ -190,8 +191,8 @@ export class QueueManager {
     // Update dependency status for dependent tasks
     for (const t of this.state.allTasks) {
       if (t.dependencies) {
-        const dep = t.dependencies.find(d => d.taskId === taskId);
-        if (dep) {
+        const dep = t.dependencies.find(d => (d.taskId || d) === taskId);
+        if (dep && typeof dep === 'object') {
           dep.satisfied = true;
         }
       }

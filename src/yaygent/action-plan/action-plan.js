@@ -442,10 +442,11 @@ async function main(args) {
         for (const pendingTask of state.pendingTasks) {
           const unsatisfied = (pendingTask.dependencies || [])
             .filter(dep => {
-              const depTask = state.allTasks.find(t => t.id === dep.taskId);
+              const depId = dep.taskId || dep;
+              const depTask = state.allTasks.find(t => t.id === depId);
               return !depTask || depTask.state !== 'completed';
             })
-            .map(dep => dep.taskId.slice(0, 8));
+            .map(dep => String(dep.taskId || dep).slice(0, 8));
           if (unsatisfied.length > 0) {
             display.error(`  Task ${pendingTask.id.slice(0, 8)} blocked by: ${unsatisfied.join(', ')}`);
           }
