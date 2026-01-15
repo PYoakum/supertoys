@@ -549,13 +549,21 @@ async function main(args) {
       // Check if blocked
       if (queueManager.isBlocked()) {
         display.error('Queue is blocked - circular dependency detected');
-        // Show which tasks are blocked
+        // Show which tasks are blocked and raw dependency structure
         const state = queueManager.getState();
         for (const pendingTask of state.pendingTasks) {
-          const unsatisfied = (pendingTask.dependencies || [])
+          const deps = pendingTask.dependencies || [];
+          if (deps.length > 0 && args.verbose) {
+            // Log raw dependency structure for debugging
+            display.info(`  [DEBUG] Task ${pendingTask.id} raw deps: ${JSON.stringify(deps).slice(0, 200)}`);
+          }
+          const unsatisfied = deps
             .filter(dep => {
               const depId = extractDepId(dep);
               const depTask = state.allTasks.find(t => t.id === depId);
+              if (args.verbose) {
+                display.info(`    [DEBUG] dep=${JSON.stringify(dep).slice(0,100)} -> depId=${depId} -> found=${!!depTask} state=${depTask?.state}`);
+              }
               return !depTask || depTask.state !== 'completed';
             })
             .map(dep => extractDepId(dep).slice(0, 8));
