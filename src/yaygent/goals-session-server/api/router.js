@@ -708,12 +708,19 @@ Respond with a JSON array of improved items. Only include items you've actually 
 function createEvaluateRoutes(sessionManager, llmClient) {
   return {
     async evaluate(ctx) {
+      if (!llmClient) {
+        throw new ValidationError(
+          'LLM client not configured. Set LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY environment variable.',
+          'llmClient'
+        );
+      }
+
       const { sessionId, options = {} } = ctx.body || {};
-      
+
       if (!sessionId) {
         throw new ValidationError('sessionId is required', 'sessionId');
       }
-      
+
       const session = sessionManager.getSession(sessionId);
       
       // Build prompt
@@ -775,6 +782,13 @@ function createEvaluateRoutes(sessionManager, llmClient) {
 function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
   return {
     async generate(ctx) {
+      if (!llmClient) {
+        throw new ValidationError(
+          'LLM client not configured. Set LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY environment variable.',
+          'llmClient'
+        );
+      }
+
       const { sessionId, options = {} } = ctx.body || {};
 
       if (!sessionId) {

@@ -48,16 +48,19 @@ function initializeServices() {
   let llmClient = null;
   if (config.llm.apiKey) {
     llmClient = new LLMClient({
+      provider: config.llm.provider,
       endpoint: config.llm.endpoint,
       apiKey: config.llm.apiKey,
       model: config.llm.model,
+      anthropicVersion: config.llm.anthropicVersion,
       parameters: config.llm.parameters.evaluation,
       retry: config.llm.retry,
       timeout: config.llm.timeout
     });
-    logger.info('LLM client initialized');
+    logger.info(`LLM client initialized (provider: ${config.llm.provider}, model: ${config.llm.model})`);
   } else {
     logger.info('LLM client not initialized (no API key configured)');
+    logger.info('Set LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY to enable LLM features');
   }
   
   return { sessionManager, toolRouter, llmClient };
