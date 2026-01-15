@@ -10,7 +10,6 @@ import { Menu } from '../components/menu.js';
 import { LogViewer } from '../components/log-viewer.js';
 import { ProgressBar } from '../components/progress-bar.js';
 import { SplitPane } from '../components/split-pane.js';
-import { TextArea } from '../components/text-area.js';
 import { SessionServerClient } from '../services/session-server-client.js';
 import { ActionPlanRunner } from '../services/action-plan-runner.js';
 
@@ -30,9 +29,15 @@ export class ExecuteTabScreen {
     // Mode: 'dashboard' | 'sessions' | 'session-detail' | 'edit-tasks' | 'running' | 'config'
     this.mode = 'dashboard';
 
-    // Task editor
-    this.taskEditor = new TextArea({ value: '' });
+    // Task form editor state
     this.taskScrollOffset = 0;
+    this.editTaskIndex = 0;           // Which task is selected
+    this.editFieldIndex = 0;          // Which field is selected (0=title, 1=priority, 2=deps, etc.)
+    this.editingField = false;        // Currently editing a field value
+    this.editFieldValue = '';         // Current edit buffer
+    this.editDepMode = false;         // Editing dependencies (multi-select mode)
+    this.editDepSelected = new Set(); // Selected dependency task IDs
+    this.taskFields = ['title', 'description', 'priority', 'sequenceNumber', 'dependencies'];
 
     // Services
     this.sessionClient = new SessionServerClient({
@@ -172,7 +177,7 @@ export class ExecuteTabScreen {
    * @returns {boolean}
    */
   isInputMode() {
-    return this.editingEnvVar || this.mode === 'edit-tasks';
+    return this.editingEnvVar || (this.mode === 'edit-tasks' && this.editingField);
   }
 
   /**
@@ -188,7 +193,7 @@ export class ExecuteTabScreen {
       case 'session-detail':
         return '[E] Execute  [T] Edit Tasks  [G] Dep Graph  [K] Kill  [Esc] Back';
       case 'edit-tasks':
-        return '[Ctrl+S] Save  [Esc] Cancel';
+        return '[↑↓] Task  [←→] Field  [Enter] Edit  [D] Deps  [Ctrl+S] Save  [Esc] Back';
       case 'running':
         return '[Esc] Abort';
       case 'config':
@@ -1116,16 +1121,19 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Start editing tasks in JSON mode
+   * Start editing tasks in form mode
    * @private
    */
   _startEditTasks() {
     if (!this.selectedSession?.taskList) return;
 
     this.mode = 'edit-tasks';
-    const tasksJson = JSON.stringify(this.selectedSession.taskList, null, 2);
-    this.taskEditor.setValue(tasksJson);
-    this.taskEditor.focus();
+    this.editTaskIndex = 0;
+    this.editFieldIndex = 0;
+    this.editingField = false;
+    this.editFieldValue = '';
+    this.editDepMode = false;
+    this.editDepSelected = new Set();
   }
 
   /**
@@ -1133,6 +1141,22 @@ export class ExecuteTabScreen {
    * @private
    */
   _handleEditTasksEvent(ctx, evt) {
+    const tasks = this.selectedSession?.taskList?.tasks || [];
+    if (tasks.length === 0) return;
+
+    // Handle dependency selection mode
+    if (this.editDepMode) {
+      this._handleDepSelectEvent(ctx, evt, tasks);
+      return;
+    }
+
+    // Handle field editing mode
+    if (this.editingField) {
+      this._handleFieldEditEvent(ctx, evt, tasks);
+      return;
+    }
+
+    // Navigation mode
     if (evt.type === 'key') {
       switch (evt.key) {
         case 'ctrl+s':
@@ -1141,11 +1165,186 @@ export class ExecuteTabScreen {
         case 'esc':
           this.mode = 'session-detail';
           return;
+        case 'up':
+          this.editTaskIndex = Math.max(0, this.editTaskIndex - 1);
+          return;
+        case 'down':
+          this.editTaskIndex = Math.min(tasks.length - 1, this.editTaskIndex + 1);
+          return;
+        case 'left':
+          this.editFieldIndex = Math.max(0, this.editFieldIndex - 1);
+          return;
+        case 'right':
+          this.editFieldIndex = Math.min(this.taskFields.length - 1, this.editFieldIndex + 1);
+          return;
+        case 'enter':
+          this._startFieldEdit(tasks);
+          return;
       }
     }
 
-    // Delegate to task editor
-    this.taskEditor.onEvent(ctx, evt);
+    if (evt.type === 'text') {
+      switch (evt.text.toLowerCase()) {
+        case 'd':
+          // Quick toggle dependency mode
+          this._startDepEdit(tasks);
+          return;
+      }
+    }
+  }
+
+  /**
+   * Start editing a field
+   * @param {Object[]} tasks
+   * @private
+   */
+  _startFieldEdit(tasks) {
+    const task = tasks[this.editTaskIndex];
+    const field = this.taskFields[this.editFieldIndex];
+
+    if (field === 'dependencies') {
+      this._startDepEdit(tasks);
+      return;
+    }
+
+    this.editingField = true;
+    const value = task[field];
+    this.editFieldValue = value !== undefined ? String(value) : '';
+  }
+
+  /**
+   * Start editing dependencies
+   * @param {Object[]} tasks
+   * @private
+   */
+  _startDepEdit(tasks) {
+    const task = tasks[this.editTaskIndex];
+    this.editDepMode = true;
+    this.editDepSelected = new Set();
+
+    // Pre-select current dependencies
+    const deps = task.dependencies || [];
+    for (const dep of deps) {
+      const depId = typeof dep === 'string' ? dep :
+                   (dep.taskId || dep.id || String(dep));
+      this.editDepSelected.add(depId);
+    }
+  }
+
+  /**
+   * Handle field editing events
+   * @param {Object} ctx
+   * @param {Object} evt
+   * @param {Object[]} tasks
+   * @private
+   */
+  _handleFieldEditEvent(ctx, evt, tasks) {
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'enter':
+          // Save the field value
+          this._applyFieldEdit(tasks);
+          this.editingField = false;
+          return;
+        case 'esc':
+          this.editingField = false;
+          return;
+        case 'backspace':
+          this.editFieldValue = this.editFieldValue.slice(0, -1);
+          return;
+      }
+    }
+
+    if (evt.type === 'text') {
+      this.editFieldValue += evt.text;
+    }
+  }
+
+  /**
+   * Apply field edit to task
+   * @param {Object[]} tasks
+   * @private
+   */
+  _applyFieldEdit(tasks) {
+    const task = tasks[this.editTaskIndex];
+    const field = this.taskFields[this.editFieldIndex];
+
+    if (field === 'priority' || field === 'sequenceNumber') {
+      const num = parseInt(this.editFieldValue, 10);
+      if (!isNaN(num)) {
+        task[field] = num;
+      }
+    } else {
+      task[field] = this.editFieldValue;
+    }
+  }
+
+  /**
+   * Handle dependency selection events
+   * @param {Object} ctx
+   * @param {Object} evt
+   * @param {Object[]} tasks
+   * @private
+   */
+  _handleDepSelectEvent(ctx, evt, tasks) {
+    const currentTask = tasks[this.editTaskIndex];
+    const otherTasks = tasks.filter((_, idx) => idx !== this.editTaskIndex);
+
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'enter':
+        case 'esc':
+          // Save dependencies and exit
+          this._applyDepEdit(currentTask);
+          this.editDepMode = false;
+          return;
+        case 'up':
+          // Navigate through other tasks
+          if (!this._depNavIndex) this._depNavIndex = 0;
+          this._depNavIndex = Math.max(0, this._depNavIndex - 1);
+          return;
+        case 'down':
+          if (!this._depNavIndex) this._depNavIndex = 0;
+          this._depNavIndex = Math.min(otherTasks.length - 1, this._depNavIndex + 1);
+          return;
+        case ' ':
+          // Toggle selection
+          if (otherTasks.length > 0 && this._depNavIndex !== undefined) {
+            const depTask = otherTasks[this._depNavIndex];
+            if (this.editDepSelected.has(depTask.id)) {
+              this.editDepSelected.delete(depTask.id);
+            } else {
+              this.editDepSelected.add(depTask.id);
+            }
+          }
+          return;
+      }
+    }
+
+    // Number keys for quick toggle (1-9)
+    if (evt.type === 'text' && /^[1-9]$/.test(evt.text)) {
+      const idx = parseInt(evt.text, 10) - 1;
+      if (idx < otherTasks.length) {
+        const depTask = otherTasks[idx];
+        if (this.editDepSelected.has(depTask.id)) {
+          this.editDepSelected.delete(depTask.id);
+        } else {
+          this.editDepSelected.add(depTask.id);
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply dependency selection to task
+   * @param {Object} task
+   * @private
+   */
+  _applyDepEdit(task) {
+    task.dependencies = Array.from(this.editDepSelected).map(taskId => ({
+      taskId,
+      type: 'completion'
+    }));
   }
 
   /**
@@ -1153,16 +1352,13 @@ export class ExecuteTabScreen {
    * @private
    */
   async _saveEditedTasks() {
-    if (!this.selectedSession) return;
+    if (!this.selectedSession?.taskList) return;
 
     try {
-      const taskList = JSON.parse(this.taskEditor.getValue());
+      const taskList = this.selectedSession.taskList;
 
-      // Validate structure
-      if (!taskList.tasks || !Array.isArray(taskList.tasks)) {
-        this.logViewer.addLine('error', 'Invalid task list: must have a "tasks" array');
-        return;
-      }
+      // Re-sequence tasks based on priority and dependencies
+      this._resequenceTasks(taskList.tasks);
 
       this.logViewer.addLine('info', `Saving ${taskList.tasks.length} tasks...`);
 
@@ -1177,12 +1373,64 @@ export class ExecuteTabScreen {
       this.logViewer.addLine('success', `Tasks saved successfully`);
       this.mode = 'session-detail';
     } catch (err) {
-      if (err instanceof SyntaxError) {
-        this.logViewer.addLine('error', 'Invalid JSON syntax');
-      } else {
-        this.logViewer.addLine('error', `Failed to save tasks: ${err.message}`);
-      }
+      this.logViewer.addLine('error', `Failed to save tasks: ${err.message}`);
     }
+  }
+
+  /**
+   * Re-sequence tasks based on dependencies and priority
+   * Ensures proper execution order and adds buffer for dependent tasks
+   * @param {Object[]} tasks
+   * @private
+   */
+  _resequenceTasks(tasks) {
+    // Build dependency graph
+    const depGraph = new Map();
+    const taskById = new Map();
+
+    for (const task of tasks) {
+      taskById.set(task.id, task);
+      const deps = (task.dependencies || []).map(d =>
+        typeof d === 'string' ? d : (d.taskId || d.id || String(d))
+      );
+      depGraph.set(task.id, deps);
+    }
+
+    // Topological sort with priority consideration
+    const visited = new Set();
+    const result = [];
+
+    const visit = (taskId, depth = 0) => {
+      if (visited.has(taskId)) return;
+      visited.add(taskId);
+
+      // Visit dependencies first
+      const deps = depGraph.get(taskId) || [];
+      for (const depId of deps) {
+        if (taskById.has(depId)) {
+          visit(depId, depth + 1);
+        }
+      }
+
+      result.push(taskId);
+    };
+
+    // Sort by priority first, then visit
+    const sortedByPriority = [...tasks].sort((a, b) =>
+      (a.priority || 5) - (b.priority || 5)
+    );
+
+    for (const task of sortedByPriority) {
+      visit(task.id);
+    }
+
+    // Assign sequence numbers
+    result.forEach((taskId, idx) => {
+      const task = taskById.get(taskId);
+      if (task) {
+        task.sequenceNumber = idx + 1;
+      }
+    });
   }
 
   /**
@@ -1503,19 +1751,231 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Render edit-tasks mode (JSON editor)
+   * Render edit-tasks mode (form-based editor)
    * @private
    */
   _renderEditTasks(ctx, rect) {
     const { screen, styles, charset } = ctx;
     const { x, y, w, h } = rect;
 
-    const title = ' Edit Tasks (JSON) ';
+    const tasks = this.selectedSession?.taskList?.tasks || [];
+    const title = ` Edit Tasks (${tasks.length}) - Ctrl+S to Save `;
     screen.drawBox(x, y, w, h, charset, styles.border, title);
 
-    // Editor area
-    const editorRect = { x: x + 1, y: y + 1, w: w - 2, h: h - 2 };
-    this.taskEditor.render(ctx, editorRect);
+    if (tasks.length === 0) {
+      screen.drawText(x + 2, y + 2, 'No tasks to edit', styles.dim);
+      return;
+    }
+
+    // Dependency selection mode - full screen overlay
+    if (this.editDepMode) {
+      this._renderDepSelector(ctx, rect, tasks);
+      return;
+    }
+
+    // Split: task list (left 40%) and task editor (right 60%)
+    const leftWidth = Math.floor((w - 2) * 0.4);
+    const rightWidth = w - 2 - leftWidth - 1;
+
+    // Left panel: Task list
+    this._renderTaskList(ctx, { x: x + 1, y: y + 1, w: leftWidth, h: h - 2 }, tasks);
+
+    // Divider
+    for (let i = 1; i < h - 1; i++) {
+      screen.drawText(x + leftWidth + 1, y + i, '│', styles.border);
+    }
+
+    // Right panel: Selected task editor
+    this._renderTaskEditor(ctx, { x: x + leftWidth + 2, y: y + 1, w: rightWidth, h: h - 2 }, tasks);
+  }
+
+  /**
+   * Render task list for form editor
+   * @private
+   */
+  _renderTaskList(ctx, rect, tasks) {
+    const { screen, styles } = ctx;
+    const { x, y, w, h } = rect;
+
+    screen.drawText(x, y, '── Tasks ──', styles.accent);
+
+    const availableHeight = h - 2;
+    const maxVisible = Math.min(tasks.length, availableHeight);
+
+    // Clamp scroll offset
+    const maxOffset = Math.max(0, tasks.length - maxVisible);
+    if (this.editTaskIndex < this.taskScrollOffset) {
+      this.taskScrollOffset = this.editTaskIndex;
+    } else if (this.editTaskIndex >= this.taskScrollOffset + maxVisible) {
+      this.taskScrollOffset = this.editTaskIndex - maxVisible + 1;
+    }
+    this.taskScrollOffset = Math.min(this.taskScrollOffset, maxOffset);
+
+    // Scroll indicator
+    if (tasks.length > maxVisible) {
+      const scrollInfo = `[${this.taskScrollOffset + 1}-${Math.min(this.taskScrollOffset + maxVisible, tasks.length)}/${tasks.length}]`;
+      screen.drawText(x + w - scrollInfo.length, y, scrollInfo, styles.dim);
+    }
+
+    for (let i = 0; i < maxVisible; i++) {
+      const taskIdx = i + this.taskScrollOffset;
+      if (taskIdx >= tasks.length) break;
+
+      const task = tasks[taskIdx];
+      const isSelected = taskIdx === this.editTaskIndex;
+      const line = y + 1 + i;
+
+      const prefix = isSelected ? '►' : ' ';
+      const priority = task.priority || 5;
+      const num = String(taskIdx + 1).padStart(2, ' ');
+
+      // Truncate title to fit
+      const titleStr = task.title || task.description || '(untitled)';
+      const maxTitleLen = w - 10;
+      const title = typeof titleStr === 'string' ? titleStr.slice(0, maxTitleLen) :
+                   (titleStr.text || titleStr.description || '').slice(0, maxTitleLen);
+
+      const style = isSelected ? styles.highlight : styles.normal;
+      screen.drawText(x, line, `${prefix}${num}. P${priority}`, style);
+      screen.drawText(x + 9, line, title, style);
+    }
+  }
+
+  /**
+   * Render task editor panel for form editor
+   * @private
+   */
+  _renderTaskEditor(ctx, rect, tasks) {
+    const { screen, styles } = ctx;
+    const { x, y, w, h } = rect;
+
+    const task = tasks[this.editTaskIndex];
+    if (!task) return;
+
+    screen.drawText(x, y, '── Edit Task ──', styles.accent);
+
+    let line = y + 2;
+
+    // Render each field
+    for (let i = 0; i < this.taskFields.length; i++) {
+      const field = this.taskFields[i];
+      const isSelected = i === this.editFieldIndex;
+      const isEditing = isSelected && this.editingField;
+
+      const prefix = isSelected ? '►' : ' ';
+      const labelStyle = isSelected ? styles.highlight : styles.normal;
+
+      screen.drawText(x, line, `${prefix} ${this._fieldLabel(field)}:`, labelStyle);
+
+      if (field === 'dependencies') {
+        // Show dependency count and hint
+        const deps = task.dependencies || [];
+        const depText = deps.length > 0
+          ? `${deps.length} task(s) - [D] to edit`
+          : 'None - [D] to add';
+        screen.drawText(x + 20, line, depText, isSelected ? styles.accent : styles.dim);
+
+        // Show dependency IDs on next line if any
+        if (deps.length > 0 && line + 1 < y + h) {
+          line++;
+          const depIds = deps.map(d => {
+            const depId = typeof d === 'string' ? d : (d.taskId || d.id || String(d));
+            const depTask = tasks.find(t => t.id === depId);
+            const depNum = depTask ? tasks.indexOf(depTask) + 1 : '?';
+            return `#${depNum}`;
+          }).join(', ');
+          screen.drawText(x + 4, line, depIds.slice(0, w - 6), styles.dim);
+        }
+      } else if (isEditing) {
+        // Show input with cursor
+        const maxLen = w - 22;
+        const displayVal = this.editFieldValue.slice(0, maxLen);
+        screen.drawText(x + 20, line, displayVal + '█', styles.highlight);
+      } else {
+        // Show current value
+        const value = task[field];
+        let displayVal = '';
+        if (value === undefined || value === null || value === '') {
+          displayVal = '(empty)';
+        } else if (typeof value === 'object') {
+          displayVal = value.text || value.description || JSON.stringify(value).slice(0, w - 25);
+        } else {
+          displayVal = String(value).slice(0, w - 25);
+        }
+        screen.drawText(x + 20, line, displayVal, isSelected ? styles.normal : styles.dim);
+      }
+
+      line += 2;
+    }
+
+    // Instructions at bottom
+    if (line + 2 < y + h) {
+      line = y + h - 2;
+      screen.drawText(x, line, '[↑↓] Select Field  [Enter] Edit  [D] Dependencies', styles.dim);
+    }
+  }
+
+  /**
+   * Get display label for a field
+   * @private
+   */
+  _fieldLabel(field) {
+    const labels = {
+      title: 'Title',
+      description: 'Description',
+      priority: 'Priority (1-10)',
+      sequenceNumber: 'Sequence #',
+      dependencies: 'Dependencies'
+    };
+    return labels[field] || field;
+  }
+
+  /**
+   * Render dependency selector overlay
+   * @private
+   */
+  _renderDepSelector(ctx, rect, tasks) {
+    const { screen, styles, charset } = ctx;
+    const { x, y, w, h } = rect;
+
+    const currentTask = tasks[this.editTaskIndex];
+    const otherTasks = tasks.filter((_, idx) => idx !== this.editTaskIndex);
+
+    screen.drawText(x + 2, y + 1, `Select Dependencies for Task #${this.editTaskIndex + 1}`, styles.accent);
+    screen.drawText(x + 2, y + 2, 'Use [↑↓] to navigate, [Space] to toggle, [Enter/Esc] to confirm', styles.dim);
+
+    let line = y + 4;
+
+    // Initialize nav index if needed
+    if (this._depNavIndex === undefined) {
+      this._depNavIndex = 0;
+    }
+
+    for (let i = 0; i < otherTasks.length && line < y + h - 1; i++) {
+      const task = otherTasks[i];
+      const taskNum = tasks.indexOf(task) + 1;
+      const isNavSelected = i === this._depNavIndex;
+      const isDepSelected = this.editDepSelected.has(task.id);
+
+      const checkbox = isDepSelected ? '[✓]' : '[ ]';
+      const prefix = isNavSelected ? '►' : ' ';
+
+      const titleStr = task.title || task.description || '(untitled)';
+      const title = typeof titleStr === 'string' ? titleStr : (titleStr.text || titleStr.description || '');
+      const truncTitle = title.slice(0, w - 15);
+
+      const style = isNavSelected ? styles.highlight : (isDepSelected ? styles.accent : styles.normal);
+      screen.drawText(x + 2, line, `${prefix} ${checkbox} #${taskNum}: ${truncTitle}`, style);
+      line++;
+    }
+
+    if (otherTasks.length === 0) {
+      screen.drawText(x + 4, line, '(No other tasks available)', styles.dim);
+    }
+
+    // Show selected count
+    line = y + h - 2;
+    screen.drawText(x + 2, line, `Selected: ${this.editDepSelected.size} task(s)`, styles.accent);
   }
 
   /**

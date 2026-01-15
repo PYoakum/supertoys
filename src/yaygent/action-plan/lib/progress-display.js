@@ -161,13 +161,20 @@ Status: Running
       }
     }
 
+    // Show buffer time if any
+    let bufferInfo = '';
+    if (metrics.totalBufferTimeMs && metrics.totalBufferTimeMs > 0) {
+      const bufferSec = (metrics.totalBufferTimeMs / 1000).toFixed(1);
+      bufferInfo = `\n  ⏳ Buffer Time: ${bufferSec}s`;
+    }
+
     console.log(`
 ══════════════════════════════════════════════════════════════════════
 Execution Complete!
 
 Summary:
   ${metrics.failedCount === 0 ? '✅' : '❌'} Tasks Completed: ${metrics.completedCount}/${metrics.totalTasks}
-  ⏱️  Total Duration: ${duration}s
+  ⏱️  Total Duration: ${duration}s${bufferInfo}
   ${bundlePath ? `📁 Bundle Created: ${bundlePath}` : ''}${evalStatus}
 
 ══════════════════════════════════════════════════════════════════════

@@ -53,13 +53,30 @@ export class QueueManager {
   /**
    * @param {string} sessionId
    * @param {Object[]} tasks - Task list from session server
+   * @param {Object} [options] - Configuration options
+   * @param {number} [options.baseBufferMs=500] - Base buffer delay in ms
+   * @param {number} [options.bufferPerDependent=200] - Additional buffer per dependent task
+   * @param {number} [options.maxBufferMs=5000] - Maximum buffer delay in ms
    */
-  constructor(sessionId, tasks) {
+  constructor(sessionId, tasks, options = {}) {
     this.sessionId = sessionId;
-    
+
+    // Buffer/delay configuration
+    this.bufferConfig = {
+      baseBufferMs: options.baseBufferMs ?? 500,
+      bufferPerDependent: options.bufferPerDependent ?? 200,
+      maxBufferMs: options.maxBufferMs ?? 5000
+    };
+
+    // Track last completed task for buffer calculation
+    this.lastCompletedTaskId = null;
+
     // Sort tasks by sequence number
     const sortedTasks = [...tasks].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
-    
+
+    // Pre-compute dependency graph (which tasks depend on which)
+    this.dependentsMap = this._buildDependentsMap(sortedTasks);
+
     /** @type {QueueState} */
     this.state = {
       sessionId,
@@ -77,6 +94,7 @@ export class QueueManager {
         startedAt: new Date().toISOString(),
         completedAt: null,
         totalExecutionTimeMs: 0,
+        totalBufferTimeMs: 0,
         totalTokenUsage: {
           promptTokens: 0,
           completionTokens: 0,
@@ -84,6 +102,81 @@ export class QueueManager {
         }
       }
     };
+  }
+
+  /**
+   * Build a map of task ID -> array of task IDs that depend on it
+   * @param {Object[]} tasks
+   * @returns {Map<string, string[]>}
+   * @private
+   */
+  _buildDependentsMap(tasks) {
+    const map = new Map();
+
+    // Initialize all tasks with empty arrays
+    for (const task of tasks) {
+      map.set(task.id, []);
+    }
+
+    // Build reverse dependency map
+    for (const task of tasks) {
+      const deps = task.dependencies || [];
+      for (const dep of deps) {
+        const depId = extractDepId(dep);
+        const dependents = map.get(depId);
+        if (dependents) {
+          dependents.push(task.id);
+        }
+      }
+    }
+
+    return map;
+  }
+
+  /**
+   * Get the number of tasks that depend on a given task
+   * @param {string} taskId
+   * @returns {number}
+   */
+  getDependentCount(taskId) {
+    return this.dependentsMap.get(taskId)?.length || 0;
+  }
+
+  /**
+   * Calculate the recommended buffer delay for a completed task
+   * Based on how many other tasks depend on it
+   * @param {string} taskId
+   * @returns {number} Buffer delay in milliseconds
+   */
+  getBufferDelayMs(taskId) {
+    const dependentCount = this.getDependentCount(taskId);
+
+    // No buffer needed if no dependents
+    if (dependentCount === 0) {
+      return 0;
+    }
+
+    // Calculate buffer: base + (perDependent * count), capped at max
+    const buffer = this.bufferConfig.baseBufferMs +
+                  (this.bufferConfig.bufferPerDependent * dependentCount);
+
+    return Math.min(buffer, this.bufferConfig.maxBufferMs);
+  }
+
+  /**
+   * Wait for the recommended buffer delay after completing a task
+   * @param {string} taskId - The completed task ID
+   * @returns {Promise<number>} The actual delay in ms (0 if no delay)
+   */
+  async waitForBuffer(taskId) {
+    const delayMs = this.getBufferDelayMs(taskId);
+
+    if (delayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      this.state.metrics.totalBufferTimeMs += delayMs;
+    }
+
+    return delayMs;
   }
 
   /**

@@ -557,6 +557,15 @@ async function main(args) {
         });
 
         display.printProgress(queueManager.getProgress());
+
+        // Apply buffer delay for tasks with dependents (single-threaded execution)
+        const dependentCount = queueManager.getDependentCount(task.id);
+        if (dependentCount > 0) {
+          const bufferMs = await queueManager.waitForBuffer(task.id);
+          if (args.verbose && bufferMs > 0) {
+            display.info(`      Buffer delay: ${bufferMs}ms (${dependentCount} dependent task(s))`);
+          }
+        }
       } else {
         // Evaluation failed
         if (!config.queue.continueOnEvaluationFailure) {
