@@ -203,7 +203,7 @@ class GoalsWatcherService {
    * Start the service
    */
   async start() {
-    this.logger.info('Starting Goals Watcher Service...');
+    this.logger.info('Starting Goal Keeper Service...');
     this.logger.info(`Watch path: ${this.watchPath}`);
     this.logger.info(`Session server: ${this.serverUrl}`);
 
@@ -249,7 +249,7 @@ class GoalsWatcherService {
     this.stats.startedAt = new Date();
     await this.watcher.start();
 
-    this.logger.info('Watcher started - waiting for goals files...');
+    this.logger.info('Goal Keeper started - waiting for goals files...');
     this.printStatus();
   }
 

@@ -1,0 +1,10 @@
+{
+  "name": "js-tui",
+  "version": "0.1.0",
+  "description": "a TUI scaffold for creating terminal applications, written in JS for use with the Bun runtime.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.js"
+  }
+}

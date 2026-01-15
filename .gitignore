@@ -68,3 +68,16 @@ src/js-vm/src/bios/*
 
 # default documents directory for webedit
 src/webedit/documents
+
+# default directory for goal-keeper
+src/yaygent/goal-keeper/goals-inbox
+src/yaygent/goal-keeper/goals-inbox/*
+
+# default director for LLM Logs
+src/yaygent/goals-session-server/llm-logs
+src/yaygent/goals-session-server/llm-logs/*
+
+src/yaygent/goals-cli/scratch-pad
+
+# Claude
+*.claude
