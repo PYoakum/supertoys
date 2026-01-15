@@ -234,6 +234,41 @@ bun goals-cli.js -g ./examples/goals.json -c ./examples/context/ --dry-run --ver
 bun goals-cli.js -g ./goals.json -c ./context/ -C ./my-config.js
 ```
 
+## TUI Mode
+
+Goals CLI includes a terminal user interface with tabbed navigation.
+
+### Start TUI
+
+```bash
+bun goals-cli.js tui
+```
+
+### With Custom Paths
+
+```bash
+bun goals-cli.js tui --goals ./my-goals.json --context ./my-context/
+```
+
+### TUI Tabs
+
+| Tab | Key | Description |
+|-----|-----|-------------|
+| Goals | `1` | Edit goals (form view and JSON editor) |
+| Context | `2` | Manage context files, AI-edit support |
+| Execute | `3` | Run workflows, view session status |
+| Output | `4` | View output bundles with score visualization |
+
+### TUI Navigation
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Next tab |
+| `Shift+Tab` | Previous tab |
+| `1-4` | Jump to tab |
+| `Q` | Quit |
+| `Esc` | Cancel/Back |
+
 ## Testing
 
 ```bash
