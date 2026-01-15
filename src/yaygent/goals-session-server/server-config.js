@@ -25,9 +25,11 @@ export default {
 
   // LLM configuration
   llm: {
+    provider: process.env.LLM_PROVIDER || 'anthropic',
     endpoint: process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-    apiKey: process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY,
+    apiKey: process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
     model: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+    anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
     timeout: parseInt(process.env.LLM_TIMEOUT, 10) || 120000,
     retry: {
       maxAttempts: 3,

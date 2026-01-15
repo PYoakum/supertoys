@@ -17,9 +17,11 @@ export default {
 
   // Action LLM configuration
   actionLlm: {
+    provider: process.env.ACTION_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
     endpoint: process.env.ACTION_LLM_ENDPOINT || process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-    apiKey: process.env.ACTION_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY,
+    apiKey: process.env.ACTION_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
     model: process.env.ACTION_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+    anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
     parameters: {
       temperature: 0.3,
       maxTokens: 8192
@@ -29,9 +31,11 @@ export default {
 
   // Evaluation LLM configuration
   evaluationLlm: {
+    provider: process.env.EVAL_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
     endpoint: process.env.EVAL_LLM_ENDPOINT || process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-    apiKey: process.env.EVAL_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY,
+    apiKey: process.env.EVAL_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
     model: process.env.EVAL_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+    anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
     parameters: {
       temperature: 0.1,
       maxTokens: 4096

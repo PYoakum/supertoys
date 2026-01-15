@@ -86,8 +86,11 @@ Options:
 
 Environment Variables:
   SESSION_SERVER_URL   Goals Session Server URL (default: http://localhost:3000)
-  LLM_API_KEY          LLM API key for execution and evaluation
+  LLM_PROVIDER         LLM provider: anthropic, openai, or custom (default: anthropic)
+  LLM_API_KEY          LLM API key (also accepts ANTHROPIC_API_KEY, OPENAI_API_KEY)
+  LLM_ENDPOINT         LLM API endpoint URL
   LLM_MODEL            LLM model name
+  ANTHROPIC_VERSION    Anthropic API version (default: 2023-06-01)
   OUTPUT_DIR           Default output directory
 
 Examples:
@@ -320,6 +323,30 @@ async function main(args) {
   // Validate configuration
   if (!config.actionLlm.apiKey) {
     throw new ConfigurationError('LLM API key is required. Set LLM_API_KEY environment variable.', 'actionLlm.apiKey');
+  }
+
+  // Debug: show LLM config info
+  if (args.verbose) {
+    display.info(`Provider: ${config.actionLlm.provider}`);
+    const key = config.actionLlm.apiKey;
+    if (key) {
+      const masked = key.length > 10 ? `${key.slice(0, 7)}...${key.slice(-4)}` : '***';
+      display.info(`API Key: ${masked} (${key.length} chars)`);
+    } else {
+      display.info(`API Key: NOT SET`);
+    }
+    // Show which env var was used
+    const sources = [];
+    if (process.env.ACTION_LLM_API_KEY) sources.push('ACTION_LLM_API_KEY');
+    if (process.env.LLM_API_KEY) sources.push('LLM_API_KEY');
+    if (process.env.ANTHROPIC_API_KEY) sources.push('ANTHROPIC_API_KEY');
+    if (process.env.OPENAI_API_KEY) sources.push('OPENAI_API_KEY');
+    display.info(`Key sources available: ${sources.join(', ') || 'none'}`);
+    display.info(`Model: ${config.actionLlm.model}`);
+    display.info(`Endpoint: ${config.actionLlm.endpoint}`);
+    if (config.actionLlm.provider === 'anthropic') {
+      display.info(`Anthropic Version: ${config.actionLlm.anthropicVersion}`);
+    }
   }
 
   // Initialize remaining clients (sessionClient already initialized above)

@@ -12,16 +12,47 @@ const DEFAULT_RETRY = {
 };
 
 /**
- * LLM Client class
+ * Provider configurations
+ */
+const PROVIDERS = {
+  anthropic: {
+    defaultEndpoint: 'https://api.anthropic.com/v1/messages',
+    defaultModel: 'claude-sonnet-4-20250514'
+  },
+  openai: {
+    defaultEndpoint: 'https://api.openai.com/v1/chat/completions',
+    defaultModel: 'gpt-4o'
+  },
+  custom: {
+    defaultEndpoint: '',
+    defaultModel: ''
+  }
+};
+
+/**
+ * LLM Client class with multi-provider support
  */
 export class LLMClient {
+  /**
+   * @param {Object} config
+   * @param {string} [config.provider='anthropic'] - Provider: 'anthropic', 'openai', or 'custom'
+   * @param {string} config.endpoint - API endpoint URL
+   * @param {string} config.apiKey - API key
+   * @param {string} config.model - Model identifier
+   * @param {string} [config.anthropicVersion='2023-06-01'] - Anthropic API version
+   * @param {Object} [config.parameters] - Generation parameters
+   * @param {number} [config.timeout] - Request timeout in ms
+   * @param {Object} [config.retry] - Retry configuration
+   */
   constructor(config) {
     if (!config.endpoint) throw new Error('endpoint is required');
     if (!config.apiKey) throw new Error('apiKey is required');
 
+    this.provider = config.provider || 'anthropic';
     this.endpoint = config.endpoint;
     this.apiKey = config.apiKey;
     this.model = config.model;
+    this.anthropicVersion = config.anthropicVersion || '2023-06-01';
     this.parameters = config.parameters || { temperature: 0.2, maxTokens: 8192 };
     this.timeout = config.timeout || 180000;
     this.retry = { ...DEFAULT_RETRY, ...config.retry };
@@ -31,12 +62,69 @@ export class LLMClient {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   * Build headers based on provider
+   * @returns {Object}
+   */
   buildHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'x-api-key': this.apiKey,
-      'anthropic-version': '2023-06-01'
+    const headers = {
+      'Content-Type': 'application/json'
     };
+
+    switch (this.provider) {
+      case 'anthropic':
+        headers['x-api-key'] = this.apiKey;
+        headers['anthropic-version'] = this.anthropicVersion;
+        break;
+      case 'openai':
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+        break;
+      case 'custom':
+      default:
+        // Custom provider - try both auth methods, prefer Bearer
+        if (this.apiKey) {
+          headers['Authorization'] = `Bearer ${this.apiKey}`;
+          headers['x-api-key'] = this.apiKey;
+        }
+        break;
+    }
+
+    return headers;
+  }
+
+  /**
+   * Build request body based on provider
+   * @param {Object} options
+   * @param {string} options.systemPrompt
+   * @param {string} options.userPrompt
+   * @param {Object} [options.parameters]
+   * @returns {Object}
+   */
+  buildRequestBody({ systemPrompt, userPrompt, parameters = {} }) {
+    const params = { ...this.parameters, ...parameters };
+
+    switch (this.provider) {
+      case 'openai':
+        return {
+          model: this.model,
+          max_tokens: params.maxTokens,
+          temperature: params.temperature,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        };
+
+      case 'anthropic':
+      default:
+        return {
+          model: this.model,
+          max_tokens: params.maxTokens,
+          temperature: params.temperature,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        };
+    }
   }
 
   parseResponse(response) {
@@ -74,15 +162,7 @@ export class LLMClient {
   }
 
   async send({ systemPrompt, userPrompt, parameters = {} }) {
-    const params = { ...this.parameters, ...parameters };
-    
-    const body = {
-      model: this.model,
-      max_tokens: params.maxTokens,
-      temperature: params.temperature,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
-    };
+    const body = this.buildRequestBody({ systemPrompt, userPrompt, parameters });
 
     let lastError;
 
@@ -135,7 +215,8 @@ export class LLMClient {
         if (err.name === 'AbortError') {
           lastError = new LLMError(`Request timeout after ${this.timeout}ms`);
         } else if (err instanceof LLMError) {
-          lastError = err;
+          // Don't retry client errors (4xx except 429) - they won't succeed
+          throw err;
         } else {
           lastError = new LLMError(`Unexpected error: ${err.message}`);
         }
@@ -162,4 +243,5 @@ export class LLMClient {
   }
 }
 
+export { PROVIDERS };
 export default LLMClient;

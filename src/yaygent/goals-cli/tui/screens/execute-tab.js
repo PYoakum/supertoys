@@ -56,13 +56,43 @@ export class ExecuteTabScreen {
     this.executionProgress = { current: 0, total: 0 };
     this.focused = false;
 
+    // Provider configurations
+    this.providers = {
+      anthropic: {
+        endpoint: 'https://api.anthropic.com/v1/messages',
+        defaultModel: 'claude-sonnet-4-20250514',
+        keyEnvVar: 'ANTHROPIC_API_KEY'
+      },
+      openai: {
+        endpoint: 'https://api.openai.com/v1/chat/completions',
+        defaultModel: 'gpt-4o',
+        keyEnvVar: 'OPENAI_API_KEY'
+      },
+      custom: {
+        endpoint: '',
+        defaultModel: '',
+        keyEnvVar: 'LLM_API_KEY'
+      }
+    };
+    this.providerList = ['anthropic', 'openai', 'custom'];
+    this.selectedProvider = 0; // Index into providerList
+
+    // Detect provider from env
+    const detectedProvider = process.env.LLM_PROVIDER || 'anthropic';
+    this.selectedProvider = Math.max(0, this.providerList.indexOf(detectedProvider));
+
     // Environment variables for execution
+    // Check multiple common API key env vars (same as action-plan-config.js)
+    const apiKey = process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || '';
+    const currentProvider = this.providerList[this.selectedProvider];
     this.envVars = {
       SESSION_SERVER_URL: this.state.serverUrl || 'http://localhost:3000',
-      LLM_API_KEY: process.env.LLM_API_KEY || '',
-      LLM_MODEL: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
-      OUTPUT_DIR: this.state.outputDir || './output',
-      LOG_LEVEL: 'info'
+      LLM_PROVIDER: currentProvider,
+      LLM_API_KEY: apiKey,
+      LLM_ENDPOINT: process.env.LLM_ENDPOINT || this.providers[currentProvider].endpoint,
+      LLM_MODEL: process.env.LLM_MODEL || this.providers[currentProvider].defaultModel,
+      ANTHROPIC_VERSION: process.env.ANTHROPIC_VERSION || '2023-06-01',
+      OUTPUT_DIR: this.state.outputDir || './output'
     };
     this.envVarKeys = Object.keys(this.envVars);
     this.selectedEnvVar = 0;
@@ -96,6 +126,11 @@ export class ExecuteTabScreen {
   focus() {
     this.focused = true;
     this._checkServerStatus();
+
+    // Warn if no API key is configured
+    if (!this.envVars.LLM_API_KEY) {
+      this.logViewer.addLine('warn', 'No LLM API key detected. Set LLM_API_KEY or ANTHROPIC_API_KEY.');
+    }
   }
 
   /**
@@ -120,7 +155,7 @@ export class ExecuteTabScreen {
       case 'running':
         return '[Esc] Abort';
       case 'config':
-        return '[Enter] Edit  [Esc] Back';
+        return '[P] Provider  [Enter] Edit  [Esc] Back';
       default:
         return '';
     }
@@ -594,6 +629,34 @@ export class ExecuteTabScreen {
           break;
       }
     }
+
+    if (evt.type === 'text') {
+      switch (evt.text.toLowerCase()) {
+        case 'p':
+          // Cycle through providers
+          this._cycleProvider();
+          break;
+      }
+    }
+  }
+
+  /**
+   * Cycle through LLM providers and update related settings
+   * @private
+   */
+  _cycleProvider() {
+    this.selectedProvider = (this.selectedProvider + 1) % this.providerList.length;
+    const providerName = this.providerList[this.selectedProvider];
+    const providerConfig = this.providers[providerName];
+
+    // Update env vars with new provider defaults
+    this.envVars.LLM_PROVIDER = providerName;
+    this.envVars.LLM_ENDPOINT = providerConfig.endpoint;
+    this.envVars.LLM_MODEL = providerConfig.defaultModel;
+
+    this.logViewer.addLine('info', `Switched to provider: ${providerName}`);
+    this.logViewer.addLine('info', `Endpoint: ${providerConfig.endpoint || '(custom)'}`);
+    this.logViewer.addLine('info', `Model: ${providerConfig.defaultModel || '(custom)'}`);
   }
 
   /**
@@ -772,6 +835,15 @@ export class ExecuteTabScreen {
     screen.drawBox(x, y, w, h, charset, styles.border, title);
 
     let line = y + 1;
+
+    // Provider selector
+    const providerName = this.providerList[this.selectedProvider];
+    const providerLabel = providerName.charAt(0).toUpperCase() + providerName.slice(1);
+    screen.drawText(x + 2, line, '[P] Provider:', styles.normal);
+    screen.drawText(x + 17, line, providerLabel, styles.highlight);
+    line += 2;
+
+    // Environment variables
     for (let i = 0; i < this.envVarKeys.length; i++) {
       const key = this.envVarKeys[i];
       const value = this.envVars[key] || '';
@@ -794,7 +866,7 @@ export class ExecuteTabScreen {
     }
 
     line++;
-    screen.drawText(x + 2, line, '[Enter] Edit  [Esc] Back', styles.dim);
+    screen.drawText(x + 2, line, '[P] Switch Provider  [Enter] Edit  [Esc] Back', styles.dim);
   }
 }
 

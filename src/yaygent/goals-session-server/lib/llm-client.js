@@ -7,9 +7,11 @@ import { LLMError, LLMUnavailableError, RateLimitedError } from './errors.js';
 
 /**
  * @typedef {Object} LLMClientConfig
+ * @property {string} [provider='anthropic'] - Provider: 'anthropic', 'openai', or 'custom'
  * @property {string} endpoint - API endpoint URL
  * @property {string} apiKey - API authentication key
  * @property {string} [model] - Default model identifier
+ * @property {string} [anthropicVersion='2023-06-01'] - Anthropic API version
  * @property {LLMParameters} [parameters] - Default generation parameters
  * @property {RetryConfig} [retry] - Retry configuration
  * @property {number} [timeout=120000] - Request timeout in milliseconds
@@ -30,6 +32,24 @@ import { LLMError, LLMUnavailableError, RateLimitedError } from './errors.js';
  */
 
 /**
+ * Provider configurations
+ */
+const PROVIDERS = {
+  anthropic: {
+    defaultEndpoint: 'https://api.anthropic.com/v1/messages',
+    defaultModel: 'claude-sonnet-4-20250514'
+  },
+  openai: {
+    defaultEndpoint: 'https://api.openai.com/v1/chat/completions',
+    defaultModel: 'gpt-4o'
+  },
+  custom: {
+    defaultEndpoint: '',
+    defaultModel: ''
+  }
+};
+
+/**
  * Default configuration
  */
 const DEFAULTS = {
@@ -46,7 +66,7 @@ const DEFAULTS = {
 };
 
 /**
- * LLM Client class
+ * LLM Client class with multi-provider support
  */
 export class LLMClient {
   /**
@@ -61,6 +81,9 @@ export class LLMClient {
     }
 
     /** @type {string} */
+    this.provider = config.provider || 'anthropic';
+
+    /** @type {string} */
     this.endpoint = config.endpoint;
 
     /** @type {string} */
@@ -68,6 +91,9 @@ export class LLMClient {
 
     /** @type {string|undefined} */
     this.model = config.model;
+
+    /** @type {string} */
+    this.anthropicVersion = config.anthropicVersion || '2023-06-01';
 
     /** @type {LLMParameters} */
     this.parameters = { ...DEFAULTS.parameters, ...config.parameters };
@@ -94,21 +120,39 @@ export class LLMClient {
   }
 
   /**
-   * Build request headers
+   * Build request headers based on provider
    * @returns {Object}
    * @private
    */
   buildHeaders() {
-    return {
+    const headers = {
       'Content-Type': 'application/json',
-      'x-api-key': this.apiKey,
-      'anthropic-version': '2023-06-01',
       ...this.headers
     };
+
+    switch (this.provider) {
+      case 'anthropic':
+        headers['x-api-key'] = this.apiKey;
+        headers['anthropic-version'] = this.anthropicVersion;
+        break;
+      case 'openai':
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+        break;
+      case 'custom':
+      default:
+        // Custom provider - try both auth methods
+        if (this.apiKey) {
+          headers['Authorization'] = `Bearer ${this.apiKey}`;
+          headers['x-api-key'] = this.apiKey;
+        }
+        break;
+    }
+
+    return headers;
   }
 
   /**
-   * Build request body
+   * Build request body based on provider
    * @param {Object} options
    * @param {string} options.systemPrompt
    * @param {string} options.userPrompt
@@ -119,20 +163,28 @@ export class LLMClient {
   buildRequestBody({ systemPrompt, userPrompt, parameters = {} }) {
     const params = { ...this.parameters, ...parameters };
 
-    const body = {
-      model: this.model,
-      max_tokens: params.maxTokens,
-      temperature: params.temperature,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt
-        }
-      ]
-    };
+    switch (this.provider) {
+      case 'openai':
+        return {
+          model: this.model,
+          max_tokens: params.maxTokens,
+          temperature: params.temperature,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        };
 
-    return body;
+      case 'anthropic':
+      default:
+        return {
+          model: this.model,
+          max_tokens: params.maxTokens,
+          temperature: params.temperature,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        };
+    }
   }
 
   /**
@@ -463,4 +515,5 @@ export class LLMClient {
   }
 }
 
+export { PROVIDERS };
 export default LLMClient;
