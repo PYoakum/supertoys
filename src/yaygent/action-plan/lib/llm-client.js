@@ -102,16 +102,30 @@ export class LLMClient {
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '');
-          
+          let errorMessage = `Request failed: ${response.status}`;
+
+          // Try to parse error details
+          try {
+            const errorJson = JSON.parse(errorBody);
+            if (errorJson.error?.message) {
+              errorMessage = `${response.status}: ${errorJson.error.message}`;
+            }
+          } catch {
+            // Use raw error body if not JSON
+            if (errorBody) {
+              errorMessage = `${response.status}: ${errorBody.slice(0, 200)}`;
+            }
+          }
+
           if (response.status === 429 || response.status >= 500) {
-            lastError = new LLMError(`Request failed: ${response.status}`);
+            lastError = new LLMError(errorMessage);
             if (attempt < this.retry.maxAttempts) {
               await this.sleep(this.retry.backoffMs * Math.pow(this.retry.backoffMultiplier, attempt - 1));
               continue;
             }
           }
 
-          throw new LLMError(`Request failed: ${response.status}`, { body: errorBody });
+          throw new LLMError(errorMessage, { body: errorBody, status: response.status });
         }
 
         const data = await response.json();
