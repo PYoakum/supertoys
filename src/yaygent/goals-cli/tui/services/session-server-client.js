@@ -88,7 +88,7 @@ export class SessionServerClient {
    * @returns {Promise<{sessionId: string}>}
    */
   async createSession(goals, context = null) {
-    return this._request('POST', '/session', { goals, context });
+    return this._request('POST', '/api/sessions', { goals, context });
   }
 
   /**
@@ -96,7 +96,7 @@ export class SessionServerClient {
    * @returns {Promise<Array<{id: string, status: string, createdAt: string}>>}
    */
   async listSessions() {
-    return this._request('GET', '/sessions');
+    return this._request('GET', '/api/sessions');
   }
 
   /**
@@ -114,7 +114,7 @@ export class SessionServerClient {
    * @returns {Promise<Object>}
    */
   async getSession(sessionId) {
-    return this._request('GET', `/session/${sessionId}`);
+    return this._request('GET', `/api/sessions/${sessionId}`);
   }
 
   /**
@@ -123,7 +123,7 @@ export class SessionServerClient {
    * @returns {Promise<{success: boolean}>}
    */
   async deleteSession(sessionId) {
-    return this._request('DELETE', `/session/${sessionId}`);
+    return this._request('DELETE', `/api/sessions/${sessionId}`);
   }
 
   /**
@@ -132,7 +132,7 @@ export class SessionServerClient {
    * @returns {Promise<Object>}
    */
   async evaluate(sessionId) {
-    return this._request('POST', `/session/${sessionId}/evaluate`);
+    return this._request('POST', `/api/sessions/${sessionId}/evaluate`);
   }
 
   /**
@@ -141,7 +141,7 @@ export class SessionServerClient {
    * @returns {Promise<{tasks: Array}>}
    */
   async generateTaskList(sessionId) {
-    return this._request('POST', `/session/${sessionId}/tasks`);
+    return this._request('POST', `/api/sessions/${sessionId}/tasks`);
   }
 
   /**
@@ -156,7 +156,7 @@ export class SessionServerClient {
     if (sessionId) {
       body.sessionId = sessionId;
     }
-    return this._request('POST', '/tool/execute', body);
+    return this._request('POST', '/api/tools/execute', body);
   }
 
   /**
@@ -165,7 +165,7 @@ export class SessionServerClient {
    * @returns {Promise<Array<{level: string, message: string, timestamp: string}>>}
    */
   async getSessionLogs(sessionId) {
-    return this._request('GET', `/session/${sessionId}/logs`);
+    return this._request('GET', `/api/sessions/${sessionId}/logs`);
   }
 
   /**
@@ -175,7 +175,7 @@ export class SessionServerClient {
    * @returns {Promise<{success: boolean}>}
    */
   async updateContext(sessionId, context) {
-    return this._request('PUT', `/session/${sessionId}/context`, { context });
+    return this._request('PUT', `/api/sessions/${sessionId}/context`, { context });
   }
 
   /**
@@ -183,7 +183,7 @@ export class SessionServerClient {
    * @returns {Promise<Object>}
    */
   async getStatus() {
-    return this._request('GET', '/status');
+    return this._request('GET', '/api/status');
   }
 }
 
