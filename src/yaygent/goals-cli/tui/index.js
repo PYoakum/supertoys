@@ -202,12 +202,8 @@ export function runMainTui(options = {}) {
     const wrapper = {
       render: (ctx, rect) => mainScreen.render(ctx, rect),
       onEvent: (ctx, evt) => {
-        // Handle global quit with Q or Escape
-        if (evt.type === 'text' && evt.text.toLowerCase() === 'q') {
-          app.shutdown();
-          return;
-        }
-        if (evt.type === 'key' && evt.key === 'esc') {
+        // Handle global quit with Ctrl+Q or Ctrl+C
+        if (evt.type === 'key' && (evt.key === 'ctrl+q' || evt.key === 'ctrl+c')) {
           app.shutdown();
           return;
         }
