@@ -4,6 +4,18 @@
  */
 
 /**
+ * Check if a string looks like a task ID (task-N, UUID, or alphanumeric ID)
+ * @param {string} str
+ * @returns {boolean}
+ */
+function looksLikeTaskId(str) {
+  if (typeof str !== 'string') return false;
+  return /^task-\d+$/i.test(str) ||
+         /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(str) ||
+         /^[a-z0-9_-]{4,}$/i.test(str);
+}
+
+/**
  * Extract dependency ID from various formats
  * Dependencies can be: string, number, or object with various property names
  * @param {*} dep - Dependency in any format
@@ -11,46 +23,62 @@
  * @returns {string}
  */
 function extractDepId(dep, depth = 0) {
-  // Safety: prevent infinite recursion
   if (depth > 10) return 'unknown';
 
-  if (typeof dep === 'string') return dep;
+  // Handle primitives
+  if (typeof dep === 'string') {
+    if (looksLikeTaskId(dep)) return dep;
+    if (depth === 0) return dep;
+    return 'unknown';
+  }
   if (typeof dep === 'number') return String(dep);
 
   if (dep && typeof dep === 'object') {
-    // Handle arrays - take first element
+    // Handle arrays
     if (Array.isArray(dep)) {
-      if (dep.length > 0) {
-        return extractDepId(dep[0], depth + 1);
-      }
+      if (dep.length > 0) return extractDepId(dep[0], depth + 1);
       return 'unknown';
     }
 
-    // Try various property names that might contain the ID
+    // ID-specific properties
     const idProps = ['taskId', 'id', 'dependsOn', 'target', 'dependency', 'task', 'ref'];
     for (const prop of idProps) {
-      if (dep[prop] !== undefined && dep[prop] !== null) {
-        return extractDepId(dep[prop], depth + 1);
+      const val = dep[prop];
+      if (val !== undefined && val !== null) {
+        if (typeof val === 'string' && looksLikeTaskId(val)) return val;
+        if (typeof val === 'number') return String(val);
+        if (typeof val === 'object' && !Array.isArray(val)) {
+          const valKeys = Object.keys(val);
+          const metadataKeys = ['type', 'satisfied', 'status', 'state', 'optional'];
+          const hasIdLikeKey = valKeys.some(k => /id|task|ref|depends/i.test(k));
+          if (hasIdLikeKey || !valKeys.every(k => metadataKeys.includes(k))) {
+            const result = extractDepId(val, depth + 1);
+            if (result !== 'unknown') return result;
+          }
+        }
       }
     }
 
-    // If object has keys, try to find one that looks like an ID
+    // Search remaining keys
     const keys = Object.keys(dep);
     if (keys.length > 0) {
-      // Look for a key that contains 'id' or 'task'
-      const idKey = keys.find(k => /id|task|ref/i.test(k));
+      const metadataKeys = ['type', 'satisfied', 'status', 'state', 'optional'];
+      const meaningfulKeys = keys.filter(k => !metadataKeys.includes(k));
+
+      const idKey = meaningfulKeys.find(k => /id|task|ref/i.test(k));
       if (idKey && dep[idKey]) {
-        return extractDepId(dep[idKey], depth + 1);
+        const result = extractDepId(dep[idKey], depth + 1);
+        if (result !== 'unknown') return result;
       }
-      // Take first value as fallback
-      const firstVal = dep[keys[0]];
-      if (typeof firstVal === 'string' || typeof firstVal === 'number') {
-        return String(firstVal);
+
+      for (const key of meaningfulKeys) {
+        const val = dep[key];
+        if (typeof val === 'string' && looksLikeTaskId(val)) return val;
       }
     }
   }
 
-  return String(dep);
+  return 'unknown';
 }
 
 /**

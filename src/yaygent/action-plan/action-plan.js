@@ -29,6 +29,19 @@ import {
 import { OutputEvalRunner } from './lib/output-eval-runner.js';
 
 /**
+ * Check if a string looks like a task ID (task-N, UUID, or alphanumeric ID)
+ * @param {string} str
+ * @returns {boolean}
+ */
+function looksLikeTaskId(str) {
+  if (typeof str !== 'string') return false;
+  // Matches: task-1, task-123, UUIDs, or alphanumeric IDs
+  return /^task-\d+$/i.test(str) ||
+         /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(str) ||
+         /^[a-z0-9_-]{4,}$/i.test(str);
+}
+
+/**
  * Extract dependency ID from various formats
  * Dependencies can be: string, number, or object with various property names
  * @param {*} dep - Dependency in any format
@@ -42,7 +55,19 @@ function extractDepId(dep, depth = 0) {
     return 'unknown';
   }
 
-  if (typeof dep === 'string') return dep;
+  // Handle primitives
+  if (typeof dep === 'string') {
+    // Don't return metadata values like "completion", "satisfied", etc.
+    if (looksLikeTaskId(dep)) {
+      return dep;
+    }
+    // If it doesn't look like an ID but we're at depth 0, it might still be the ID
+    if (depth === 0) {
+      return dep;
+    }
+    // At deeper levels, reject non-ID strings
+    return 'unknown';
+  }
   if (typeof dep === 'number') return String(dep);
 
   if (dep && typeof dep === 'object') {
@@ -54,35 +79,65 @@ function extractDepId(dep, depth = 0) {
       return 'unknown';
     }
 
-    // Try various property names that might contain the ID
+    // ID-specific properties (these should contain the actual ID)
     const idProps = ['taskId', 'id', 'dependsOn', 'target', 'dependency', 'task', 'ref'];
     for (const prop of idProps) {
-      if (dep[prop] !== undefined && dep[prop] !== null) {
-        return extractDepId(dep[prop], depth + 1);
+      const val = dep[prop];
+      if (val !== undefined && val !== null) {
+        // If it's a string that looks like an ID, use it directly
+        if (typeof val === 'string' && looksLikeTaskId(val)) {
+          return val;
+        }
+        // If it's a number, convert to string
+        if (typeof val === 'number') {
+          return String(val);
+        }
+        // If it's an object, recurse but only if it's not just metadata
+        if (typeof val === 'object' && !Array.isArray(val)) {
+          // Skip if this object only has metadata keys (type, satisfied, etc.)
+          const valKeys = Object.keys(val);
+          const metadataKeys = ['type', 'satisfied', 'status', 'state', 'optional'];
+          const hasIdLikeKey = valKeys.some(k => /id|task|ref|depends/i.test(k));
+          if (hasIdLikeKey || !valKeys.every(k => metadataKeys.includes(k))) {
+            const result = extractDepId(val, depth + 1);
+            if (result !== 'unknown') {
+              return result;
+            }
+          }
+        }
       }
     }
 
-    // If object has keys, try to find one that looks like an ID
+    // If object has keys, try to find one that looks like it contains an ID
     const keys = Object.keys(dep);
     if (keys.length > 0) {
+      // Skip metadata-only keys
+      const metadataKeys = ['type', 'satisfied', 'status', 'state', 'optional'];
+      const meaningfulKeys = keys.filter(k => !metadataKeys.includes(k));
+
       // Look for a key that contains 'id' or 'task'
-      const idKey = keys.find(k => /id|task|ref/i.test(k));
+      const idKey = meaningfulKeys.find(k => /id|task|ref/i.test(k));
       if (idKey && dep[idKey]) {
-        return extractDepId(dep[idKey], depth + 1);
+        const result = extractDepId(dep[idKey], depth + 1);
+        if (result !== 'unknown') {
+          return result;
+        }
       }
-      // Take first value as fallback
-      const firstVal = dep[keys[0]];
-      if (typeof firstVal === 'string' || typeof firstVal === 'number') {
-        return String(firstVal);
+
+      // Take first meaningful value if it looks like an ID
+      for (const key of meaningfulKeys) {
+        const val = dep[key];
+        if (typeof val === 'string' && looksLikeTaskId(val)) {
+          return val;
+        }
       }
     }
 
     // Debug: log unhandled object structure
-    console.error('[DEBUG] extractDepId unhandled object:', JSON.stringify(dep).slice(0, 200));
+    console.error('[DEBUG] extractDepId unhandled object:', JSON.stringify(dep).slice(0, 300));
   }
 
-  // Fallback - convert to string (will show [object Object] for objects)
-  return String(dep);
+  return 'unknown';
 }
 
 /**
