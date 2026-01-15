@@ -273,6 +273,10 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
   const toolInvocations = [];
 
   if (toolUse) {
+    // Log what we're about to execute
+    console.log(`      Tool: ${toolUse.toolName}`);
+    console.log(`      Params: ${JSON.stringify(toolUse.parameters).slice(0, 150)}...`);
+
     // Execute the tool via session server
     const toolResult = await executeToolViaServer(
       sessionClient,
@@ -281,15 +285,39 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
       toolUse.parameters
     );
     toolInvocations.push(toolResult);
+
+    // Log errors immediately
+    if (!toolResult.success && toolResult.error) {
+      const errMsg = typeof toolResult.error === 'object'
+        ? toolResult.error.message : toolResult.error;
+      const errCode = typeof toolResult.error === 'object' && toolResult.error.code
+        ? ` [${toolResult.error.code}]` : '';
+      console.log(`      ❌ Tool Error${errCode}: ${errMsg}`);
+    }
   } else {
     // No tool use detected, use the task's predefined parameters
+    const toolName = task.tool.toolName;
+    const params = task.tool.command.parameters;
+
+    console.log(`      Tool: ${toolName} (predefined)`);
+    console.log(`      Params: ${JSON.stringify(params).slice(0, 150)}...`);
+
     const toolResult = await executeToolViaServer(
       sessionClient,
       sessionId,
-      task.tool.toolName,
-      task.tool.command.parameters
+      toolName,
+      params
     );
     toolInvocations.push(toolResult);
+
+    // Log errors immediately
+    if (!toolResult.success && toolResult.error) {
+      const errMsg = typeof toolResult.error === 'object'
+        ? toolResult.error.message : toolResult.error;
+      const errCode = typeof toolResult.error === 'object' && toolResult.error.code
+        ? ` [${toolResult.error.code}]` : '';
+      console.log(`      ❌ Tool Error${errCode}: ${errMsg}`);
+    }
   }
 
   return {
