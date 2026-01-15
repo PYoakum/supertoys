@@ -147,6 +147,16 @@ export class SessionServerClient {
   }
 
   /**
+   * Update/overwrite task list for session
+   * @param {string} sessionId
+   * @param {Object} taskList - Task list object with tasks array
+   * @returns {Promise<Object>}
+   */
+  async updateTaskList(sessionId, taskList) {
+    return this._request('PUT', '/api/tasklist/update', { sessionId, taskList });
+  }
+
+  /**
    * Execute a tool
    * @param {string} toolName - Tool name
    * @param {Object} params - Tool parameters

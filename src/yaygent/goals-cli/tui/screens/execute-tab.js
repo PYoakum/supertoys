@@ -10,6 +10,7 @@ import { Menu } from '../components/menu.js';
 import { LogViewer } from '../components/log-viewer.js';
 import { ProgressBar } from '../components/progress-bar.js';
 import { SplitPane } from '../components/split-pane.js';
+import { TextArea } from '../components/text-area.js';
 import { SessionServerClient } from '../services/session-server-client.js';
 import { ActionPlanRunner } from '../services/action-plan-runner.js';
 
@@ -26,8 +27,12 @@ export class ExecuteTabScreen {
   constructor(options = {}) {
     this.state = options.state || {};
 
-    // Mode: 'dashboard' | 'sessions' | 'session-detail' | 'running' | 'config'
+    // Mode: 'dashboard' | 'sessions' | 'session-detail' | 'edit-tasks' | 'running' | 'config'
     this.mode = 'dashboard';
+
+    // Task editor
+    this.taskEditor = new TextArea({ value: '' });
+    this.taskScrollOffset = 0;
 
     // Services
     this.sessionClient = new SessionServerClient({
@@ -167,7 +172,7 @@ export class ExecuteTabScreen {
    * @returns {boolean}
    */
   isInputMode() {
-    return this.editingEnvVar;
+    return this.editingEnvVar || this.mode === 'edit-tasks';
   }
 
   /**
@@ -181,7 +186,9 @@ export class ExecuteTabScreen {
       case 'sessions':
         return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
-        return '[E] Execute  [K] Kill  [D] Dry-run  [Esc] Back';
+        return '[E] Execute  [T] Edit Tasks  [K] Kill  [Esc] Back';
+      case 'edit-tasks':
+        return '[Ctrl+S] Save  [Esc] Cancel';
       case 'running':
         return '[Esc] Abort';
       case 'config':
@@ -666,6 +673,9 @@ export class ExecuteTabScreen {
       case 'session-detail':
         this._handleSessionDetailEvent(ctx, evt);
         break;
+      case 'edit-tasks':
+        this._handleEditTasksEvent(ctx, evt);
+        break;
       case 'running':
         this._handleRunningEvent(ctx, evt);
         break;
@@ -814,6 +824,19 @@ export class ExecuteTabScreen {
       switch (evt.key) {
         case 'esc':
           this.mode = 'sessions';
+          this.taskScrollOffset = 0;
+          break;
+        case 'up':
+          this.taskScrollOffset = Math.max(0, this.taskScrollOffset - 1);
+          break;
+        case 'down':
+          this.taskScrollOffset++;
+          break;
+        case 'pageup':
+          this.taskScrollOffset = Math.max(0, this.taskScrollOffset - 10);
+          break;
+        case 'pagedown':
+          this.taskScrollOffset += 10;
           break;
       }
     }
@@ -825,9 +848,12 @@ export class ExecuteTabScreen {
             this._executeSession(this.selectedSession.id);
           }
           break;
-        case 'd':
-          this.dryRun = !this.dryRun;
-          this.logViewer.addLine('info', `Dry-run: ${this.dryRun ? 'ON' : 'OFF'}`);
+        case 't':
+          if (this.selectedSession?.taskList) {
+            this._startEditTasks();
+          } else {
+            this.logViewer.addLine('warn', 'No tasks to edit. Run "Prepare Session" first.');
+          }
           break;
         case 'k':
           if (this.selectedSession) {
@@ -838,6 +864,76 @@ export class ExecuteTabScreen {
             this.mode = 'sessions';
           }
           break;
+      }
+    }
+  }
+
+  /**
+   * Start editing tasks in JSON mode
+   * @private
+   */
+  _startEditTasks() {
+    if (!this.selectedSession?.taskList) return;
+
+    this.mode = 'edit-tasks';
+    const tasksJson = JSON.stringify(this.selectedSession.taskList, null, 2);
+    this.taskEditor.setValue(tasksJson);
+    this.taskEditor.focus();
+  }
+
+  /**
+   * Handle edit-tasks mode events
+   * @private
+   */
+  _handleEditTasksEvent(ctx, evt) {
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'ctrl+s':
+          this._saveEditedTasks();
+          return;
+        case 'esc':
+          this.mode = 'session-detail';
+          return;
+      }
+    }
+
+    // Delegate to task editor
+    this.taskEditor.onEvent(ctx, evt);
+  }
+
+  /**
+   * Save edited tasks to server
+   * @private
+   */
+  async _saveEditedTasks() {
+    if (!this.selectedSession) return;
+
+    try {
+      const taskList = JSON.parse(this.taskEditor.getValue());
+
+      // Validate structure
+      if (!taskList.tasks || !Array.isArray(taskList.tasks)) {
+        this.logViewer.addLine('error', 'Invalid task list: must have a "tasks" array');
+        return;
+      }
+
+      this.logViewer.addLine('info', `Saving ${taskList.tasks.length} tasks...`);
+
+      const response = await this.sessionClient.updateTaskList(
+        this.selectedSession.id,
+        taskList
+      );
+
+      const result = response.data || response;
+      this.selectedSession.taskList = result.taskList || taskList;
+
+      this.logViewer.addLine('success', `Tasks saved successfully`);
+      this.mode = 'session-detail';
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        this.logViewer.addLine('error', 'Invalid JSON syntax');
+      } else {
+        this.logViewer.addLine('error', `Failed to save tasks: ${err.message}`);
       }
     }
   }
@@ -978,6 +1074,9 @@ export class ExecuteTabScreen {
       case 'session-detail':
         this._renderSessionDetail(ctx, rect);
         break;
+      case 'edit-tasks':
+        this._renderEditTasks(ctx, rect);
+        break;
       case 'running':
         this._renderRunning(ctx, rect);
         break;
@@ -1045,7 +1144,7 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Render session detail
+   * Render session detail with task preview
    * @private
    */
   _renderSessionDetail(ctx, rect) {
@@ -1061,22 +1160,75 @@ export class ExecuteTabScreen {
       return;
     }
 
+    // Header section
     let line = y + 1;
-    screen.drawText(x + 2, line++, `ID: ${session.id}`, styles.normal);
-    screen.drawText(x + 2, line++, `State: ${session.state || 'unknown'}`, styles.normal);
-    screen.drawText(x + 2, line++, `Created: ${session.createdAt || 'unknown'}`, styles.dim);
+    screen.drawText(x + 2, line, `ID: ${session.id}`, styles.normal);
+    screen.drawText(x + 45, line++, `State: ${session.state || 'unknown'}`, styles.accent);
+
+    const goalsCount = session.goals?.items?.length || 0;
+    const tasksCount = session.taskList?.tasks?.length || 0;
+    screen.drawText(x + 2, line++, `Goals: ${goalsCount}  |  Tasks: ${tasksCount}`, styles.dim);
     line++;
 
-    if (session.goals?.items) {
-      screen.drawText(x + 2, line++, `Goals: ${session.goals.items.length}`, styles.normal);
-    }
+    // Tasks preview section
+    if (session.taskList?.tasks && session.taskList.tasks.length > 0) {
+      screen.drawText(x + 2, line++, '─── Tasks ───', styles.accent);
 
-    if (session.taskList?.tasks) {
-      screen.drawText(x + 2, line++, `Tasks: ${session.taskList.tasks.length}`, styles.normal);
-    }
+      const tasks = session.taskList.tasks;
+      const availableHeight = h - line + y - 2;
+      const maxTasks = Math.min(tasks.length, availableHeight);
 
-    line++;
-    screen.drawText(x + 2, line++, '[E] Execute  [D] Toggle dry-run  [Esc] Back', styles.dim);
+      // Clamp scroll offset
+      const maxOffset = Math.max(0, tasks.length - maxTasks);
+      this.taskScrollOffset = Math.min(this.taskScrollOffset, maxOffset);
+
+      // Show scroll indicator
+      if (tasks.length > maxTasks) {
+        const scrollInfo = `[${this.taskScrollOffset + 1}-${this.taskScrollOffset + maxTasks}/${tasks.length}]`;
+        screen.drawText(x + w - scrollInfo.length - 2, line - 1, scrollInfo, styles.dim);
+      }
+
+      // Render visible tasks
+      for (let i = 0; i < maxTasks && line < y + h - 1; i++) {
+        const taskIndex = i + this.taskScrollOffset;
+        if (taskIndex >= tasks.length) break;
+
+        const task = tasks[taskIndex];
+        const stateIcon = task.state === 'completed' ? '✓' :
+                         task.state === 'running' ? '▶' :
+                         task.state === 'failed' ? '✗' : '○';
+        const stateStyle = task.state === 'completed' ? styles.success :
+                          task.state === 'failed' ? styles.error :
+                          task.state === 'running' ? styles.accent : styles.dim;
+
+        const taskNum = String(taskIndex + 1).padStart(2, ' ');
+        const toolName = task.tool ? `[${task.tool}]` : '';
+        const description = (task.description || task.objective || '(no description)').slice(0, w - 20);
+
+        screen.drawText(x + 2, line, `${taskNum}. ${stateIcon}`, stateStyle);
+        screen.drawText(x + 8, line, toolName, styles.accent);
+        screen.drawText(x + 8 + toolName.length + 1, line, description, styles.normal);
+        line++;
+      }
+    } else {
+      screen.drawText(x + 2, line++, '(No tasks - run "Prepare Session" first)', styles.dim);
+    }
+  }
+
+  /**
+   * Render edit-tasks mode (JSON editor)
+   * @private
+   */
+  _renderEditTasks(ctx, rect) {
+    const { screen, styles, charset } = ctx;
+    const { x, y, w, h } = rect;
+
+    const title = ' Edit Tasks (JSON) ';
+    screen.drawBox(x, y, w, h, charset, styles.border, title);
+
+    // Editor area
+    const editorRect = { x: x + 1, y: y + 1, w: w - 2, h: h - 2 };
+    this.taskEditor.render(ctx, editorRect);
   }
 
   /**

@@ -249,6 +249,7 @@ export function createApiHandler(services) {
 
   // Task list
   router.post('/api/tasklist/generate', tasklistRoutes.generate);
+  router.put('/api/tasklist/update', tasklistRoutes.update);
 
   // Tools
   router.get('/api/tools', toolRoutes.list);
@@ -939,6 +940,43 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
           sessionId,
           state: updatedSession.state,
           taskList
+        }
+      });
+    },
+
+    /**
+     * Update/overwrite task list for a session
+     */
+    async update(ctx) {
+      const { sessionId, taskList } = ctx.body || {};
+
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+
+      if (!taskList) {
+        throw new ValidationError('taskList is required', 'taskList');
+      }
+
+      // Validate taskList structure
+      if (!taskList.tasks || !Array.isArray(taskList.tasks)) {
+        throw new ValidationError('taskList.tasks must be an array', 'taskList.tasks');
+      }
+
+      // Get session to verify it exists
+      const session = sessionManager.getSession(sessionId);
+
+      // Update the task list
+      const updatedSession = sessionManager.setTaskList(sessionId, taskList);
+
+      console.log(`[TaskList] Updated: ${taskList.tasks.length} tasks for session ${sessionId.slice(0, 8)}`);
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          state: updatedSession.state,
+          taskList: updatedSession.taskList
         }
       });
     }
