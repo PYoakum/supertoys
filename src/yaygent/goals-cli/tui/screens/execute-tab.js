@@ -177,7 +177,7 @@ export class ExecuteTabScreen {
   getHelpText() {
     switch (this.mode) {
       case 'dashboard':
-        return '[S] Server  [K] Kill  [D] Dry-run  [V] Verbose  [Enter] Select';
+        return '[S] Server  [Q] Kill Server  [K] Kill Session  [D] Dry  [V] Verbose';
       case 'sessions':
         return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
@@ -337,7 +337,7 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Stop the session server
+   * Stop the session server (graceful SIGTERM)
    * @private
    */
   _stopServer() {
@@ -346,8 +346,29 @@ export class ExecuteTabScreen {
       return;
     }
 
-    this.logViewer.addLine('info', 'Stopping server...');
+    this.logViewer.addLine('info', 'Stopping server (SIGTERM)...');
     this.serverProcess.kill('SIGTERM');
+  }
+
+  /**
+   * Kill the session server (forceful SIGKILL)
+   * @private
+   */
+  _killServer() {
+    if (!this.serverRunning || !this.serverProcess) {
+      this.logViewer.addLine('warn', 'Server is not running');
+      return;
+    }
+
+    this.logViewer.addLine('warn', 'Killing server (SIGKILL)...');
+    this.serverProcess.kill('SIGKILL');
+
+    // Force cleanup since SIGKILL won't trigger normal exit handlers
+    this.serverRunning = false;
+    this.serverProcess = null;
+    this._updateServerMenuItem();
+    this.logViewer.addLine('info', 'Server killed');
+    this._checkServerStatus();
   }
 
   /**
@@ -675,6 +696,9 @@ export class ExecuteTabScreen {
       switch (evt.text.toLowerCase()) {
         case 's':
           this._toggleServer();
+          break;
+        case 'q':
+          this._killServer();
           break;
         case 'd':
           this.dryRun = !this.dryRun;
