@@ -146,6 +146,14 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Check if screen is in input/editing mode
+   * @returns {boolean}
+   */
+  isInputMode() {
+    return this.editingEnvVar;
+  }
+
+  /**
    * Get help text
    * @returns {string}
    */

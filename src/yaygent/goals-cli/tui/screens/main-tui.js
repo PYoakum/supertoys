@@ -204,9 +204,13 @@ export class MainTuiScreen {
       return;
     }
 
+    // Check if active screen is in input/editing mode
+    const activeScreen = this.getActiveTabScreen();
+    const isInputMode = activeScreen?.isInputMode?.() || false;
+
     // Global quit handler is in App
-    // Handle tab navigation first
-    if (evt.type === 'key') {
+    // Handle tab navigation first (but not when screen is in input mode)
+    if (evt.type === 'key' && !isInputMode) {
       // Tab/Shift+Tab for cycling
       if (evt.key === 'tab' || evt.key === 'shift+tab') {
         this.tabBar.onKey(evt.key);
@@ -214,15 +218,14 @@ export class MainTuiScreen {
       }
     }
 
-    // Number keys for direct tab access
-    if (evt.type === 'text') {
+    // Number keys for direct tab access (but not when screen is in input mode)
+    if (evt.type === 'text' && !isInputMode) {
       if (this.tabBar.onText(evt.text)) {
         return;
       }
     }
 
     // Delegate to active tab screen
-    const activeScreen = this.getActiveTabScreen();
     if (activeScreen?.onEvent) {
       activeScreen.onEvent(ctx, evt);
     }

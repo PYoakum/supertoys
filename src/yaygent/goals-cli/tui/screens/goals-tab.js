@@ -92,6 +92,14 @@ export class GoalsTabScreen {
   }
 
   /**
+   * Check if screen is in input/editing mode
+   * @returns {boolean}
+   */
+  isInputMode() {
+    return this.mode !== 'list';
+  }
+
+  /**
    * Get help text for status bar
    * @returns {string}
    */
