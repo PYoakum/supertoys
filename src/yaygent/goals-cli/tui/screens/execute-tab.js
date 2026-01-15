@@ -47,7 +47,6 @@ export class ExecuteTabScreen {
       title: 'Actions',
       items: [
         'Start Server',
-        'Kill Server',
         'Create Session',
         'Prepare Session',
         'List Sessions',
@@ -178,7 +177,7 @@ export class ExecuteTabScreen {
   getHelpText() {
     switch (this.mode) {
       case 'dashboard':
-        return '[S] Server  [Q] Kill Server  [K] Kill Session  [D] Dry  [V] Verbose';
+        return '[S] Server  [K] Kill Session  [D] Dry-run  [V] Verbose  [Enter] Select';
       case 'sessions':
         return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
@@ -217,13 +216,12 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Update the server menu items based on server state
+   * Update the server menu item based on server state
    * @private
    */
   _updateServerMenuItem() {
     const items = this.dashboardMenu.items.slice();
     items[0] = this.serverRunning ? 'Stop Server' : 'Start Server';
-    items[1] = this.serverRunning ? 'Kill Server' : '(Kill Server)';
     this.dashboardMenu.setItems(items);
   }
 
@@ -339,7 +337,7 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Stop the session server (graceful SIGTERM)
+   * Stop the session server
    * @private
    */
   _stopServer() {
@@ -348,29 +346,8 @@ export class ExecuteTabScreen {
       return;
     }
 
-    this.logViewer.addLine('info', 'Stopping server (SIGTERM)...');
+    this.logViewer.addLine('info', 'Stopping server...');
     this.serverProcess.kill('SIGTERM');
-  }
-
-  /**
-   * Kill the session server (forceful SIGKILL)
-   * @private
-   */
-  _killServer() {
-    if (!this.serverRunning || !this.serverProcess) {
-      this.logViewer.addLine('warn', 'Server is not running');
-      return;
-    }
-
-    this.logViewer.addLine('warn', 'Killing server (SIGKILL)...');
-    this.serverProcess.kill('SIGKILL');
-
-    // Force cleanup since SIGKILL won't trigger normal exit handlers
-    this.serverRunning = false;
-    this.serverProcess = null;
-    this._updateServerMenuItem();
-    this.logViewer.addLine('info', 'Server killed');
-    this._checkServerStatus();
   }
 
   /**
@@ -699,9 +676,6 @@ export class ExecuteTabScreen {
         case 's':
           this._toggleServer();
           break;
-        case 'q':
-          this._killServer();
-          break;
         case 'd':
           this.dryRun = !this.dryRun;
           this.logViewer.addLine('info', `Dry-run: ${this.dryRun ? 'ON' : 'OFF'}`);
@@ -727,29 +701,26 @@ export class ExecuteTabScreen {
       case 0: // Start/Stop Server
         this._toggleServer();
         break;
-      case 1: // Kill Server
-        this._killServer();
-        break;
-      case 2: // Create Session
+      case 1: // Create Session
         this._createSession();
         break;
-      case 3: // Prepare Session (Evaluate + Generate Tasks)
+      case 2: // Prepare Session (Evaluate + Generate Tasks)
         this._prepareSession();
         break;
-      case 4: // List Sessions
+      case 3: // List Sessions
         this._loadSessions();
         this.mode = 'sessions';
         break;
-      case 5: // Run Next Session
+      case 4: // Run Next Session
         this._runNextSession();
         break;
-      case 6: // Kill Session
+      case 5: // Kill Session
         this._killCurrentSession();
         break;
-      case 7: // Environment Config
+      case 6: // Environment Config
         this.mode = 'config';
         break;
-      case 8: // Refresh Status
+      case 7: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;
