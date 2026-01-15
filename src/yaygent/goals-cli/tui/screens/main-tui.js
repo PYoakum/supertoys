@@ -41,7 +41,7 @@ export class MainTuiScreen {
     this.statusBar = new StatusBar({
       left: 'Ready',
       center: '',
-      right: '[1-4] Tabs  [Tab] Next  [Q] Quit'
+      right: '[1-4] Tabs  [Tab] Next  [Q/Esc] Quit'
     });
 
     // Tab screens (lazy loaded or passed in)
@@ -129,7 +129,7 @@ export class MainTuiScreen {
     const center = this.state.serverConnected ? 'Connected' : '';
 
     // Right: context-sensitive help
-    let right = '[1-4] Tabs  [Q] Quit';
+    let right = '[1-4] Tabs  [Q/Esc] Quit';
     const activeScreen = this.getActiveTabScreen();
     if (activeScreen?.getHelpText) {
       right = activeScreen.getHelpText();
