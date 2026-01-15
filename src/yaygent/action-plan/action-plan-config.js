@@ -16,32 +16,52 @@ export default {
   },
 
   // Action LLM configuration
-  actionLlm: {
-    provider: process.env.ACTION_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
-    endpoint: process.env.ACTION_LLM_ENDPOINT || process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-    apiKey: process.env.ACTION_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
-    model: process.env.ACTION_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
-    anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
-    parameters: {
-      temperature: 0.3,
-      maxTokens: 8192
-    },
-    timeout: parseInt(process.env.ACTION_LLM_TIMEOUT, 10) || 120000
-  },
+  actionLlm: (() => {
+    const provider = process.env.ACTION_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic';
+    // Select API key based on provider (prefer provider-specific key)
+    let apiKey = process.env.ACTION_LLM_API_KEY || process.env.LLM_API_KEY;
+    if (!apiKey) {
+      apiKey = provider === 'openai'
+        ? (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY)
+        : (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+    }
+    return {
+      provider,
+      endpoint: process.env.ACTION_LLM_ENDPOINT || process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
+      apiKey,
+      model: process.env.ACTION_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+      anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
+      parameters: {
+        temperature: 0.3,
+        maxTokens: 8192
+      },
+      timeout: parseInt(process.env.ACTION_LLM_TIMEOUT, 10) || 120000
+    };
+  })(),
 
   // Evaluation LLM configuration
-  evaluationLlm: {
-    provider: process.env.EVAL_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
-    endpoint: process.env.EVAL_LLM_ENDPOINT || process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-    apiKey: process.env.EVAL_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
-    model: process.env.EVAL_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
-    anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
-    parameters: {
-      temperature: 0.1,
-      maxTokens: 4096
-    },
-    timeout: parseInt(process.env.EVAL_LLM_TIMEOUT, 10) || 60000
-  },
+  evaluationLlm: (() => {
+    const provider = process.env.EVAL_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic';
+    // Select API key based on provider (prefer provider-specific key)
+    let apiKey = process.env.EVAL_LLM_API_KEY || process.env.LLM_API_KEY;
+    if (!apiKey) {
+      apiKey = provider === 'openai'
+        ? (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY)
+        : (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+    }
+    return {
+      provider,
+      endpoint: process.env.EVAL_LLM_ENDPOINT || process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
+      apiKey,
+      model: process.env.EVAL_LLM_MODEL || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+      anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
+      parameters: {
+        temperature: 0.1,
+        maxTokens: 4096
+      },
+      timeout: parseInt(process.env.EVAL_LLM_TIMEOUT, 10) || 60000
+    };
+  })(),
 
   // Output configuration
   output: {

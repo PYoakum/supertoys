@@ -1,0 +1,33 @@
+{
+  "sessionId": "ff3b8f16-7fab-4d4f-9990-0bccf4d65e9d",
+  "startedAt": "2026-01-15T08:01:17.835Z",
+  "completedAt": "2026-01-15T08:01:17.958Z",
+  "finalStatus": "failed",
+  "entries": [
+    {
+      "timestamp": "2026-01-15T08:01:17.958Z",
+      "taskId": "task-1",
+      "stage": "execution",
+      "status": "error",
+      "message": "401: invalid x-api-key"
+    }
+  ],
+  "metrics": {
+    "totalTasks": 8,
+    "completedCount": 0,
+    "failedCount": 1,
+    "remainingCount": 7,
+    "startedAt": "2026-01-15T08:01:17.835Z",
+    "completedAt": "2026-01-15T08:01:17.958Z",
+    "totalExecutionTimeMs": 119,
+    "totalTokenUsage": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0
+    }
+  },
+  "config": {
+    "actionModel": "claude-sonnet-4-20250514",
+    "evalModel": "claude-sonnet-4-20250514"
+  }
+}

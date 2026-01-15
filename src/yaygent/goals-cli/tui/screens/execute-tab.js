@@ -82,9 +82,9 @@ export class ExecuteTabScreen {
     this.selectedProvider = Math.max(0, this.providerList.indexOf(detectedProvider));
 
     // Environment variables for execution
-    // Check multiple common API key env vars (same as action-plan-config.js)
-    const apiKey = process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || '';
+    // Select API key based on provider (prefer provider-specific key)
     const currentProvider = this.providerList[this.selectedProvider];
+    const apiKey = this._getApiKeyForProvider(currentProvider);
     this.envVars = {
       SESSION_SERVER_URL: this.state.serverUrl || 'http://localhost:3000',
       LLM_PROVIDER: currentProvider,
@@ -127,9 +127,14 @@ export class ExecuteTabScreen {
     this.focused = true;
     this._checkServerStatus();
 
-    // Warn if no API key is configured
-    if (!this.envVars.LLM_API_KEY) {
-      this.logViewer.addLine('warn', 'No LLM API key detected. Set LLM_API_KEY or ANTHROPIC_API_KEY.');
+    // Show API key status
+    const provider = this.envVars.LLM_PROVIDER;
+    const hasKey = !!this.envVars.LLM_API_KEY;
+    if (!hasKey) {
+      this.logViewer.addLine('warn', `No API key for ${provider}. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.`);
+    } else {
+      const keyPrefix = this.envVars.LLM_API_KEY.slice(0, 7);
+      this.logViewer.addLine('info', `Provider: ${provider}, Key: ${keyPrefix}...`);
     }
   }
 
@@ -641,6 +646,24 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Get the appropriate API key for a provider
+   * @param {string} provider - Provider name
+   * @returns {string} API key
+   * @private
+   */
+  _getApiKeyForProvider(provider) {
+    switch (provider) {
+      case 'anthropic':
+        return process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY || '';
+      case 'openai':
+        return process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || '';
+      case 'custom':
+      default:
+        return process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || '';
+    }
+  }
+
+  /**
    * Cycle through LLM providers and update related settings
    * @private
    */
@@ -653,6 +676,7 @@ export class ExecuteTabScreen {
     this.envVars.LLM_PROVIDER = providerName;
     this.envVars.LLM_ENDPOINT = providerConfig.endpoint;
     this.envVars.LLM_MODEL = providerConfig.defaultModel;
+    this.envVars.LLM_API_KEY = this._getApiKeyForProvider(providerName);
 
     this.logViewer.addLine('info', `Switched to provider: ${providerName}`);
     this.logViewer.addLine('info', `Endpoint: ${providerConfig.endpoint || '(custom)'}`);
