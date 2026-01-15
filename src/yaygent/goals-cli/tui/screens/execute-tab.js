@@ -37,6 +37,7 @@ export class ExecuteTabScreen {
       title: 'Actions',
       items: [
         'Create Session',
+        'Prepare Session',
         'List Sessions',
         'Run Next Session',
         'Environment Config',
@@ -225,6 +226,47 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Prepare a session for execution (evaluate + generate task list)
+   * @private
+   */
+  async _prepareSession() {
+    if (!this.state.sessionId) {
+      this.logViewer.addLine('error', 'No session selected. Create a session first.');
+      return;
+    }
+
+    const sessionId = this.state.sessionId;
+
+    try {
+      // Step 1: Evaluate the session
+      this.logViewer.addLine('info', 'Evaluating session...');
+      const evalResponse = await this.sessionClient.evaluate(sessionId);
+      const evalResult = evalResponse.data || evalResponse;
+
+      if (evalResult.evaluation) {
+        this.logViewer.addLine('success', 'Evaluation complete');
+      }
+
+      // Step 2: Generate task list
+      this.logViewer.addLine('info', 'Generating task list...');
+      const taskResponse = await this.sessionClient.generateTaskList(sessionId);
+      const taskResult = taskResponse.data || taskResponse;
+
+      if (taskResult.taskList) {
+        const taskCount = taskResult.taskList.tasks?.length || 0;
+        this.logViewer.addLine('success', `Generated ${taskCount} tasks`);
+        this.logViewer.addLine('info', 'Session is ready for execution');
+      }
+
+      // Refresh sessions list
+      await this._loadSessions();
+
+    } catch (err) {
+      this.logViewer.addLine('error', `Preparation failed: ${err.message}`);
+    }
+  }
+
+  /**
    * Execute a session
    * @param {string} sessionId
    * @private
@@ -396,17 +438,20 @@ export class ExecuteTabScreen {
       case 0: // Create Session
         this._createSession();
         break;
-      case 1: // List Sessions
+      case 1: // Prepare Session (Evaluate + Generate Tasks)
+        this._prepareSession();
+        break;
+      case 2: // List Sessions
         this._loadSessions();
         this.mode = 'sessions';
         break;
-      case 2: // Run Next Session
+      case 3: // Run Next Session
         this._runNextSession();
         break;
-      case 3: // Environment Config
+      case 4: // Environment Config
         this.mode = 'config';
         break;
-      case 4: // Refresh Status
+      case 5: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;
