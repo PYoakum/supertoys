@@ -111,7 +111,14 @@ Status: Running
     console.log(`      Tool result:`);
     console.log(`        Success: ${toolResult.success}`);
     if (toolResult.error) {
-      console.log(`        Error: ${toolResult.error}`);
+      // Handle error as object {message, code} or string
+      const errorMsg = typeof toolResult.error === 'object'
+        ? (toolResult.error.message || JSON.stringify(toolResult.error))
+        : toolResult.error;
+      const errorCode = typeof toolResult.error === 'object' && toolResult.error.code
+        ? ` [${toolResult.error.code}]`
+        : '';
+      console.log(`        Error${errorCode}: ${errorMsg}`);
     }
     if (toolResult.result) {
       const resultStr = JSON.stringify(toolResult.result).slice(0, 200);
