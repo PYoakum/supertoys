@@ -164,47 +164,56 @@ export function previewAiEditsTui(edits, options = {}) {
  * @param {string} [options.outputDir='./output'] - Output directory
  * @returns {Promise<void>}
  */
-export async function runMainTui(options = {}) {
-  const app = new App();
+export function runMainTui(options = {}) {
+  return new Promise((resolve) => {
+    const app = new App();
 
-  // Create main screen
-  const mainScreen = new MainTuiScreen({
-    goalsPath: options.goalsPath || './goals.json',
-    contextPath: options.contextPath,
-    serverUrl: options.serverUrl || 'http://localhost:3000',
-    outputDir: options.outputDir || './output'
-  });
+    // Create main screen
+    const mainScreen = new MainTuiScreen({
+      goalsPath: options.goalsPath || './goals.json',
+      contextPath: options.contextPath,
+      serverUrl: options.serverUrl || 'http://localhost:3000',
+      outputDir: options.outputDir || './output'
+    });
 
-  // Create tab screens
-  const goalsTab = new GoalsTabScreen({ state: mainScreen.state });
-  const contextTab = new ContextTabScreen({ state: mainScreen.state });
-  const executeTab = new ExecuteTabScreen({ state: mainScreen.state });
-  const outputTab = new OutputTabScreen({ state: mainScreen.state });
+    // Create tab screens
+    const goalsTab = new GoalsTabScreen({ state: mainScreen.state });
+    const contextTab = new ContextTabScreen({ state: mainScreen.state });
+    const executeTab = new ExecuteTabScreen({ state: mainScreen.state });
+    const outputTab = new OutputTabScreen({ state: mainScreen.state });
 
-  // Register tab screens
-  mainScreen.setTabScreen('goals', goalsTab);
-  mainScreen.setTabScreen('context', contextTab);
-  mainScreen.setTabScreen('execute', executeTab);
-  mainScreen.setTabScreen('output', outputTab);
+    // Register tab screens
+    mainScreen.setTabScreen('goals', goalsTab);
+    mainScreen.setTabScreen('context', contextTab);
+    mainScreen.setTabScreen('execute', executeTab);
+    mainScreen.setTabScreen('output', outputTab);
 
-  // Focus initial tab
-  goalsTab.focus();
+    // Focus initial tab
+    goalsTab.focus();
 
-  // Wrap to handle quit
-  const wrapper = {
-    render: (ctx, rect) => mainScreen.render(ctx, rect),
-    onEvent: (ctx, evt) => {
-      // Handle global quit
-      if (evt.type === 'text' && evt.text.toLowerCase() === 'q') {
-        app.shutdown();
-        return;
+    // Store original shutdown to intercept
+    const originalShutdown = app.shutdown.bind(app);
+    app.shutdown = () => {
+      originalShutdown();
+      resolve();
+    };
+
+    // Wrap to handle quit
+    const wrapper = {
+      render: (ctx, rect) => mainScreen.render(ctx, rect),
+      onEvent: (ctx, evt) => {
+        // Handle global quit
+        if (evt.type === 'text' && evt.text.toLowerCase() === 'q') {
+          app.shutdown();
+          return;
+        }
+        mainScreen.onEvent(ctx, evt);
       }
-      mainScreen.onEvent(ctx, evt);
-    }
-  };
+    };
 
-  app.mount(wrapper);
-  await app.start();
+    app.mount(wrapper);
+    app.start();
+  });
 }
 
 export default {
