@@ -51,6 +51,7 @@ export class ExecuteTabScreen {
         'Prepare Session',
         'List Sessions',
         'Run Next Session',
+        'Kill Session',
         'Environment Config',
         'Refresh Status'
       ]
@@ -176,11 +177,11 @@ export class ExecuteTabScreen {
   getHelpText() {
     switch (this.mode) {
       case 'dashboard':
-        return '[S] Server  [D] Dry-run  [V] Verbose  [Enter] Select';
+        return '[S] Server  [K] Kill  [D] Dry-run  [V] Verbose  [Enter] Select';
       case 'sessions':
-        return '[Enter] View  [X] Delete  [R] Refresh  [Esc] Back';
+        return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
-        return '[E] Execute  [D] Dry-run  [Esc] Back';
+        return '[E] Execute  [K] Kill  [D] Dry-run  [Esc] Back';
       case 'running':
         return '[Esc] Abort';
       case 'config':
@@ -583,6 +584,52 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Kill the current or selected session
+   * @private
+   */
+  async _killCurrentSession() {
+    // First, check if we have a current session in state
+    if (this.state.sessionId) {
+      const sessionId = this.state.sessionId;
+      this.logViewer.addLine('info', `Killing session: ${sessionId.slice(0, 8)}...`);
+      try {
+        await this.sessionClient.deleteSession(sessionId);
+        this.logViewer.addLine('success', `Session killed: ${sessionId.slice(0, 8)}...`);
+        this.state.sessionId = null;
+        await this._loadSessions();
+      } catch (err) {
+        this.logViewer.addLine('error', `Failed to kill session: ${err.message}`);
+      }
+      return;
+    }
+
+    // No current session, check if we have a selected session from the list
+    if (this.selectedSession) {
+      const sessionId = this.selectedSession.id;
+      this.logViewer.addLine('info', `Killing selected session: ${sessionId.slice(0, 8)}...`);
+      try {
+        await this.sessionClient.deleteSession(sessionId);
+        this.logViewer.addLine('success', `Session killed: ${sessionId.slice(0, 8)}...`);
+        this.selectedSession = null;
+        await this._loadSessions();
+      } catch (err) {
+        this.logViewer.addLine('error', `Failed to kill session: ${err.message}`);
+      }
+      return;
+    }
+
+    // No session selected, prompt user to select one
+    this.logViewer.addLine('warn', 'No session selected. Use "List Sessions" to select one, or press [K] in sessions list.');
+    this.logViewer.addLine('info', 'Loading sessions list...');
+    await this._loadSessions();
+    if (this.sessions.length > 0) {
+      this.mode = 'sessions';
+    } else {
+      this.logViewer.addLine('info', 'No sessions found on server');
+    }
+  }
+
+  /**
    * Handle events
    * @param {Object} ctx
    * @param {Object} evt
@@ -637,6 +684,9 @@ export class ExecuteTabScreen {
           this.verbose = !this.verbose;
           this.logViewer.addLine('info', `Verbose: ${this.verbose ? 'ON' : 'OFF'}`);
           break;
+        case 'k':
+          this._killCurrentSession();
+          break;
       }
     }
   }
@@ -664,10 +714,13 @@ export class ExecuteTabScreen {
       case 4: // Run Next Session
         this._runNextSession();
         break;
-      case 5: // Environment Config
+      case 5: // Kill Session
+        this._killCurrentSession();
+        break;
+      case 6: // Environment Config
         this.mode = 'config';
         break;
-      case 6: // Refresh Status
+      case 7: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;
@@ -702,8 +755,10 @@ export class ExecuteTabScreen {
           this._loadSessions();
           break;
         case 'x':
+        case 'k':
           if (this.sessions.length > 0 && this.sessionsMenu.selected < this.sessions.length) {
             const session = this.sessions[this.sessionsMenu.selected];
+            this.logViewer.addLine('info', `Killing session: ${session.id.slice(0, 8)}...`);
             this._deleteSession(session.id);
           }
           break;
@@ -752,6 +807,15 @@ export class ExecuteTabScreen {
         case 'd':
           this.dryRun = !this.dryRun;
           this.logViewer.addLine('info', `Dry-run: ${this.dryRun ? 'ON' : 'OFF'}`);
+          break;
+        case 'k':
+          if (this.selectedSession) {
+            const sessionId = this.selectedSession.id;
+            this.logViewer.addLine('info', `Killing session: ${sessionId.slice(0, 8)}...`);
+            this._deleteSession(sessionId);
+            this.selectedSession = null;
+            this.mode = 'sessions';
+          }
           break;
       }
     }
