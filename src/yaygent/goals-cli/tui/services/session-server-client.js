@@ -1,0 +1,190 @@
+/**
+ * @fileoverview Session Server REST API Client
+ * @module tui/services/session-server-client
+ */
+
+/**
+ * Client for goals-session-server REST API
+ */
+export class SessionServerClient {
+  /**
+   * @param {Object} options
+   * @param {string} [options.baseUrl='http://localhost:3000'] - Server base URL
+   * @param {number} [options.timeout=30000] - Request timeout in ms
+   */
+  constructor(options = {}) {
+    this.baseUrl = options.baseUrl || 'http://localhost:3000';
+    this.timeout = options.timeout || 30000;
+    this.connected = false;
+    this.lastError = null;
+  }
+
+  /**
+   * Make HTTP request to server
+   * @param {string} method - HTTP method
+   * @param {string} path - API path
+   * @param {Object} [body] - Request body
+   * @returns {Promise<Object>}
+   * @private
+   */
+  async _request(method, path, body = null) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const options = {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+      };
+
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(`${this.baseUrl}${path}`, options);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`HTTP ${response.status}: ${error}`);
+      }
+
+      const data = await response.json();
+      this.connected = true;
+      this.lastError = null;
+      return data;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      this.lastError = err.message;
+      if (err.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Check server health
+   * @returns {Promise<{status: string, uptime: number}>}
+   */
+  async healthCheck() {
+    try {
+      const result = await this._request('GET', '/health');
+      this.connected = true;
+      return result;
+    } catch (err) {
+      this.connected = false;
+      throw err;
+    }
+  }
+
+  /**
+   * Create a new session
+   * @param {Object} goals - Goals data
+   * @param {Object} [context] - Context data
+   * @returns {Promise<{sessionId: string}>}
+   */
+  async createSession(goals, context = null) {
+    return this._request('POST', '/session', { goals, context });
+  }
+
+  /**
+   * List all sessions
+   * @returns {Promise<Array<{id: string, status: string, createdAt: string}>>}
+   */
+  async listSessions() {
+    return this._request('GET', '/sessions');
+  }
+
+  /**
+   * List sessions in ready state
+   * @returns {Promise<Array<{id: string, status: string, createdAt: string}>>}
+   */
+  async listReadySessions() {
+    const sessions = await this.listSessions();
+    return sessions.filter(s => s.status === 'ready');
+  }
+
+  /**
+   * Get session details
+   * @param {string} sessionId
+   * @returns {Promise<Object>}
+   */
+  async getSession(sessionId) {
+    return this._request('GET', `/session/${sessionId}`);
+  }
+
+  /**
+   * Delete a session
+   * @param {string} sessionId
+   * @returns {Promise<{success: boolean}>}
+   */
+  async deleteSession(sessionId) {
+    return this._request('DELETE', `/session/${sessionId}`);
+  }
+
+  /**
+   * Run evaluation on session
+   * @param {string} sessionId
+   * @returns {Promise<Object>}
+   */
+  async evaluate(sessionId) {
+    return this._request('POST', `/session/${sessionId}/evaluate`);
+  }
+
+  /**
+   * Generate task list for session
+   * @param {string} sessionId
+   * @returns {Promise<{tasks: Array}>}
+   */
+  async generateTaskList(sessionId) {
+    return this._request('POST', `/session/${sessionId}/tasks`);
+  }
+
+  /**
+   * Execute a tool
+   * @param {string} toolName - Tool name
+   * @param {Object} params - Tool parameters
+   * @param {string} [sessionId] - Optional session ID
+   * @returns {Promise<Object>}
+   */
+  async executeTool(toolName, params, sessionId = null) {
+    const body = { tool: toolName, params };
+    if (sessionId) {
+      body.sessionId = sessionId;
+    }
+    return this._request('POST', '/tool/execute', body);
+  }
+
+  /**
+   * Get session logs
+   * @param {string} sessionId
+   * @returns {Promise<Array<{level: string, message: string, timestamp: string}>>}
+   */
+  async getSessionLogs(sessionId) {
+    return this._request('GET', `/session/${sessionId}/logs`);
+  }
+
+  /**
+   * Update session context
+   * @param {string} sessionId
+   * @param {Object} context
+   * @returns {Promise<{success: boolean}>}
+   */
+  async updateContext(sessionId, context) {
+    return this._request('PUT', `/session/${sessionId}/context`, { context });
+  }
+
+  /**
+   * Get server status
+   * @returns {Promise<Object>}
+   */
+  async getStatus() {
+    return this._request('GET', '/status');
+  }
+}
+
+export default SessionServerClient;

@@ -27,7 +27,7 @@
 /**
  * Valid subcommands
  */
-const SUBCOMMANDS = ['import', 'get', 'set', 'delete', 'list-paths', 'ai-edit', 'browse', 'run', 'validate'];
+const SUBCOMMANDS = ['import', 'get', 'set', 'delete', 'list-paths', 'ai-edit', 'browse', 'tui', 'run', 'validate'];
 
 /**
  * Default argument values
@@ -305,6 +305,8 @@ Commands:
   delete    Delete a value by path expression
   list-paths List all editable paths in the goals file
   ai-edit   Use LLM to enhance goal objectives, criteria, and constraints
+  browse    Interactive goal browser (simple TUI)
+  tui       Full tabbed TUI with Goals, Context, Execute, and Output tabs
   run       Execute goals (same as legacy mode)
   validate  Validate goals without executing
 

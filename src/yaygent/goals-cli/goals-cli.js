@@ -41,7 +41,8 @@ import {
   GoalsBrowserScreen,
   AiEditPreviewScreen,
   ANSI,
-  writeStdout
+  writeStdout,
+  runMainTui
 } from './tui/index.js';
 
 /**
@@ -789,6 +790,30 @@ async function cmdBrowse(args, logger) {
 }
 
 /**
+ * Handle the tui command (full tabbed TUI)
+ * @param {Object} args - Parsed arguments
+ * @param {Logger} logger - Logger
+ * @returns {Promise<number>} Exit code
+ */
+async function cmdTui(args, logger) {
+  logger.debug('Starting tabbed TUI...');
+
+  try {
+    await runMainTui({
+      goalsPath: args.goals || DEFAULT_GOALS_FILE,
+      contextPath: args.context,
+      serverUrl: args.serverUrl || process.env.SESSION_SERVER_URL || 'http://localhost:3000',
+      outputDir: args.output || process.env.OUTPUT_DIR || './output'
+    });
+
+    return ExitCodes.SUCCESS;
+  } catch (err) {
+    logger.error(`TUI error: ${err.message}`);
+    return ExitCodes.UNKNOWN_ERROR;
+  }
+}
+
+/**
  * Run AI edit with TUI preview
  * @param {Object} args - Parsed arguments
  * @param {Logger} logger - Logger
@@ -879,6 +904,9 @@ async function main(argv) {
 
         case 'browse':
           return await cmdBrowse(args, logger);
+
+        case 'tui':
+          return await cmdTui(args, logger);
 
         case 'validate':
           // Treat validate as dry-run

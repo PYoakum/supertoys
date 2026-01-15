@@ -148,6 +148,26 @@ export class Input {
       return { consumed: 1, event: { type: 'key', key: 'ctrl+q' } };
     }
 
+    // Ctrl+S (save)
+    if (buf.startsWith('\x13')) {
+      return { consumed: 1, event: { type: 'key', key: 'ctrl+s' } };
+    }
+
+    // Ctrl+A (select all)
+    if (buf.startsWith('\x01')) {
+      return { consumed: 1, event: { type: 'key', key: 'ctrl+a' } };
+    }
+
+    // Ctrl+N (new)
+    if (buf.startsWith('\x0e')) {
+      return { consumed: 1, event: { type: 'key', key: 'ctrl+n' } };
+    }
+
+    // Ctrl+R (refresh/rename)
+    if (buf.startsWith('\x12')) {
+      return { consumed: 1, event: { type: 'key', key: 'ctrl+r' } };
+    }
+
     // Escape sequences
     if (buf.startsWith('\x1b')) {
       // Arrow keys: ESC [ A/B/C/D
@@ -159,6 +179,9 @@ export class Input {
       // Home/End
       if (buf.startsWith('\x1b[H')) return { consumed: 3, event: { type: 'key', key: 'home' } };
       if (buf.startsWith('\x1b[F')) return { consumed: 3, event: { type: 'key', key: 'end' } };
+
+      // Shift+Tab: ESC [ Z
+      if (buf.startsWith('\x1b[Z')) return { consumed: 3, event: { type: 'key', key: 'shift+tab' } };
 
       // Delete: ESC [ 3 ~
       if (buf.startsWith('\x1b[3~')) return { consumed: 4, event: { type: 'key', key: 'delete' } };

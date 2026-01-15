@@ -12,9 +12,31 @@ import { Input, stop, isStopped, keyEvent, textEvent } from './input.js';
 import { ANSI, writeStdout, getTerminalSize } from './ansi.js';
 import { CGA, UI, C, STYLES, fg, bg, styleToSgr } from './colors.js';
 import { ASCII, CharMapper, createCharMapper } from './charset.js';
+
+// Components
 import { Menu } from './components/menu.js';
+import { TabBar } from './components/tab-bar.js';
+import { TextInput } from './components/text-input.js';
+import { TextArea } from './components/text-area.js';
+import { StatusBar } from './components/status-bar.js';
+import { Modal, confirmModal, alertModal } from './components/modal.js';
+import { ProgressBar, scoreBar } from './components/progress-bar.js';
+import { LogViewer } from './components/log-viewer.js';
+import { SplitPane } from './components/split-pane.js';
+
+// Screens
 import { GoalsBrowserScreen } from './screens/goals-browser.js';
 import { AiEditPreviewScreen } from './screens/ai-edit-preview.js';
+import { MainTuiScreen } from './screens/main-tui.js';
+import { GoalsTabScreen } from './screens/goals-tab.js';
+import { ContextTabScreen } from './screens/context-tab.js';
+import { ExecuteTabScreen } from './screens/execute-tab.js';
+import { OutputTabScreen } from './screens/output-tab.js';
+
+// Services
+import { SessionServerClient } from './services/session-server-client.js';
+import { ActionPlanRunner } from './services/action-plan-runner.js';
+import { OutputEvalRunner } from './services/output-eval-runner.js';
 
 // Re-export everything
 export {
@@ -44,10 +66,31 @@ export {
 
   // Components
   Menu,
+  TabBar,
+  TextInput,
+  TextArea,
+  StatusBar,
+  Modal,
+  confirmModal,
+  alertModal,
+  ProgressBar,
+  scoreBar,
+  LogViewer,
+  SplitPane,
 
   // Screens
   GoalsBrowserScreen,
-  AiEditPreviewScreen
+  AiEditPreviewScreen,
+  MainTuiScreen,
+  GoalsTabScreen,
+  ContextTabScreen,
+  ExecuteTabScreen,
+  OutputTabScreen,
+
+  // Services
+  SessionServerClient,
+  ActionPlanRunner,
+  OutputEvalRunner
 };
 
 /**
@@ -112,14 +155,83 @@ export function previewAiEditsTui(edits, options = {}) {
   });
 }
 
+/**
+ * Run the main tabbed TUI
+ * @param {Object} options
+ * @param {string} [options.goalsPath='./goals.json'] - Goals file path
+ * @param {string} [options.contextPath] - Context directory path
+ * @param {string} [options.serverUrl='http://localhost:3000'] - Session server URL
+ * @param {string} [options.outputDir='./output'] - Output directory
+ * @returns {Promise<void>}
+ */
+export async function runMainTui(options = {}) {
+  const app = new App();
+
+  // Create main screen
+  const mainScreen = new MainTuiScreen({
+    goalsPath: options.goalsPath || './goals.json',
+    contextPath: options.contextPath,
+    serverUrl: options.serverUrl || 'http://localhost:3000',
+    outputDir: options.outputDir || './output'
+  });
+
+  // Create tab screens
+  const goalsTab = new GoalsTabScreen({ state: mainScreen.state });
+  const contextTab = new ContextTabScreen({ state: mainScreen.state });
+  const executeTab = new ExecuteTabScreen({ state: mainScreen.state });
+  const outputTab = new OutputTabScreen({ state: mainScreen.state });
+
+  // Register tab screens
+  mainScreen.setTabScreen('goals', goalsTab);
+  mainScreen.setTabScreen('context', contextTab);
+  mainScreen.setTabScreen('execute', executeTab);
+  mainScreen.setTabScreen('output', outputTab);
+
+  // Focus initial tab
+  goalsTab.focus();
+
+  // Wrap to handle quit
+  const wrapper = {
+    render: (ctx, rect) => mainScreen.render(ctx, rect),
+    onEvent: (ctx, evt) => {
+      // Handle global quit
+      if (evt.type === 'text' && evt.text.toLowerCase() === 'q') {
+        app.shutdown();
+        return;
+      }
+      mainScreen.onEvent(ctx, evt);
+    }
+  };
+
+  app.mount(wrapper);
+  await app.start();
+}
+
 export default {
   App,
   Screen,
   Input,
   Menu,
+  TabBar,
+  TextInput,
+  TextArea,
+  StatusBar,
+  Modal,
+  ProgressBar,
+  LogViewer,
+  SplitPane,
   GoalsBrowserScreen,
   AiEditPreviewScreen,
+  MainTuiScreen,
+  GoalsTabScreen,
+  ContextTabScreen,
+  ExecuteTabScreen,
+  OutputTabScreen,
+  SessionServerClient,
+  ActionPlanRunner,
+  OutputEvalRunner,
   runTui,
+  runMainTui,
   browseGoals,
   previewAiEditsTui
 };
