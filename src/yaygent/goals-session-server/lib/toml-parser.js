@@ -95,20 +95,21 @@ export function parseTaskToml(content) {
       const key = kvMatch[1];
       let value = kvMatch[2];
 
-      // Check for multiline string start
-      if (value === "'''" || value === '"""') {
-        inMultiline = true;
-        multilineKey = currentSection === 'parameters' ? `parameters.${key}` : key;
-        multilineValue = [];
-        continue;
-      }
-
       // Check for multiline string on same line ('''content''')
-      if ((value.startsWith("'''") && value.endsWith("'''")) ||
-          (value.startsWith('"""') && value.endsWith('"""'))) {
+      if ((value.startsWith("'''") && value.endsWith("'''") && value.length > 6) ||
+          (value.startsWith('"""') && value.endsWith('"""') && value.length > 6)) {
         value = value.slice(3, -3);
       }
-      // Parse the value
+      // Check for multiline string start (''' alone or '''content on first line)
+      else if (value.startsWith("'''") || value.startsWith('"""')) {
+        inMultiline = true;
+        multilineKey = currentSection === 'parameters' ? `parameters.${key}` : key;
+        // If there's content after the opening quotes, start with it
+        const afterQuotes = value.slice(3);
+        multilineValue = afterQuotes ? [afterQuotes] : [];
+        continue;
+      }
+      // Parse regular value
       else {
         value = parseTomlValue(value);
       }

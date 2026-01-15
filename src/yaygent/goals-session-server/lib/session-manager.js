@@ -397,9 +397,9 @@ export class SessionManager {
           blockers: []
         },
         dependencies: {
-          declaredDependencies: goal.dependencies ?? [],
+          declaredDependencies: goal.dependencies?.declaredDependencies ?? [],
           inferredDependencies: [],
-          allDependencies: goal.dependencies ?? [],
+          allDependencies: goal.dependencies?.declaredDependencies ?? [],
           dependencyStatus: []
         },
         executionIndex: null,
@@ -467,7 +467,10 @@ export class SessionManager {
     // Update items with execution order and inferred dependencies
     const updatedItems = goals.items.map(item => {
       const inferredDeps = inferredDepsMap.get(item.id) || [];
-      const allDeps = [...new Set([...item.dependencies.declaredDependencies, ...inferredDeps])];
+      const declaredDeps = Array.isArray(item.dependencies?.declaredDependencies)
+        ? item.dependencies.declaredDependencies
+        : [];
+      const allDeps = [...new Set([...declaredDeps, ...inferredDeps])];
       
       // Calculate execution index
       const execIndex = executionOrder ? executionOrder.indexOf(item.id) : null;
