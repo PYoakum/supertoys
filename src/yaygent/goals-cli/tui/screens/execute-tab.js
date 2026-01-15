@@ -153,8 +153,10 @@ export class ExecuteTabScreen {
    */
   async _loadSessions() {
     try {
-      const sessions = await this.sessionClient.listSessions();
-      this.sessions = Array.isArray(sessions) ? sessions : (sessions.sessions || []);
+      const response = await this.sessionClient.listSessions();
+      // Server returns { success: true, data: { sessions: [...], pagination: {...} } }
+      const data = response.data || response;
+      this.sessions = Array.isArray(data) ? data : (data.sessions || []);
       this._updateSessionsMenu();
     } catch (err) {
       this.sessions = [];
@@ -193,10 +195,13 @@ export class ExecuteTabScreen {
 
     try {
       this.logViewer.addLine('info', 'Creating session...');
-      const result = await this.sessionClient.createSession(
+      const response = await this.sessionClient.createSession(
         this.state.goals,
         this.state.context
       );
+
+      // Server returns { success: true, data: { sessionId: "...", ... } }
+      const result = response.data || response;
 
       if (result.sessionId) {
         this.state.sessionId = result.sessionId;
@@ -442,7 +447,9 @@ export class ExecuteTabScreen {
   async _selectSession(index) {
     if (index >= 0 && index < this.sessions.length) {
       try {
-        this.selectedSession = await this.sessionClient.getSession(this.sessions[index].id);
+        const response = await this.sessionClient.getSession(this.sessions[index].id);
+        // Server returns { success: true, data: { id: "...", state: "...", ... } }
+        this.selectedSession = response.data || response;
         this.mode = 'session-detail';
       } catch (err) {
         this.logViewer.addLine('error', `Failed to load session: ${err.message}`);
