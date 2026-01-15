@@ -30,23 +30,58 @@ import { OutputEvalRunner } from './lib/output-eval-runner.js';
 
 /**
  * Extract dependency ID from various formats
- * Dependencies can be: string, number, or object with taskId property (which itself can be nested)
+ * Dependencies can be: string, number, or object with various property names
  * @param {*} dep - Dependency in any format
+ * @param {number} [depth=0] - Recursion depth for safety
  * @returns {string} - The dependency ID as a string
  */
-function extractDepId(dep) {
+function extractDepId(dep, depth = 0) {
+  // Safety: prevent infinite recursion
+  if (depth > 10) {
+    console.error('[DEBUG] extractDepId max depth reached:', JSON.stringify(dep));
+    return 'unknown';
+  }
+
   if (typeof dep === 'string') return dep;
   if (typeof dep === 'number') return String(dep);
+
   if (dep && typeof dep === 'object') {
-    // Try taskId first, then id, then recurse if taskId is an object
-    if (dep.taskId) {
-      return extractDepId(dep.taskId);
+    // Handle arrays - take first element
+    if (Array.isArray(dep)) {
+      if (dep.length > 0) {
+        return extractDepId(dep[0], depth + 1);
+      }
+      return 'unknown';
     }
-    if (dep.id) {
-      return extractDepId(dep.id);
+
+    // Try various property names that might contain the ID
+    const idProps = ['taskId', 'id', 'dependsOn', 'target', 'dependency', 'task', 'ref'];
+    for (const prop of idProps) {
+      if (dep[prop] !== undefined && dep[prop] !== null) {
+        return extractDepId(dep[prop], depth + 1);
+      }
     }
+
+    // If object has keys, try to find one that looks like an ID
+    const keys = Object.keys(dep);
+    if (keys.length > 0) {
+      // Look for a key that contains 'id' or 'task'
+      const idKey = keys.find(k => /id|task|ref/i.test(k));
+      if (idKey && dep[idKey]) {
+        return extractDepId(dep[idKey], depth + 1);
+      }
+      // Take first value as fallback
+      const firstVal = dep[keys[0]];
+      if (typeof firstVal === 'string' || typeof firstVal === 'number') {
+        return String(firstVal);
+      }
+    }
+
+    // Debug: log unhandled object structure
+    console.error('[DEBUG] extractDepId unhandled object:', JSON.stringify(dep).slice(0, 200));
   }
-  // Fallback - convert to string
+
+  // Fallback - convert to string (will show [object Object] for objects)
   return String(dep);
 }
 

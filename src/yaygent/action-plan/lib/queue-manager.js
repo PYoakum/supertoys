@@ -5,16 +5,51 @@
 
 /**
  * Extract dependency ID from various formats
+ * Dependencies can be: string, number, or object with various property names
  * @param {*} dep - Dependency in any format
+ * @param {number} [depth=0] - Recursion depth for safety
  * @returns {string}
  */
-function extractDepId(dep) {
+function extractDepId(dep, depth = 0) {
+  // Safety: prevent infinite recursion
+  if (depth > 10) return 'unknown';
+
   if (typeof dep === 'string') return dep;
   if (typeof dep === 'number') return String(dep);
+
   if (dep && typeof dep === 'object') {
-    if (dep.taskId) return extractDepId(dep.taskId);
-    if (dep.id) return extractDepId(dep.id);
+    // Handle arrays - take first element
+    if (Array.isArray(dep)) {
+      if (dep.length > 0) {
+        return extractDepId(dep[0], depth + 1);
+      }
+      return 'unknown';
+    }
+
+    // Try various property names that might contain the ID
+    const idProps = ['taskId', 'id', 'dependsOn', 'target', 'dependency', 'task', 'ref'];
+    for (const prop of idProps) {
+      if (dep[prop] !== undefined && dep[prop] !== null) {
+        return extractDepId(dep[prop], depth + 1);
+      }
+    }
+
+    // If object has keys, try to find one that looks like an ID
+    const keys = Object.keys(dep);
+    if (keys.length > 0) {
+      // Look for a key that contains 'id' or 'task'
+      const idKey = keys.find(k => /id|task|ref/i.test(k));
+      if (idKey && dep[idKey]) {
+        return extractDepId(dep[idKey], depth + 1);
+      }
+      // Take first value as fallback
+      const firstVal = dep[keys[0]];
+      if (typeof firstVal === 'string' || typeof firstVal === 'number') {
+        return String(firstVal);
+      }
+    }
   }
+
   return String(dep);
 }
 
