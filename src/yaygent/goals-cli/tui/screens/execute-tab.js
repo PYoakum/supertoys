@@ -195,9 +195,20 @@ export class ExecuteTabScreen {
 
     try {
       this.logViewer.addLine('info', 'Creating session...');
+
+      // Provide default context if none exists
+      const context = this.state.context || {
+        files: [],
+        formattedContent: '',
+        metadata: {
+          source: 'tui',
+          createdAt: new Date().toISOString()
+        }
+      };
+
       const response = await this.sessionClient.createSession(
         this.state.goals,
-        this.state.context
+        context
       );
 
       // Server returns { success: true, data: { sessionId: "...", ... } }
