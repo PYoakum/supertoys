@@ -4,6 +4,21 @@
  */
 
 /**
+ * Extract dependency ID from various formats
+ * @param {*} dep - Dependency in any format
+ * @returns {string}
+ */
+function extractDepId(dep) {
+  if (typeof dep === 'string') return dep;
+  if (typeof dep === 'number') return String(dep);
+  if (dep && typeof dep === 'object') {
+    if (dep.taskId) return extractDepId(dep.taskId);
+    if (dep.id) return extractDepId(dep.id);
+  }
+  return String(dep);
+}
+
+/**
  * @typedef {'initializing'|'running'|'paused'|'completed'|'failed'|'aborted'} QueueStatus
  */
 
@@ -111,7 +126,7 @@ export class QueueManager {
     }
     
     return task.dependencies.every(dep => {
-      const depId = dep.taskId || dep;
+      const depId = extractDepId(dep);
       const depTask = this.state.allTasks.find(t => t.id === depId);
       return depTask && depTask.state === 'completed';
     });
@@ -191,7 +206,7 @@ export class QueueManager {
     // Update dependency status for dependent tasks
     for (const t of this.state.allTasks) {
       if (t.dependencies) {
-        const dep = t.dependencies.find(d => (d.taskId || d) === taskId);
+        const dep = t.dependencies.find(d => extractDepId(d) === taskId);
         if (dep && typeof dep === 'object') {
           dep.satisfied = true;
         }

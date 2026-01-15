@@ -29,6 +29,28 @@ import {
 import { OutputEvalRunner } from './lib/output-eval-runner.js';
 
 /**
+ * Extract dependency ID from various formats
+ * Dependencies can be: string, number, or object with taskId property (which itself can be nested)
+ * @param {*} dep - Dependency in any format
+ * @returns {string} - The dependency ID as a string
+ */
+function extractDepId(dep) {
+  if (typeof dep === 'string') return dep;
+  if (typeof dep === 'number') return String(dep);
+  if (dep && typeof dep === 'object') {
+    // Try taskId first, then id, then recurse if taskId is an object
+    if (dep.taskId) {
+      return extractDepId(dep.taskId);
+    }
+    if (dep.id) {
+      return extractDepId(dep.id);
+    }
+  }
+  // Fallback - convert to string
+  return String(dep);
+}
+
+/**
  * Parse command line arguments
  * @returns {Object}
  */
@@ -442,11 +464,11 @@ async function main(args) {
         for (const pendingTask of state.pendingTasks) {
           const unsatisfied = (pendingTask.dependencies || [])
             .filter(dep => {
-              const depId = dep.taskId || dep;
+              const depId = extractDepId(dep);
               const depTask = state.allTasks.find(t => t.id === depId);
               return !depTask || depTask.state !== 'completed';
             })
-            .map(dep => String(dep.taskId || dep).slice(0, 8));
+            .map(dep => extractDepId(dep).slice(0, 8));
           if (unsatisfied.length > 0) {
             display.error(`  Task ${pendingTask.id.slice(0, 8)} blocked by: ${unsatisfied.join(', ')}`);
           }
