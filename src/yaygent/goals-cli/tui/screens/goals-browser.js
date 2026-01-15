@@ -67,12 +67,24 @@ export class GoalsBrowserScreen {
    * @param {Object} evt
    */
   onEvent(ctx, evt) {
-    if (evt.type !== 'key') return;
+    // Handle key events
+    if (evt.type === 'key') {
+      if (this.viewMode === 'list') {
+        this._handleListEvent(ctx, evt);
+      } else {
+        this._handleDetailEvent(ctx, evt);
+      }
+    }
 
-    if (this.viewMode === 'list') {
-      this._handleListEvent(ctx, evt);
-    } else {
-      this._handleDetailEvent(ctx, evt);
+    // Handle text events (for 'q' to quit)
+    if (evt.type === 'text') {
+      if (evt.text === 'q' || evt.text === 'Q') {
+        if (this.viewMode === 'detail') {
+          this.viewMode = 'list';
+        } else if (this.onBackCallback) {
+          this.onBackCallback();
+        }
+      }
     }
   }
 
@@ -91,7 +103,7 @@ export class GoalsBrowserScreen {
       }
     }
 
-    if (evt.key === 'esc' || evt.key === 'q') {
+    if (evt.key === 'esc') {
       if (this.onBackCallback) {
         this.onBackCallback();
       }
@@ -103,7 +115,7 @@ export class GoalsBrowserScreen {
    * @private
    */
   _handleDetailEvent(ctx, evt) {
-    if (evt.key === 'esc' || evt.key === 'backspace' || evt.key === 'q') {
+    if (evt.key === 'esc' || evt.key === 'backspace') {
       this.viewMode = 'list';
     }
 

@@ -154,21 +154,26 @@ export class App {
    * @private
    */
   _handleEvent(evt) {
-    // Global quit handlers
-    if (evt.type === 'key') {
-      if (evt.key === 'ctrl+c' || evt.key === 'ctrl+q') {
-        this.shutdown();
-        return;
+    try {
+      // Global quit handlers
+      if (evt.type === 'key') {
+        if (evt.key === 'ctrl+c' || evt.key === 'ctrl+q') {
+          this.shutdown();
+          return;
+        }
       }
-    }
 
-    // Pass to current screen
-    if (this.currentScreen?.onEvent) {
-      this.currentScreen.onEvent(this.ctx, evt);
-    }
+      // Pass to current screen
+      if (this.currentScreen?.onEvent) {
+        this.currentScreen.onEvent(this.ctx, evt);
+      }
 
-    // Render after event
-    this._render();
+      // Render after event
+      this._render();
+    } catch (err) {
+      // Log error to stderr and continue
+      process.stderr.write(`[TUI Error] ${err.message}\n${err.stack}\n`);
+    }
   }
 
   /**
@@ -176,14 +181,18 @@ export class App {
    * @private
    */
   _render() {
-    this.screen.clear(this.styles.panelBg);
+    try {
+      this.screen.clear(this.styles.panelBg);
 
-    if (this.currentScreen?.render) {
-      const rect = { x: 0, y: 0, w: this.screen.width, h: this.screen.height };
-      this.currentScreen.render(this.ctx, rect);
+      if (this.currentScreen?.render) {
+        const rect = { x: 0, y: 0, w: this.screen.width, h: this.screen.height };
+        this.currentScreen.render(this.ctx, rect);
+      }
+
+      this.screen.render();
+    } catch (err) {
+      process.stderr.write(`[TUI Render Error] ${err.message}\n${err.stack}\n`);
     }
-
-    this.screen.render();
   }
 
   /**

@@ -13,12 +13,20 @@ export class Input {
     this._handlers = new Set();
     this._onData = this._onData.bind(this);
     this._buffer = '';
+    this._escTimeout = null;
+    this._ESC_TIMEOUT_MS = 50; // Wait 50ms for escape sequence completion
   }
 
   /**
    * Start listening for keyboard input
    */
   start() {
+    // Check if stdin is a TTY (interactive terminal)
+    if (!process.stdin.isTTY) {
+      console.error('Error: stdin is not a TTY. Run this command in an interactive terminal.');
+      process.exit(1);
+    }
+
     process.stdin.setEncoding('utf8');
     process.stdin.setRawMode(true);
     process.stdin.resume();
@@ -29,11 +37,17 @@ export class Input {
    * Stop listening
    */
   stop() {
+    if (this._escTimeout) {
+      clearTimeout(this._escTimeout);
+      this._escTimeout = null;
+    }
     process.stdin.off('data', this._onData);
-    try {
-      process.stdin.setRawMode(false);
-    } catch {
-      // Ignore errors when restoring mode
+    if (process.stdin.isTTY && process.stdin.setRawMode) {
+      try {
+        process.stdin.setRawMode(false);
+      } catch {
+        // Ignore errors when restoring mode
+      }
     }
     process.stdin.pause();
   }
@@ -65,13 +79,45 @@ export class Input {
    * @private
    */
   _onData(chunk) {
+    // Clear any pending ESC timeout since we got more data
+    if (this._escTimeout) {
+      clearTimeout(this._escTimeout);
+      this._escTimeout = null;
+    }
+
     // Append to buffer
     this._buffer += chunk;
 
     // Parse as much as possible
+    this._parseBuffer();
+  }
+
+  /**
+   * Parse buffer and emit events
+   * @private
+   */
+  _parseBuffer() {
     while (this._buffer.length > 0) {
       const result = this._tryParse();
-      if (!result) break;
+
+      if (!result) {
+        // Check if we have a lone ESC that needs a timeout
+        if (this._buffer === '\x1b' || this._buffer === '\x1b[') {
+          // Set timeout to either get more data or treat as standalone
+          this._escTimeout = setTimeout(() => {
+            this._escTimeout = null;
+            if (this._buffer === '\x1b') {
+              this._buffer = '';
+              this._emit({ type: 'key', key: 'esc' });
+            } else if (this._buffer === '\x1b[') {
+              // Incomplete sequence, discard
+              this._buffer = '';
+            }
+          }, this._ESC_TIMEOUT_MS);
+        }
+        break;
+      }
+
       this._buffer = this._buffer.slice(result.consumed);
       if (result.event) {
         this._emit(result.event);
@@ -124,9 +170,8 @@ export class Input {
       // If we have ESC followed by something we don't recognize,
       // wait for more data if buffer is short
       if (buf.length === 1) {
-        // Bare ESC - could be part of a sequence or standalone
-        // Return it as ESC for now (user pressed Escape)
-        return { consumed: 1, event: { type: 'key', key: 'esc' } };
+        // Bare ESC - wait for more data (timeout will handle standalone ESC)
+        return null;
       }
 
       // If ESC followed by [ but not enough chars, wait for more
@@ -134,16 +179,22 @@ export class Input {
         return null; // Wait for more data
       }
 
-      // Unknown escape sequence starting with ESC [
+      // ESC followed by [ and at least one more char
       if (buf.startsWith('\x1b[')) {
-        // Skip the unknown sequence (find the end)
+        // Check if we need more data for numeric sequences like \x1b[5~
+        if (buf.length === 3 && buf[2] >= '0' && buf[2] <= '9') {
+          return null; // Wait for ~ terminator
+        }
+
+        // Unknown escape sequence - skip it
         let end = 2;
         while (end < buf.length && buf[end] >= '0' && buf[end] <= '9') end++;
         if (end < buf.length) end++; // Skip the final character
         return { consumed: end, event: { type: 'key', key: 'unknown' } };
       }
 
-      // ESC alone
+      // ESC followed by non-[ character (like ESC+letter for Alt combos)
+      // Treat ESC as standalone and leave the rest
       return { consumed: 1, event: { type: 'key', key: 'esc' } };
     }
 

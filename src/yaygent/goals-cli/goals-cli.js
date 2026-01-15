@@ -39,7 +39,9 @@ import {
 import {
   App,
   GoalsBrowserScreen,
-  AiEditPreviewScreen
+  AiEditPreviewScreen,
+  ANSI,
+  writeStdout
 } from './tui/index.js';
 
 /**
@@ -741,25 +743,49 @@ async function cmdBrowse(args, logger) {
     return ExitCodes.VALIDATION_ERROR;
   }
 
-  // Create TUI app
-  const app = new App();
+  // Return a promise that resolves when TUI exits
+  return new Promise((resolve) => {
+    // Create TUI app
+    const app = new App();
 
-  // Create browse screen
-  const screen = new GoalsBrowserScreen({
-    goals,
-    onSelect: (goal, index) => {
-      logger.debug(`Selected goal: ${goal.id}`);
-    },
-    onBack: () => {
-      app.shutdown();
-    }
+    // Override shutdown to resolve promise instead of process.exit
+    const originalShutdown = app.shutdown.bind(app);
+    app.shutdown = () => {
+      if (!app.running) return;
+      app.running = false;
+
+      // Stop render loop
+      if (app._renderLoop) {
+        clearInterval(app._renderLoop);
+        app._renderLoop = null;
+      }
+
+      // Stop input
+      app.input.stop();
+
+      // Restore terminal
+      writeStdout(ANSI.reset());
+      writeStdout(ANSI.showCursor());
+      writeStdout(ANSI.altScreenOff());
+
+      // Resolve instead of exit
+      resolve(ExitCodes.SUCCESS);
+    };
+
+    // Create browse screen
+    const screen = new GoalsBrowserScreen({
+      goals,
+      onSelect: (goal, index) => {
+        logger.debug(`Selected goal: ${goal.id}`);
+      },
+      onBack: () => {
+        app.shutdown();
+      }
+    });
+
+    // Start TUI
+    app.mount(screen).start();
   });
-
-  // Start TUI
-  app.mount(screen).start();
-
-  // TUI will handle exit via app.shutdown()
-  return ExitCodes.SUCCESS;
 }
 
 /**
