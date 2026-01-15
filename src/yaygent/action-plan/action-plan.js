@@ -268,6 +268,9 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
   const response = await actionLlm.send({ systemPrompt, userPrompt });
 
   // Parse tool use from response
+  // Log raw response for debugging (first 500 chars)
+  console.log(`      LLM Response: ${response.content.slice(0, 300).replace(/\n/g, '\\n')}...`);
+
   const toolUse = parseToolUse(response.content);
 
   const toolInvocations = [];

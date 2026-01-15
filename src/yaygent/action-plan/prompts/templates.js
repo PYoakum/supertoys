@@ -75,28 +75,80 @@ Respond with a <tool_use> block containing the tool call, followed by your reaso
  * @returns {{toolName: string, parameters: Object}|null}
  */
 export function parseToolUse(content) {
+  // Try XML format first: <tool_use>...</tool_use>
   const toolUseMatch = content.match(/<tool_use>([\s\S]*?)<\/tool_use>/);
-  if (!toolUseMatch) return null;
+  if (toolUseMatch) {
+    const toolBlock = toolUseMatch[1];
 
-  const toolBlock = toolUseMatch[1];
+    const nameMatch = toolBlock.match(/<tool_name>([\s\S]*?)<\/tool_name>/);
+    const paramsMatch = toolBlock.match(/<parameters>([\s\S]*?)<\/parameters>/);
 
-  const nameMatch = toolBlock.match(/<tool_name>([\s\S]*?)<\/tool_name>/);
-  const paramsMatch = toolBlock.match(/<parameters>([\s\S]*?)<\/parameters>/);
+    if (nameMatch) {
+      const toolName = nameMatch[1].trim();
+      let parameters = {};
 
-  if (!nameMatch) return null;
+      if (paramsMatch) {
+        const paramsStr = paramsMatch[1].trim();
+        try {
+          parameters = JSON.parse(paramsStr);
+        } catch (e) {
+          // Try to extract JSON from the params block (might have extra text)
+          const jsonMatch = paramsStr.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              parameters = JSON.parse(jsonMatch[0]);
+            } catch (e2) {
+              console.error('[WARN] Failed to parse tool parameters:', paramsStr.slice(0, 200));
+            }
+          } else {
+            console.error('[WARN] No JSON found in parameters block:', paramsStr.slice(0, 200));
+          }
+        }
+      } else {
+        console.error('[WARN] No <parameters> block found in tool_use');
+      }
 
-  const toolName = nameMatch[1].trim();
-  let parameters = {};
-
-  if (paramsMatch) {
-    try {
-      parameters = JSON.parse(paramsMatch[1].trim());
-    } catch (e) {
-      // Failed to parse parameters, use empty object
+      return { toolName, parameters };
     }
   }
 
-  return { toolName, parameters };
+  // Try JSON format: {"tool": "name", "parameters": {...}}
+  const jsonMatch = content.match(/\{[\s\S]*?"tool"[\s\S]*?\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.tool && parsed.parameters) {
+        return { toolName: parsed.tool, parameters: parsed.parameters };
+      }
+      if (parsed.name && parsed.input) {
+        // Anthropic native format
+        return { toolName: parsed.name, parameters: parsed.input };
+      }
+    } catch (e) {
+      // Not valid JSON
+    }
+  }
+
+  // Try to find tool name and params separately
+  const toolNameMatch = content.match(/tool[_\s]*name[:\s]*["']?(\w+)["']?/i);
+  if (toolNameMatch) {
+    const toolName = toolNameMatch[1];
+    let parameters = {};
+
+    // Look for JSON object after tool name
+    const paramsJsonMatch = content.match(/parameters[:\s]*(\{[\s\S]*?\})/i);
+    if (paramsJsonMatch) {
+      try {
+        parameters = JSON.parse(paramsJsonMatch[1]);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return { toolName, parameters };
+  }
+
+  return null;
 }
 
 /**
