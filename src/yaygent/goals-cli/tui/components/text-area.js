@@ -25,6 +25,11 @@ export class TextArea {
     this.scrollY = 0;
     this.scrollX = 0;
     this.focused = false;
+
+    // Blinking cursor
+    this.cursorVisible = true;
+    this.cursorBlinkInterval = null;
+    this.blinkRate = options.blinkRate || 530; // ms
   }
 
   /**
@@ -68,6 +73,8 @@ export class TextArea {
    */
   focus() {
     this.focused = true;
+    this.cursorVisible = true;
+    this._startBlinking();
   }
 
   /**
@@ -75,6 +82,38 @@ export class TextArea {
    */
   blur() {
     this.focused = false;
+    this._stopBlinking();
+  }
+
+  /**
+   * Start cursor blinking
+   * @private
+   */
+  _startBlinking() {
+    this._stopBlinking();
+    this.cursorBlinkInterval = setInterval(() => {
+      this.cursorVisible = !this.cursorVisible;
+    }, this.blinkRate);
+  }
+
+  /**
+   * Stop cursor blinking
+   * @private
+   */
+  _stopBlinking() {
+    if (this.cursorBlinkInterval) {
+      clearInterval(this.cursorBlinkInterval);
+      this.cursorBlinkInterval = null;
+    }
+  }
+
+  /**
+   * Reset cursor visibility (call after any edit)
+   * @private
+   */
+  _resetCursorBlink() {
+    this.cursorVisible = true;
+    this._startBlinking();
   }
 
   /**
@@ -232,6 +271,7 @@ export class TextArea {
    */
   _adjustScrollY() {
     // Will be calculated in render based on visible height
+    this._resetCursorBlink();
   }
 
   /**
@@ -239,6 +279,7 @@ export class TextArea {
    * @private
    */
   _notifyChange() {
+    this._resetCursorBlink();
     if (this.onChange) {
       this.onChange(this.getValue());
     }
@@ -283,13 +324,13 @@ export class TextArea {
         const style = this.focused ? styles.item : styles.dim;
         screen.drawText(x, lineY, lineText, style);
 
-        // Draw cursor
-        if (this.focused && lineIndex === this.cursorLine) {
+        // Draw cursor (with blinking support)
+        if (this.focused && this.cursorVisible && lineIndex === this.cursorLine) {
           const cursorX = this.cursorCol - (this.wrap ? 0 : this.scrollX);
           if (cursorX >= 0 && cursorX < w) {
             const cursorChar = this.cursorCol < this.lines[lineIndex].length
               ? this.lines[lineIndex][this.cursorCol]
-              : ' ';
+              : '█';
             screen.drawText(x + cursorX, lineY, cursorChar, styles.accent);
           }
         }

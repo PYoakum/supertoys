@@ -200,15 +200,16 @@ export class SessionManager {
    */
   setTaskList(sessionId, taskList) {
     const session = this.store.get(sessionId);
-    
-    if (session.state !== SessionState.EVALUATED) {
+
+    // Allow setting tasks when EVALUATED (first time) or GENERATED (editing)
+    if (session.state !== SessionState.EVALUATED && session.state !== SessionState.GENERATED) {
       throw new SessionInvalidStateError(
         sessionId,
         session.state,
-        SessionState.EVALUATED
+        `${SessionState.EVALUATED} or ${SessionState.GENERATED}`
       );
     }
-    
+
     return this.store.update(sessionId, {
       state: SessionState.GENERATED,
       taskList
