@@ -23,6 +23,7 @@ import { TokenReplaceTool } from '../lib/token-replace-tool.js';
 import { PdfExportTool } from '../lib/pdf-export-tool.js';
 import { FrameworkExecTool } from '../lib/framework-exec-tool.js';
 import { ComposeEmailTool } from '../lib/compose-email-tool.js';
+import { GolangExecTool } from '../lib/golang-exec-tool.js';
 
 // Test constants
 const TEST_SESSION_ID = 'test-workstream-' + Date.now();
@@ -606,6 +607,191 @@ describe('Workstream Tools Test Suite', () => {
     });
   });
 
+  describe('GolangExecTool', () => {
+    let golangExecTool;
+
+    beforeAll(() => {
+      golangExecTool = new GolangExecTool(sandboxManager);
+    });
+
+    test('should run simple Go code', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'run',
+        code: `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello from Go!")
+}`
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.stdout).toContain('Hello from Go!');
+    });
+
+    test('should run Go code with command-line arguments', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'run',
+        code: `package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    for i, arg := range os.Args[1:] {
+        fmt.Printf("Arg %d: %s\\n", i, arg)
+    }
+}`,
+        args: ['hello', 'world', '123']
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.stdout).toContain('Arg 0: hello');
+      expect(parsed.stdout).toContain('Arg 1: world');
+    });
+
+    test('should block unsafe imports', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'run',
+        code: `package main
+
+import (
+    "fmt"
+    "os/exec"
+)
+
+func main() {
+    cmd := exec.Command("ls")
+    fmt.Println(cmd)
+}`
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Blocked import');
+    });
+
+    test('should block syscall import', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'run',
+        code: `package main
+
+import "syscall"
+
+func main() {
+    syscall.Exit(0)
+}`
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Blocked import');
+    });
+
+    test('should block unsafe import', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'run',
+        code: `package main
+
+import "unsafe"
+
+func main() {
+    var x int = 42
+    _ = unsafe.Pointer(&x)
+}`
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Blocked import');
+    });
+
+    test('should initialize Go module', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'mod-init',
+        moduleName: 'test/mymodule',
+        workingDir: 'go-test-project'
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.moduleName).toBe('test/mymodule');
+    });
+
+    test('should format Go code', async () => {
+      // First create an unformatted Go file
+      const unformattedCode = `package main
+import "fmt"
+func main(){fmt.Println("unformatted")}`;
+
+      await writeFile(join(sandboxPath, 'unformatted.go'), unformattedCode);
+
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'fmt',
+        filePath: 'unformatted.go'
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.action).toBe('fmt');
+    });
+
+    test('should handle stdin input', async () => {
+      const result = await golangExecTool.execute({
+        sessionId: TEST_SESSION_ID,
+        action: 'run',
+        code: `package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func main() {
+    scanner := bufio.NewScanner(os.Stdin)
+    for scanner.Scan() {
+        fmt.Println("Received:", scanner.Text())
+    }
+}`,
+        inputData: 'line1\nline2\nline3'
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.stdout).toContain('Received: line1');
+      expect(parsed.stdout).toContain('Received: line2');
+    });
+
+    test('should require sessionId', async () => {
+      const result = await golangExecTool.execute({
+        action: 'run',
+        code: 'package main'
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('sessionId is required');
+    });
+  });
+
   describe('Integration: Document Processing Pipeline', () => {
 
     test('should complete full document pipeline: MD -> DOCX -> MD -> PDF', async () => {
@@ -740,7 +926,10 @@ console.log('  - DocxMdTool (DOCX to Markdown)');
 console.log('  - PdfExportTool (PDF generation)');
 console.log('  - FrameworkExecTool (Bun framework execution)');
 console.log('  - ComposeEmailTool (Email composition with .eml export)');
+console.log('  - GolangExecTool (Go code execution with sandbox)');
 console.log('\nPlaceholder addresses for email:');
 console.log('  - Sender: SENDER@SENDER.SEND');
 console.log('  - Recipient: RECIPIENT@RECIPIENT.RECEIVE');
+console.log('\nGo security:');
+console.log('  - Blocked: os/exec, syscall, unsafe, plugin, CGO');
 console.log('\n');
