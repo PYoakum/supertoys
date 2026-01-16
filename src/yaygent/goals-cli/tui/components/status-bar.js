@@ -68,24 +68,25 @@ export class StatusBar {
     // Draw background on second line
     screen.drawText(x, y + 1, ' '.repeat(w), styles.footer);
 
-    // Draw left section
+    // Draw left section (keyboard hints - allow more space)
     if (this.left) {
-      const leftText = ' ' + this.left.slice(0, Math.floor(w / 3) - 2);
-      screen.drawText(x, y + 1, leftText, styles.footer);
+      const maxLeft = Math.floor(w * 0.7) - 2;  // Allow 70% for left
+      const leftText = ' ' + this.left.slice(0, maxLeft);
+      screen.drawText(x, y + 1, leftText, styles.dim);
     }
 
     // Draw center section
     if (this.center) {
-      const centerText = this.center.slice(0, Math.floor(w / 3));
+      const centerText = this.center.slice(0, Math.floor(w / 5));
       const centerX = x + Math.floor((w - centerText.length) / 2);
       screen.drawText(centerX, y + 1, centerText, styles.footer);
     }
 
-    // Draw right section (keyboard hints)
+    // Draw right section (mode/status)
     if (this.right) {
-      const rightText = this.right.slice(0, Math.floor(w / 3) - 1) + ' ';
+      const rightText = this.right.slice(0, Math.floor(w / 4) - 1) + ' ';
       const rightX = x + w - rightText.length;
-      screen.drawText(rightX, y + 1, rightText, styles.dim);
+      screen.drawText(rightX, y + 1, rightText, styles.footer);
     }
   }
 }

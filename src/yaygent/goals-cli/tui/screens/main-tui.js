@@ -116,23 +116,23 @@ export class MainTuiScreen {
   _updateStatusBar() {
     const tab = this.tabBar.getActiveTab();
 
-    // Left: current mode/status
-    let left = tab ? tab.label : '';
-    if (this.state.dirty) {
-      left += ' *';
-    }
-    if (this.state.sessionId) {
-      left += ` [Session: ${this.state.sessionId.slice(0, 8)}...]`;
+    // Left: context-sensitive help (keyboard shortcuts)
+    let left = '[1-4] Tabs  [Ctrl+Q] Quit';
+    const activeScreen = this.getActiveTabScreen();
+    if (activeScreen?.getHelpText) {
+      left = activeScreen.getHelpText();
     }
 
     // Center: server status
     const center = this.state.serverConnected ? 'Connected' : '';
 
-    // Right: context-sensitive help
-    let right = '[1-4] Tabs  [Ctrl+Q] Quit';
-    const activeScreen = this.getActiveTabScreen();
-    if (activeScreen?.getHelpText) {
-      right = activeScreen.getHelpText();
+    // Right: current mode/status
+    let right = tab ? tab.label : '';
+    if (this.state.dirty) {
+      right += ' *';
+    }
+    if (this.state.sessionId) {
+      right += ` [Session: ${this.state.sessionId.slice(0, 8)}...]`;
     }
 
     this.statusBar.set({ left, center, right });

@@ -92,6 +92,8 @@ export class ExecuteTabScreen {
     this.editToolMode = false;        // Editing tool selection
     this.availableTools = [];         // Cached list of available tools from server
     this.toolNavIndex = 0;            // Navigation index in tool selector
+    this.editLLMTierMode = false;     // Editing LLM tier selection
+    this.llmTierNavIndex = 0;         // Navigation index in LLM tier selector
     this.taskFields = ['title', 'description', 'tool', 'llmTier', 'priority', 'sequenceNumber', 'delay', 'scheduledAt', 'dependencies'];
 
     // Import mode state
@@ -321,6 +323,7 @@ export class ExecuteTabScreen {
            this.importMode ||
            this.editDepMode ||
            this.editToolMode ||
+           this.editLLMTierMode ||
            (this.mode === 'edit-tasks' && this.editingField);
   }
 
@@ -337,7 +340,7 @@ export class ExecuteTabScreen {
       case 'session-detail':
         return '[E] Execute  [I] Import Tasks  [T] Edit Tasks  [C] Clean  [G] Graph  [K] Kill  [Esc] Back';
       case 'edit-tasks':
-        return '[N] New  [X] Delete  [E] Export  [I] Import  [↑↓] Task  [←→] Field  [Enter] Edit  [T] Tool  [D] Deps  [Ctrl+S] Save  [Esc] Back';
+        return '[N] New  [X] Delete  [E] Export  [I] Import  [↑↓] Task  [←→] Field  [Enter] Edit  [T] Tool  [L] LLM  [D] Deps  [Ctrl+S] Save  [Esc] Back';
       case 'running':
         return '[+/-] Scroll Log  [Esc] Abort';
       case 'config':
@@ -1742,6 +1745,8 @@ export class ExecuteTabScreen {
     this.editDepSelected = new Set();
     this.editToolMode = false;
     this.toolNavIndex = 0;
+    this.editLLMTierMode = false;
+    this.llmTierNavIndex = 0;
 
     // Fetch available tools if not cached
     if (this.availableTools.length === 0) {
@@ -1773,6 +1778,12 @@ export class ExecuteTabScreen {
     // Handle tool selection mode
     if (this.editToolMode) {
       this._handleToolSelectEvent(ctx, evt, tasks);
+      return;
+    }
+
+    // Handle LLM tier selection mode
+    if (this.editLLMTierMode) {
+      this._handleLLMTierSelectEvent(ctx, evt, tasks);
       return;
     }
 
@@ -1842,6 +1853,12 @@ export class ExecuteTabScreen {
           // Quick toggle tool selection mode
           if (tasks.length > 0) {
             this._startToolEdit(tasks);
+          }
+          return;
+        case 'l':
+          // Quick toggle LLM tier selection mode
+          if (tasks.length > 0) {
+            this._startLLMTierEdit(tasks);
           }
           return;
         case 'x':
@@ -2399,6 +2416,91 @@ export class ExecuteTabScreen {
 
     task.llmTier = nextTier;
     this._setStatus(`LLM Tier: ${nextTier}`, 'info', 2000);
+  }
+
+  /**
+   * Start LLM tier selection mode
+   * @param {Object[]} tasks
+   * @private
+   */
+  _startLLMTierEdit(tasks) {
+    const configuredTiers = this._getConfiguredLLMTiers();
+    if (configuredTiers.length === 0) {
+      this.logViewer.addLine('warn', 'No LLM tiers configured. Set API keys in environment.');
+      return;
+    }
+
+    const task = tasks[this.editTaskIndex];
+    this.editLLMTierMode = true;
+
+    // Find current tier index in configured tiers list
+    const currentTier = task.llmTier || 'PRIMARY';
+    this.llmTierNavIndex = Math.max(0,
+      configuredTiers.indexOf(currentTier)
+    );
+  }
+
+  /**
+   * Handle LLM tier selection events
+   * @param {Object} ctx
+   * @param {Object} evt
+   * @param {Object[]} tasks
+   * @private
+   */
+  _handleLLMTierSelectEvent(ctx, evt, tasks) {
+    const currentTask = tasks[this.editTaskIndex];
+    const configuredTiers = this._getConfiguredLLMTiers();
+
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'enter':
+          // Apply selected tier and exit
+          this._applyLLMTierEdit(currentTask, configuredTiers);
+          this.editLLMTierMode = false;
+          return;
+        case 'esc':
+          // Cancel without applying
+          this.editLLMTierMode = false;
+          return;
+        case 'up':
+          this.llmTierNavIndex = Math.max(0, this.llmTierNavIndex - 1);
+          return;
+        case 'down':
+          this.llmTierNavIndex = Math.min(configuredTiers.length - 1, this.llmTierNavIndex + 1);
+          return;
+        case 'home':
+          this.llmTierNavIndex = 0;
+          return;
+        case 'end':
+          this.llmTierNavIndex = configuredTiers.length - 1;
+          return;
+      }
+    }
+
+    // Number keys for quick selection (1-5 for the 5 tiers)
+    if (evt.type === 'text' && /^[1-5]$/.test(evt.text)) {
+      const idx = parseInt(evt.text, 10) - 1;
+      if (idx < configuredTiers.length) {
+        this.llmTierNavIndex = idx;
+        this._applyLLMTierEdit(currentTask, configuredTiers);
+        this.editLLMTierMode = false;
+      }
+    }
+  }
+
+  /**
+   * Apply LLM tier selection to task
+   * @param {Object} task
+   * @param {string[]} configuredTiers
+   * @private
+   */
+  _applyLLMTierEdit(task, configuredTiers) {
+    const selectedTier = configuredTiers[this.llmTierNavIndex];
+    if (!selectedTier) return;
+
+    task.llmTier = selectedTier;
+    this._setStatus(`LLM Tier set to: ${selectedTier}`, 'success', 2000);
+    this.logViewer.addLine('info', `Task LLM tier changed to: ${selectedTier}`);
   }
 
   /**
@@ -2983,6 +3085,12 @@ export class ExecuteTabScreen {
       return;
     }
 
+    // LLM tier selection mode - full screen overlay
+    if (this.editLLMTierMode) {
+      this._renderLLMTierSelector(ctx, rect, tasks);
+      return;
+    }
+
     // Split: task list (left 40%) and task editor (right 60%)
     const leftWidth = Math.floor((w - 2) * 0.4);
     const rightWidth = w - 2 - leftWidth - 1;
@@ -3092,10 +3200,10 @@ export class ExecuteTabScreen {
         const toolText = toolName ? `${toolName} - [T] to change` : '(none) - [T] to select';
         screen.drawText(x + 20, line, toolText, isSelected ? styles.accent : styles.dim);
       } else if (field === 'llmTier') {
-        // Show current LLM tier with available tiers hint
+        // Show current LLM tier with hint to change
         const tier = task.llmTier || 'PRIMARY';
         const configuredTiers = this._getConfiguredLLMTiers();
-        const tierText = `${tier} (${configuredTiers.length} configured)`;
+        const tierText = `${tier} - [L] to change (${configuredTiers.length} available)`;
         screen.drawText(x + 20, line, tierText, isSelected ? styles.accent : styles.dim);
       } else if (field === 'dependencies') {
         // Show dependency count and hint
@@ -3176,7 +3284,7 @@ export class ExecuteTabScreen {
     // Instructions at bottom
     if (line + 2 < y + h) {
       line = y + h - 2;
-      screen.drawText(x, line, '[↑↓] Select Field  [Enter] Edit  [D] Dependencies', styles.dim);
+      screen.drawText(x, line, '[↑↓] Select Field  [Enter] Edit  [T] Tool  [L] LLM  [D] Deps', styles.dim);
     }
   }
 
@@ -3307,6 +3415,82 @@ export class ExecuteTabScreen {
     // Show footer
     line = y + h - 2;
     screen.drawText(x + 2, line, `Tools: ${this.availableTools.length} | Use 1-9 for quick select`, styles.dim);
+  }
+
+  /**
+   * Render LLM tier selector overlay
+   * @private
+   */
+  _renderLLMTierSelector(ctx, rect, tasks) {
+    const { screen, styles, charset } = ctx;
+    const { x, y, w, h } = rect;
+
+    const currentTask = tasks[this.editTaskIndex];
+    const currentTier = currentTask.llmTier || 'PRIMARY';
+    const configuredTiers = this._getConfiguredLLMTiers();
+
+    screen.drawText(x + 2, y + 1, `Select LLM Tier for Task #${this.editTaskIndex + 1}`, styles.accent);
+    screen.drawText(x + 2, y + 2, 'Use [↑↓] to navigate, [Enter] to select, [Esc] to cancel', styles.dim);
+
+    let line = y + 4;
+
+    // Show current tier
+    screen.drawText(x + 2, line++, `Current: ${currentTier}`, styles.warning);
+    line++;
+
+    // Tier descriptions
+    const tierDescs = {
+      PRIMARY: 'Default tier - main model for most tasks',
+      SECONDARY: 'Fallback tier - used when primary unavailable',
+      TERTIARY: 'Third tier - for specialized or lighter tasks',
+      QUATERNARY: 'Fourth tier - additional fallback option',
+      QUINARY: 'Fifth tier - final fallback option'
+    };
+
+    // Render tier list
+    for (let i = 0; i < configuredTiers.length; i++) {
+      const tier = configuredTiers[i];
+      const isSelected = i === this.llmTierNavIndex;
+      const isCurrent = tier === currentTier;
+
+      const prefix = isSelected ? '►' : ' ';
+      const marker = isCurrent ? ' ◄' : '';
+      const num = String(i + 1);
+
+      // Get provider info if available
+      const provider = this.envVars[`${tier}_LLM_PROVIDER`] || 'unknown';
+      const model = this.envVars[`${tier}_LLM_MODEL`] || '';
+      const providerInfo = model ? `${provider} (${model})` : provider;
+
+      const style = isSelected ? styles.highlight : (isCurrent ? styles.accent : styles.normal);
+      screen.drawText(x + 2, line, `${prefix}${num}. ${tier}${marker}`, style);
+
+      // Show provider info on same line
+      const providerStyle = isSelected ? styles.accent : styles.dim;
+      screen.drawText(x + 20, line, providerInfo, providerStyle);
+      line++;
+
+      // Show description on next line for selected item
+      if (isSelected && tierDescs[tier]) {
+        screen.drawText(x + 6, line, tierDescs[tier], styles.dim);
+        line++;
+      }
+    }
+
+    // Show unconfigured tiers as disabled
+    line++;
+    const unconfigured = this.llmTiers.filter(t => !configuredTiers.includes(t));
+    if (unconfigured.length > 0) {
+      screen.drawText(x + 2, line++, 'Unconfigured tiers (set API keys to enable):', styles.dim);
+      for (const tier of unconfigured) {
+        screen.drawText(x + 4, line++, `  ${tier}`, styles.dim);
+        if (line >= y + h - 3) break;
+      }
+    }
+
+    // Show footer
+    line = y + h - 2;
+    screen.drawText(x + 2, line, `Tiers: ${configuredTiers.length}/${this.llmTiers.length} configured | Use 1-5 for quick select`, styles.dim);
   }
 
   /**
