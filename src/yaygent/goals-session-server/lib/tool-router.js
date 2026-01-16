@@ -26,6 +26,7 @@ import { MdDocxTool } from './md-docx-tool.js';
 import { PdfExportTool } from './pdf-export-tool.js';
 import { ComposeEmailTool } from './compose-email-tool.js';
 import { GolangExecTool } from './golang-exec-tool.js';
+import { ContextResearchBrowserTool } from './context-research-browser-tool.js';
 
 /**
  * Tool Router Class
@@ -572,10 +573,21 @@ export function createToolRouter(options = {}) {
   });
   golangExec.registerTools(router);
 
+  // Initialize and register context research browser tool
+  const contextResearchBrowser = new ContextResearchBrowserTool(
+    sandboxManager,
+    options.sessionManager || null,
+    {
+      allowedHosts: options.researchAllowedHosts || ['*'],
+      timeout: options.researchTimeout || 30000
+    }
+  );
+  contextResearchBrowser.registerTools(router);
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, SandboxManager, createToolRouter };

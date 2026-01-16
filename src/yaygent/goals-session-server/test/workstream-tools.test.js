@@ -24,6 +24,7 @@ import { PdfExportTool } from '../lib/pdf-export-tool.js';
 import { FrameworkExecTool } from '../lib/framework-exec-tool.js';
 import { ComposeEmailTool } from '../lib/compose-email-tool.js';
 import { GolangExecTool } from '../lib/golang-exec-tool.js';
+import { ContextResearchBrowserTool } from '../lib/context-research-browser-tool.js';
 
 // Test constants
 const TEST_SESSION_ID = 'test-workstream-' + Date.now();
@@ -792,6 +793,113 @@ func main() {
     });
   });
 
+  describe('ContextResearchBrowserTool', () => {
+    let contextResearchTool;
+
+    beforeAll(() => {
+      contextResearchTool = new ContextResearchBrowserTool(sandboxManager, null, {
+        allowedHosts: ['*'],
+        timeout: 30000
+      });
+    });
+
+    test('should require sessionId', async () => {
+      const result = await contextResearchTool.execute({
+        url: 'https://example.com'
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('sessionId is required');
+    });
+
+    test('should require url', async () => {
+      const result = await contextResearchTool.execute({
+        sessionId: TEST_SESSION_ID
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('url is required');
+    });
+
+    test('should reject invalid URL', async () => {
+      const result = await contextResearchTool.execute({
+        sessionId: TEST_SESSION_ID,
+        url: 'not-a-valid-url'
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Invalid URL');
+    });
+
+    test('should fetch and convert web content to markdown', async () => {
+      const result = await contextResearchTool.execute({
+        sessionId: TEST_SESSION_ID,
+        url: 'https://example.com',
+        filename: 'example-test.md',
+        includeMetadata: true
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.outputPath).toBe('context/example-test.md');
+      expect(parsed.contentLength).toBeGreaterThan(0);
+
+      // Verify file was created
+      const outputPath = join(sandboxPath, 'context', 'example-test.md');
+      expect(existsSync(outputPath)).toBe(true);
+
+      // Verify content has metadata header
+      const content = await readFile(outputPath, 'utf-8');
+      expect(content).toContain('---');
+      expect(content).toContain('url:');
+      expect(content).toContain('example.com');
+    });
+
+    test('should auto-generate filename from URL', async () => {
+      const result = await contextResearchTool.execute({
+        sessionId: TEST_SESSION_ID,
+        url: 'https://httpbin.org/html'
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.outputPath).toMatch(/context\/.*\.md$/);
+    });
+
+    test('should respect host allowlist when configured', async () => {
+      const restrictedTool = new ContextResearchBrowserTool(sandboxManager, null, {
+        allowedHosts: ['allowed.com'],
+        timeout: 10000
+      });
+
+      const result = await restrictedTool.execute({
+        sessionId: TEST_SESSION_ID,
+        url: 'https://blocked.com/page'
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Host not allowed');
+    });
+
+    test('should support wildcard host patterns', async () => {
+      const wildcardTool = new ContextResearchBrowserTool(sandboxManager, null, {
+        allowedHosts: ['*.example.com'],
+        timeout: 10000
+      });
+
+      // Should allow subdomain
+      expect(wildcardTool.isHostAllowed('docs.example.com')).toBe(true);
+      expect(wildcardTool.isHostAllowed('api.example.com')).toBe(true);
+
+      // Should not allow different domain
+      expect(wildcardTool.isHostAllowed('example.org')).toBe(false);
+    });
+  });
+
   describe('Integration: Document Processing Pipeline', () => {
 
     test('should complete full document pipeline: MD -> DOCX -> MD -> PDF', async () => {
@@ -927,9 +1035,13 @@ console.log('  - PdfExportTool (PDF generation)');
 console.log('  - FrameworkExecTool (Bun framework execution)');
 console.log('  - ComposeEmailTool (Email composition with .eml export)');
 console.log('  - GolangExecTool (Go code execution with sandbox)');
+console.log('  - ContextResearchBrowserTool (Web research to context)');
 console.log('\nPlaceholder addresses for email:');
 console.log('  - Sender: SENDER@SENDER.SEND');
 console.log('  - Recipient: RECIPIENT@RECIPIENT.RECEIVE');
 console.log('\nGo security:');
 console.log('  - Blocked: os/exec, syscall, unsafe, plugin, CGO');
+console.log('\nContext Research:');
+console.log('  - Fetches web pages with headless browser');
+console.log('  - Converts to markdown and saves to context/');
 console.log('\n');
