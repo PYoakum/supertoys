@@ -3,8 +3,8 @@
  * @module tui/screens/context-tab
  */
 
-import { readdirSync, readFileSync, statSync } from 'fs';
-import { resolve, join, basename, extname } from 'path';
+import { readdirSync, readFileSync, statSync, copyFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
+import { resolve, join, basename, extname, dirname } from 'path';
 import { Menu } from '../components/menu.js';
 import { TextArea } from '../components/text-area.js';
 
@@ -33,6 +33,16 @@ export class ContextTabScreen {
     this.files = [];
     this.selectedFile = null;
     this.focused = false;
+
+    // Add file mode state
+    this.addMode = false;
+    this.addFilePath = '';
+
+    // Confirm delete state
+    this.confirmDelete = false;
+
+    // Status message
+    this.statusMessage = '';
   }
 
   /**
@@ -64,9 +74,15 @@ export class ContextTabScreen {
    * @returns {string}
    */
   getHelpText() {
+    if (this.addMode) {
+      return '[Enter] Add File  [Esc] Cancel';
+    }
+    if (this.confirmDelete) {
+      return '[Y] Confirm Delete  [N/Esc] Cancel';
+    }
     switch (this.mode) {
       case 'browse':
-        return '[Enter] View  [E] AI-Edit  [R] Refresh';
+        return '[Enter] View  [A] Add  [X] Delete  [R] Refresh';
       case 'view':
         return '[Up/Down] Scroll  [Esc] Back';
       case 'ai-edit':
@@ -177,11 +193,109 @@ export class ContextTabScreen {
   }
 
   /**
+   * Start add file mode
+   * @private
+   */
+  _startAddFile() {
+    this.addMode = true;
+    this.addFilePath = '';
+  }
+
+  /**
+   * Add a file to the context directory
+   * @private
+   */
+  _addFile() {
+    if (!this.addFilePath.trim()) {
+      this.addMode = false;
+      return;
+    }
+
+    try {
+      const sourcePath = resolve(this.addFilePath.trim());
+
+      if (!existsSync(sourcePath)) {
+        this.statusMessage = `File not found: ${this.addFilePath}`;
+        this.addMode = false;
+        return;
+      }
+
+      const stat = statSync(sourcePath);
+      if (!stat.isFile()) {
+        this.statusMessage = 'Path is not a file';
+        this.addMode = false;
+        return;
+      }
+
+      // Ensure context directory exists
+      const contextDir = resolve(this.contextPath);
+      if (!existsSync(contextDir)) {
+        mkdirSync(contextDir, { recursive: true });
+      }
+
+      // Copy file to context directory
+      const destPath = join(contextDir, basename(sourcePath));
+      copyFileSync(sourcePath, destPath);
+
+      this.statusMessage = `Added: ${basename(sourcePath)}`;
+      this.addMode = false;
+      this.addFilePath = '';
+      this._loadFiles();
+    } catch (err) {
+      this.statusMessage = `Error: ${err.message}`;
+      this.addMode = false;
+    }
+  }
+
+  /**
+   * Start delete confirmation
+   * @private
+   */
+  _startDelete() {
+    const index = this.filesList.selected;
+    if (index >= 0 && index < this.files.length) {
+      this.confirmDelete = true;
+    }
+  }
+
+  /**
+   * Delete the selected file
+   * @private
+   */
+  _deleteFile() {
+    const index = this.filesList.selected;
+    if (index >= 0 && index < this.files.length) {
+      try {
+        const file = this.files[index];
+        unlinkSync(file.path);
+        this.statusMessage = `Deleted: ${file.name}`;
+        this.confirmDelete = false;
+        this._loadFiles();
+      } catch (err) {
+        this.statusMessage = `Error: ${err.message}`;
+        this.confirmDelete = false;
+      }
+    }
+  }
+
+  /**
    * Handle events
    * @param {Object} ctx
    * @param {Object} evt
    */
   onEvent(ctx, evt) {
+    // Handle add mode first
+    if (this.addMode) {
+      this._handleAddModeEvent(ctx, evt);
+      return;
+    }
+
+    // Handle delete confirmation
+    if (this.confirmDelete) {
+      this._handleDeleteConfirmEvent(ctx, evt);
+      return;
+    }
+
     switch (this.mode) {
       case 'browse':
         this._handleBrowseEvent(ctx, evt);
@@ -192,6 +306,54 @@ export class ContextTabScreen {
       case 'ai-edit':
         this._handleAiEditEvent(ctx, evt);
         break;
+    }
+  }
+
+  /**
+   * Handle add mode events (file path input)
+   * @private
+   */
+  _handleAddModeEvent(ctx, evt) {
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'esc':
+          this.addMode = false;
+          this.addFilePath = '';
+          return;
+        case 'enter':
+          this._addFile();
+          return;
+        case 'backspace':
+          this.addFilePath = this.addFilePath.slice(0, -1);
+          return;
+      }
+    }
+
+    if (evt.type === 'text') {
+      this.addFilePath += evt.text;
+    }
+  }
+
+  /**
+   * Handle delete confirmation events
+   * @private
+   */
+  _handleDeleteConfirmEvent(ctx, evt) {
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'esc':
+          this.confirmDelete = false;
+          return;
+      }
+    }
+
+    if (evt.type === 'text') {
+      const char = evt.text.toLowerCase();
+      if (char === 'y') {
+        this._deleteFile();
+      } else if (char === 'n') {
+        this.confirmDelete = false;
+      }
     }
   }
 
@@ -218,6 +380,13 @@ export class ContextTabScreen {
       switch (evt.text.toLowerCase()) {
         case 'r':
           this._loadFiles();
+          break;
+        case 'a':
+          this._startAddFile();
+          break;
+        case 'x':
+        case 'd':
+          this._startDelete();
           break;
         case 'e':
           // AI-edit mode - would integrate with existing ai-editor.js
@@ -287,8 +456,37 @@ export class ContextTabScreen {
     const title = ` Context: ${basename(this.contextPath)} `;
     screen.drawBox(x, y, w, h, charset, styles.border, title);
 
-    const menuRect = { x: x + 1, y: y + 1, w: w - 2, h: h - 2 };
+    // Reserve space for input/status at bottom
+    const hasOverlay = this.addMode || this.confirmDelete || this.statusMessage;
+    const menuHeight = hasOverlay ? h - 4 : h - 2;
+
+    const menuRect = { x: x + 1, y: y + 1, w: w - 2, h: menuHeight };
     this.filesList.render(ctx, menuRect);
+
+    // Render add file input
+    if (this.addMode) {
+      const inputY = y + h - 3;
+      screen.drawText(x + 2, inputY, 'File path:', styles.normal);
+      screen.drawText(x + 13, inputY, this.addFilePath + '_', styles.highlight);
+    }
+
+    // Render delete confirmation
+    if (this.confirmDelete) {
+      const index = this.filesList.selected;
+      const fileName = this.files[index]?.name || 'file';
+      const confirmY = y + h - 3;
+      const msg = `Delete "${fileName}"? [Y/N]`;
+      screen.drawText(x + 2, confirmY, msg, styles.error);
+    }
+
+    // Render status message (clear after showing)
+    if (this.statusMessage && !this.addMode && !this.confirmDelete) {
+      const statusY = y + h - 3;
+      const isError = this.statusMessage.startsWith('Error');
+      screen.drawText(x + 2, statusY, this.statusMessage, isError ? styles.error : styles.success);
+      // Clear status after a render
+      setTimeout(() => { this.statusMessage = ''; }, 2000);
+    }
   }
 
   /**

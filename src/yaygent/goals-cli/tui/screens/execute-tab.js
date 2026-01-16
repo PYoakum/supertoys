@@ -169,6 +169,7 @@ export class ExecuteTabScreen {
       }
     };
     this.providerList = ['anthropic', 'openai', 'custom'];
+    this.selectedProvider = 0;  // Index into providerList
 
     // LLM Tiers for per-task routing
     this.llmTiers = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY', 'QUINARY'];

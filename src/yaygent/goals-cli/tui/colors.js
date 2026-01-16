@@ -7,7 +7,7 @@
 
 /**
  * CGA color indices (standard ANSI 0-15)
- * Note: RED and LIGHT_RED replaced with LAVENDER (256-color mode)
+ * Note: RED and LIGHT_RED replaced with INDIGO (256-color mode)
  */
 export const CGA = {
   BLACK: 0,
@@ -33,12 +33,14 @@ export const CGA = {
  */
 export const EXTENDED = {
   LAVENDER: 183,       // Light lavender (#d7afff)
-  LIGHT_LAVENDER: 189  // Lighter lavender (#d7d7ff)
+  LIGHT_LAVENDER: 189, // Lighter lavender (#d7d7ff)
+  INDIGO: 54,          // Deep indigo (#5f0087)
+  LIGHT_INDIGO: 99     // Lighter indigo (#875fff)
 };
 
 /**
  * Semantic color aliases for UI elements
- * Note: Error colors now use lavender instead of red
+ * Note: Error colors now use indigo instead of red
  */
 export const UI = {
   // Backgrounds
@@ -47,7 +49,7 @@ export const UI = {
   BG_SELECTED: CGA.CYAN,
   BG_HEADER: CGA.BLUE,
   BG_FOOTER: CGA.BLUE,
-  BG_ERROR: EXTENDED.LAVENDER,      // Changed from RED to LAVENDER
+  BG_ERROR: EXTENDED.INDIGO,        // Changed from RED to INDIGO
   BG_SUCCESS: CGA.GREEN,
 
   // Foregrounds
@@ -57,7 +59,7 @@ export const UI = {
   FG_SELECTED: CGA.BLACK,
   FG_TITLE: CGA.YELLOW,
   FG_ACCENT: CGA.LIGHT_CYAN,
-  FG_ERROR: EXTENDED.LIGHT_LAVENDER, // Changed from LIGHT_RED to LIGHT_LAVENDER
+  FG_ERROR: EXTENDED.LIGHT_INDIGO,  // Changed from LIGHT_RED to LIGHT_INDIGO
   FG_SUCCESS: CGA.LIGHT_GREEN,
   FG_WARNING: CGA.YELLOW,
 

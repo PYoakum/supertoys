@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Product Comparison Report",
+    "description": "Research cloud providers and generate an interactive comparison table",
+    "author": "user",
+    "created": "2025-01-15T00:00:00Z",
+    "tags": ["research", "comparison", "tablemaker", "report"]
+  },
+  "goals": [
+    {
+      "id": "research-cloud-providers",
+      "objective": "Research the top 3 cloud providers (AWS, Azure, GCP) and gather pricing and feature information for compute services",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Information gathered for AWS EC2, Azure VMs, and GCP Compute Engine",
+          "Pricing tiers documented for each provider",
+          "Key features and limitations noted"
+        ],
+        "acceptance": [
+          "Data is structured and ready for comparison"
+        ],
+        "validation": "auto"
+      },
+      "constraints": [
+        "Focus on general-purpose compute instances",
+        "Include at least 3 pricing tiers per provider"
+      ],
+      "context": {
+        "sources": ["official documentation", "pricing pages"],
+        "outputFormat": "structured data"
+      }
+    },
+    {
+      "id": "generate-comparison-table",
+      "objective": "Create an interactive HTML comparison table showing cloud provider features, pricing, and recommendations",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "HTML table generated with all provider data",
+          "Table is sortable by column",
+          "Table can be exported to CSV",
+          "Data is clearly organized and readable"
+        ],
+        "acceptance": [
+          "Table renders correctly in a web browser",
+          "All comparison data is accurately displayed"
+        ],
+        "validation": "manual"
+      },
+      "constraints": [
+        "Use the tablemaker tool to generate the table",
+        "Include columns for: Provider, Tier, vCPUs, RAM, Storage, Price/Hour, Best For",
+        "Apply a professional theme"
+      ],
+      "context": {
+        "tool": "tablemaker",
+        "outputPath": "reports/cloud-comparison.html",
+        "theme": "default"
+      },
+      "dependencies": ["research-cloud-providers"]
+    }
+  ],
+  "globalContext": {
+    "projectName": "cloud-provider-analysis",
+    "targetEnvironment": "report-generation",
+    "outputDir": "./reports"
+  }
+}
