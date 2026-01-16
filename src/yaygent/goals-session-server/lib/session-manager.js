@@ -71,23 +71,27 @@ export class SessionManager {
    * @param {Object} params.goals - Goals definition
    * @param {Object} params.context - Context bundle
    * @param {Object} [params.metadata] - Additional metadata
+   * @param {Object} [params.llmRouting] - LLM routing configuration for per-task inference
    * @returns {Object} Created session
    */
-  createSession({ goals, context, metadata = {} }) {
+  createSession({ goals, context, metadata = {}, llmRouting = null }) {
     // Validate goals
     this.validateGoals(goals);
-    
+
     // Validate context
     this.validateContext(context);
-    
+
     const sessionId = randomUUID();
-    
+
     // Transform goals into checklist format
     const goalsChecklist = this.transformGoalsToChecklist(goals);
-    
+
     // Process context bundle
     const contextBundle = this.processContext(context);
-    
+
+    // Build LLM routing config from environment if not provided
+    const llmConfig = llmRouting || this._buildLLMRoutingFromEnv();
+
     const session = {
       id: sessionId,
       state: SessionState.LOADED,
@@ -95,6 +99,7 @@ export class SessionManager {
       context: contextBundle,
       evaluation: null,
       taskList: null,
+      llmRouting: llmConfig,
       metadata: {
         ...metadata,
         createdAt: new Date().toISOString(),
@@ -103,8 +108,39 @@ export class SessionManager {
       },
       error: null
     };
-    
+
     return this.store.create(session);
+  }
+
+  /**
+   * Build LLM routing configuration from environment variables
+   * @returns {Object}
+   * @private
+   */
+  _buildLLMRoutingFromEnv() {
+    const tiers = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY', 'QUINARY'];
+    const routing = {
+      defaultTier: 'PRIMARY',
+      tiers: {}
+    };
+
+    for (const tier of tiers) {
+      const provider = process.env[`${tier}_LLM_PROVIDER`] || (tier === 'PRIMARY' ? process.env.LLM_PROVIDER : '');
+      const apiKey = process.env[`${tier}_LLM_API_KEY`] || (tier === 'PRIMARY' ? process.env.LLM_API_KEY : '');
+      const endpoint = process.env[`${tier}_LLM_ENDPOINT`] || (tier === 'PRIMARY' ? process.env.LLM_ENDPOINT : '');
+      const model = process.env[`${tier}_LLM_MODEL`] || (tier === 'PRIMARY' ? process.env.LLM_MODEL : '');
+
+      if (apiKey) {
+        routing.tiers[tier] = {
+          provider: provider || 'anthropic',
+          endpoint: endpoint || '',
+          model: model || '',
+          configured: true
+        };
+      }
+    }
+
+    return routing;
   }
 
   /**

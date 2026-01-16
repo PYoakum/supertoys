@@ -476,11 +476,22 @@ ${colors.bold}OPTIONS:${colors.reset}
   --version, -V           Show version
 
 ${colors.bold}ENVIRONMENT VARIABLES:${colors.reset}
-  LLM_API_KEY             API key for LLM provider
-  LLM_PROVIDER            Provider: anthropic, openai, custom
-  LLM_MODEL               Model to use
-  LLM_ENDPOINT            Custom API endpoint
+  PRIMARY_LLM_API_KEY     API key for primary LLM (default tier)
+  PRIMARY_LLM_PROVIDER    Provider: anthropic, openai, custom
+  PRIMARY_LLM_MODEL       Model to use
+  PRIMARY_LLM_ENDPOINT    Custom API endpoint
+
+  SECONDARY_LLM_*         Secondary tier (same pattern as PRIMARY)
+  TERTIARY_LLM_*          Tertiary tier
+  QUATERNARY_LLM_*        Quaternary tier
+  QUINARY_LLM_*           Quinary tier
+
   MAX_RETRIES             Override max retries
+
+  Legacy (fallback):
+  LLM_API_KEY             Falls back to PRIMARY_LLM_API_KEY
+  ANTHROPIC_API_KEY       Used if PRIMARY not set
+  OPENAI_API_KEY          Used if PRIMARY not set
 
 ${colors.bold}EXIT CODES:${colors.reset}
   0  Success
@@ -562,14 +573,15 @@ async function main() {
     process.exit(EXIT.INVALID_ARGS);
   }
 
-  // Check for API key
-  const apiKey = process.env.LLM_API_KEY ||
-                 process.env.ANTHROPIC_API_KEY ||
-                 process.env.OPENAI_API_KEY;
+  // Check for API key (PRIMARY tier or legacy)
+  const primaryApiKey = process.env.PRIMARY_LLM_API_KEY ||
+                        process.env.LLM_API_KEY ||
+                        process.env.ANTHROPIC_API_KEY ||
+                        process.env.OPENAI_API_KEY;
 
-  if (!apiKey) {
+  if (!primaryApiKey) {
     console.error(`${colors.red}Error:${colors.reset} No API key found`);
-    console.error('Set LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY');
+    console.error('Set PRIMARY_LLM_API_KEY, LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY');
     process.exit(EXIT.INVALID_ARGS);
   }
 
@@ -577,6 +589,9 @@ async function main() {
   const maxRetries = parseInt(args['max-retries'], 10) || 3;
   const port = parseInt(args.port, 10) || 3000;
   const serverUrl = args['server-url'] || `http://localhost:${port}`;
+
+  // LLM tiers
+  const llmTiers = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY', 'QUINARY'];
 
   let serverProcess = null;
   let sessionId = null;
@@ -587,7 +602,8 @@ async function main() {
     phases: {},
     scores: null,
     duration: 0,
-    error: null
+    error: null,
+    llmTiers: []
   };
 
   const startTime = Date.now();
@@ -596,13 +612,51 @@ async function main() {
     logger.banner('☆ RUN ALL - Starting Workflow ☆');
 
     const client = new SessionClient(serverUrl);
+
+    // Build environment with all LLM tier configurations
     const env = {
-      LLM_API_KEY: apiKey,
-      LLM_PROVIDER: process.env.LLM_PROVIDER || 'anthropic',
-      LLM_MODEL: process.env.LLM_MODEL,
-      LLM_ENDPOINT: process.env.LLM_ENDPOINT,
-      MAX_RETRIES: String(maxRetries)
+      MAX_RETRIES: String(maxRetries),
+      ANTHROPIC_VERSION: process.env.ANTHROPIC_VERSION || '2023-06-01',
+      // Primary LLM (with legacy fallbacks)
+      PRIMARY_LLM_PROVIDER: process.env.PRIMARY_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
+      PRIMARY_LLM_API_KEY: primaryApiKey,
+      PRIMARY_LLM_ENDPOINT: process.env.PRIMARY_LLM_ENDPOINT || process.env.LLM_ENDPOINT || '',
+      PRIMARY_LLM_MODEL: process.env.PRIMARY_LLM_MODEL || process.env.LLM_MODEL || '',
+      // Legacy vars for backwards compatibility
+      LLM_PROVIDER: process.env.PRIMARY_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
+      LLM_API_KEY: primaryApiKey,
+      LLM_ENDPOINT: process.env.PRIMARY_LLM_ENDPOINT || process.env.LLM_ENDPOINT || '',
+      LLM_MODEL: process.env.PRIMARY_LLM_MODEL || process.env.LLM_MODEL || '',
+      // Secondary LLM
+      SECONDARY_LLM_PROVIDER: process.env.SECONDARY_LLM_PROVIDER || '',
+      SECONDARY_LLM_API_KEY: process.env.SECONDARY_LLM_API_KEY || '',
+      SECONDARY_LLM_ENDPOINT: process.env.SECONDARY_LLM_ENDPOINT || '',
+      SECONDARY_LLM_MODEL: process.env.SECONDARY_LLM_MODEL || '',
+      // Tertiary LLM
+      TERTIARY_LLM_PROVIDER: process.env.TERTIARY_LLM_PROVIDER || '',
+      TERTIARY_LLM_API_KEY: process.env.TERTIARY_LLM_API_KEY || '',
+      TERTIARY_LLM_ENDPOINT: process.env.TERTIARY_LLM_ENDPOINT || '',
+      TERTIARY_LLM_MODEL: process.env.TERTIARY_LLM_MODEL || '',
+      // Quaternary LLM
+      QUATERNARY_LLM_PROVIDER: process.env.QUATERNARY_LLM_PROVIDER || '',
+      QUATERNARY_LLM_API_KEY: process.env.QUATERNARY_LLM_API_KEY || '',
+      QUATERNARY_LLM_ENDPOINT: process.env.QUATERNARY_LLM_ENDPOINT || '',
+      QUATERNARY_LLM_MODEL: process.env.QUATERNARY_LLM_MODEL || '',
+      // Quinary LLM
+      QUINARY_LLM_PROVIDER: process.env.QUINARY_LLM_PROVIDER || '',
+      QUINARY_LLM_API_KEY: process.env.QUINARY_LLM_API_KEY || '',
+      QUINARY_LLM_ENDPOINT: process.env.QUINARY_LLM_ENDPOINT || '',
+      QUINARY_LLM_MODEL: process.env.QUINARY_LLM_MODEL || ''
     };
+
+    // Log configured tiers
+    const configuredTiers = llmTiers.filter(tier => !!env[`${tier}_LLM_API_KEY`]);
+    result.llmTiers = configuredTiers;
+    logger.info(`LLM Tiers configured: ${configuredTiers.length}`);
+    for (const tier of configuredTiers) {
+      const provider = env[`${tier}_LLM_PROVIDER`];
+      logger.debug(`  ${tier}: ${provider}`);
+    }
 
     // Phase 1: Server
     logger.phase(1, 5, 'Server');

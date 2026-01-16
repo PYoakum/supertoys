@@ -92,7 +92,7 @@ export class ExecuteTabScreen {
     this.editToolMode = false;        // Editing tool selection
     this.availableTools = [];         // Cached list of available tools from server
     this.toolNavIndex = 0;            // Navigation index in tool selector
-    this.taskFields = ['title', 'description', 'tool', 'priority', 'sequenceNumber', 'scheduledAt', 'dependencies'];
+    this.taskFields = ['title', 'description', 'tool', 'llmTier', 'priority', 'sequenceNumber', 'scheduledAt', 'dependencies'];
 
     // Import mode state
     this.importMode = false;          // Currently entering import filename
@@ -169,31 +169,46 @@ export class ExecuteTabScreen {
       }
     };
     this.providerList = ['anthropic', 'openai', 'custom'];
-    this.selectedProvider = 0; // Index into providerList
 
-    // Detect provider from env
-    const detectedProvider = process.env.LLM_PROVIDER || 'anthropic';
-    this.selectedProvider = Math.max(0, this.providerList.indexOf(detectedProvider));
+    // LLM Tiers for per-task routing
+    this.llmTiers = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY', 'QUINARY'];
 
     // Environment variables for execution
-    // Select API key based on provider (prefer provider-specific key)
-    const currentProvider = this.providerList[this.selectedProvider];
-    const apiKey = this._getApiKeyForProvider(currentProvider);
     this.envVars = {
       // Server settings
       SERVER_PORT: process.env.PORT || '3000',
       SERVER_HOST: process.env.HOST || '0.0.0.0',
       SESSION_SERVER_URL: this.state.serverUrl || 'http://localhost:3000',
-      // LLM settings
-      LLM_PROVIDER: currentProvider,
-      LLM_API_KEY: apiKey,
-      LLM_ENDPOINT: process.env.LLM_ENDPOINT || this.providers[currentProvider].endpoint,
-      LLM_MODEL: process.env.LLM_MODEL || this.providers[currentProvider].defaultModel,
       ANTHROPIC_VERSION: process.env.ANTHROPIC_VERSION || '2023-06-01',
       // Output settings
       OUTPUT_DIR: this.state.outputDir || './output',
       // Retry settings
-      MAX_RETRIES: process.env.MAX_RETRIES || '3'
+      MAX_RETRIES: process.env.MAX_RETRIES || '3',
+      // Primary LLM (default)
+      PRIMARY_LLM_PROVIDER: process.env.PRIMARY_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
+      PRIMARY_LLM_API_KEY: process.env.PRIMARY_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || '',
+      PRIMARY_LLM_ENDPOINT: process.env.PRIMARY_LLM_ENDPOINT || process.env.LLM_ENDPOINT || this.providers.anthropic.endpoint,
+      PRIMARY_LLM_MODEL: process.env.PRIMARY_LLM_MODEL || process.env.LLM_MODEL || this.providers.anthropic.defaultModel,
+      // Secondary LLM
+      SECONDARY_LLM_PROVIDER: process.env.SECONDARY_LLM_PROVIDER || '',
+      SECONDARY_LLM_API_KEY: process.env.SECONDARY_LLM_API_KEY || '',
+      SECONDARY_LLM_ENDPOINT: process.env.SECONDARY_LLM_ENDPOINT || '',
+      SECONDARY_LLM_MODEL: process.env.SECONDARY_LLM_MODEL || '',
+      // Tertiary LLM
+      TERTIARY_LLM_PROVIDER: process.env.TERTIARY_LLM_PROVIDER || '',
+      TERTIARY_LLM_API_KEY: process.env.TERTIARY_LLM_API_KEY || '',
+      TERTIARY_LLM_ENDPOINT: process.env.TERTIARY_LLM_ENDPOINT || '',
+      TERTIARY_LLM_MODEL: process.env.TERTIARY_LLM_MODEL || '',
+      // Quaternary LLM
+      QUATERNARY_LLM_PROVIDER: process.env.QUATERNARY_LLM_PROVIDER || '',
+      QUATERNARY_LLM_API_KEY: process.env.QUATERNARY_LLM_API_KEY || '',
+      QUATERNARY_LLM_ENDPOINT: process.env.QUATERNARY_LLM_ENDPOINT || '',
+      QUATERNARY_LLM_MODEL: process.env.QUATERNARY_LLM_MODEL || '',
+      // Quinary LLM
+      QUINARY_LLM_PROVIDER: process.env.QUINARY_LLM_PROVIDER || '',
+      QUINARY_LLM_API_KEY: process.env.QUINARY_LLM_API_KEY || '',
+      QUINARY_LLM_ENDPOINT: process.env.QUINARY_LLM_ENDPOINT || '',
+      QUINARY_LLM_MODEL: process.env.QUINARY_LLM_MODEL || ''
     };
     this.envVarKeys = Object.keys(this.envVars);
     this.selectedEnvVar = 0;
@@ -235,15 +250,57 @@ export class ExecuteTabScreen {
     this.focused = true;
     this._checkServerStatus();
 
-    // Show API key status
-    const provider = this.envVars.LLM_PROVIDER;
-    const hasKey = !!this.envVars.LLM_API_KEY;
-    if (!hasKey) {
-      this.logViewer.addLine('warn', `No API key for ${provider}. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.`);
+    // Show API key status for all configured tiers
+    const configuredTiers = this._getConfiguredLLMTiers();
+    if (configuredTiers.length === 0) {
+      this.logViewer.addLine('warn', 'No LLM API keys configured. Set PRIMARY_LLM_API_KEY or ANTHROPIC_API_KEY.');
     } else {
-      const keyPrefix = this.envVars.LLM_API_KEY.slice(0, 7);
-      this.logViewer.addLine('info', `Provider: ${provider}, Key: ${keyPrefix}...`);
+      this.logViewer.addLine('info', `LLM Tiers configured: ${configuredTiers.length}`);
+      for (const tier of configuredTiers) {
+        const provider = this.envVars[`${tier}_LLM_PROVIDER`];
+        const keyPrefix = this.envVars[`${tier}_LLM_API_KEY`].slice(0, 7);
+        this.logViewer.addLine('debug', `  ${tier}: ${provider} (${keyPrefix}...)`);
+      }
     }
+  }
+
+  /**
+   * Get list of configured LLM tiers (those with API keys)
+   * @returns {string[]}
+   * @private
+   */
+  _getConfiguredLLMTiers() {
+    return this.llmTiers.filter(tier => !!this.envVars[`${tier}_LLM_API_KEY`]);
+  }
+
+  /**
+   * Build LLM routing configuration for session
+   * @returns {Object}
+   * @private
+   */
+  _buildLLMRoutingConfig() {
+    const routing = {
+      defaultTier: 'PRIMARY',
+      tiers: {}
+    };
+
+    for (const tier of this.llmTiers) {
+      const provider = this.envVars[`${tier}_LLM_PROVIDER`];
+      const apiKey = this.envVars[`${tier}_LLM_API_KEY`];
+      const endpoint = this.envVars[`${tier}_LLM_ENDPOINT`];
+      const model = this.envVars[`${tier}_LLM_MODEL`];
+
+      if (apiKey) {
+        routing.tiers[tier] = {
+          provider: provider || 'anthropic',
+          endpoint: endpoint || this.providers[provider]?.endpoint || '',
+          model: model || this.providers[provider]?.defaultModel || '',
+          configured: true
+        };
+      }
+    }
+
+    return routing;
   }
 
   /**
@@ -346,23 +403,48 @@ export class ExecuteTabScreen {
     }
 
     // Warn if no API key
-    if (!this.envVars.LLM_API_KEY) {
+    if (!this.envVars.PRIMARY_LLM_API_KEY) {
       this.logViewer.addLine('warn', 'Starting server WITHOUT API key - LLM features will be unavailable!');
-      this.logViewer.addLine('info', 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY, then restart server.');
+      this.logViewer.addLine('info', 'Set PRIMARY_LLM_API_KEY or ANTHROPIC_API_KEY, then restart server.');
     }
 
     this.logViewer.addLine('info', 'Starting session server...');
 
-    // Build environment for server
+    // Build environment for server with all LLM tier configs
     const env = {
       ...process.env,
       PORT: this.envVars.SERVER_PORT,
       HOST: this.envVars.SERVER_HOST,
-      LLM_PROVIDER: this.envVars.LLM_PROVIDER,
-      LLM_API_KEY: this.envVars.LLM_API_KEY,
-      LLM_ENDPOINT: this.envVars.LLM_ENDPOINT,
-      LLM_MODEL: this.envVars.LLM_MODEL,
-      ANTHROPIC_VERSION: this.envVars.ANTHROPIC_VERSION
+      ANTHROPIC_VERSION: this.envVars.ANTHROPIC_VERSION,
+      // Primary LLM (also set legacy vars for backwards compatibility)
+      PRIMARY_LLM_PROVIDER: this.envVars.PRIMARY_LLM_PROVIDER,
+      PRIMARY_LLM_API_KEY: this.envVars.PRIMARY_LLM_API_KEY,
+      PRIMARY_LLM_ENDPOINT: this.envVars.PRIMARY_LLM_ENDPOINT,
+      PRIMARY_LLM_MODEL: this.envVars.PRIMARY_LLM_MODEL,
+      LLM_PROVIDER: this.envVars.PRIMARY_LLM_PROVIDER,
+      LLM_API_KEY: this.envVars.PRIMARY_LLM_API_KEY,
+      LLM_ENDPOINT: this.envVars.PRIMARY_LLM_ENDPOINT,
+      LLM_MODEL: this.envVars.PRIMARY_LLM_MODEL,
+      // Secondary LLM
+      SECONDARY_LLM_PROVIDER: this.envVars.SECONDARY_LLM_PROVIDER,
+      SECONDARY_LLM_API_KEY: this.envVars.SECONDARY_LLM_API_KEY,
+      SECONDARY_LLM_ENDPOINT: this.envVars.SECONDARY_LLM_ENDPOINT,
+      SECONDARY_LLM_MODEL: this.envVars.SECONDARY_LLM_MODEL,
+      // Tertiary LLM
+      TERTIARY_LLM_PROVIDER: this.envVars.TERTIARY_LLM_PROVIDER,
+      TERTIARY_LLM_API_KEY: this.envVars.TERTIARY_LLM_API_KEY,
+      TERTIARY_LLM_ENDPOINT: this.envVars.TERTIARY_LLM_ENDPOINT,
+      TERTIARY_LLM_MODEL: this.envVars.TERTIARY_LLM_MODEL,
+      // Quaternary LLM
+      QUATERNARY_LLM_PROVIDER: this.envVars.QUATERNARY_LLM_PROVIDER,
+      QUATERNARY_LLM_API_KEY: this.envVars.QUATERNARY_LLM_API_KEY,
+      QUATERNARY_LLM_ENDPOINT: this.envVars.QUATERNARY_LLM_ENDPOINT,
+      QUATERNARY_LLM_MODEL: this.envVars.QUATERNARY_LLM_MODEL,
+      // Quinary LLM
+      QUINARY_LLM_PROVIDER: this.envVars.QUINARY_LLM_PROVIDER,
+      QUINARY_LLM_API_KEY: this.envVars.QUINARY_LLM_API_KEY,
+      QUINARY_LLM_ENDPOINT: this.envVars.QUINARY_LLM_ENDPOINT,
+      QUINARY_LLM_MODEL: this.envVars.QUINARY_LLM_MODEL
     };
 
     // Use bun if available, otherwise node
@@ -470,7 +552,7 @@ export class ExecuteTabScreen {
       return;
     }
 
-    if (!this.envVars.LLM_API_KEY) {
+    if (!this.envVars.PRIMARY_LLM_API_KEY) {
       this.logViewer.addLine('error', 'No API key configured!');
       this.logViewer.addLine('warn', 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment.');
       return;
@@ -792,7 +874,7 @@ export class ExecuteTabScreen {
    */
   async _prepareSession() {
     // Check for API key first
-    if (!this.envVars.LLM_API_KEY) {
+    if (!this.envVars.PRIMARY_LLM_API_KEY) {
       this.logViewer.addLine('error', 'No API key configured!');
       this.logViewer.addLine('warn', `Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment, then restart.`);
       this.logViewer.addLine('info', 'Or configure in Environment Config menu.');
@@ -1262,7 +1344,7 @@ export class ExecuteTabScreen {
    */
   async _runNextSession() {
     // Check for API key first
-    if (!this.envVars.LLM_API_KEY) {
+    if (!this.envVars.PRIMARY_LLM_API_KEY) {
       this.logViewer.addLine('error', 'No API key configured!');
       this.logViewer.addLine('warn', 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment, then restart.');
       return;
@@ -1798,6 +1880,12 @@ export class ExecuteTabScreen {
       return;
     }
 
+    if (field === 'llmTier') {
+      // Cycle through configured LLM tiers
+      this._cycleLLMTier(tasks);
+      return;
+    }
+
     this.editingField = true;
     const value = task[field];
     // Handle object values (e.g., description: { text: '...' })
@@ -2287,6 +2375,29 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Cycle through configured LLM tiers for a task
+   * @param {Object[]} tasks
+   * @private
+   */
+  _cycleLLMTier(tasks) {
+    const task = tasks[this.editTaskIndex];
+    const configuredTiers = this._getConfiguredLLMTiers();
+
+    if (configuredTiers.length === 0) {
+      this.logViewer.addLine('warn', 'No LLM tiers configured');
+      return;
+    }
+
+    const currentTier = task.llmTier || 'PRIMARY';
+    const currentIndex = configuredTiers.indexOf(currentTier);
+    const nextIndex = (currentIndex + 1) % configuredTiers.length;
+    const nextTier = configuredTiers[nextIndex];
+
+    task.llmTier = nextTier;
+    this._setStatus(`LLM Tier: ${nextTier}`, 'info', 2000);
+  }
+
+  /**
    * Get tool name from task.tool (handles string or object)
    * @param {string|Object} tool
    * @returns {string}
@@ -2523,12 +2634,18 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Get the appropriate API key for a provider
+   * Get the appropriate API key for a provider (legacy support)
    * @param {string} provider - Provider name
+   * @param {string} [tier='PRIMARY'] - LLM tier
    * @returns {string} API key
    * @private
    */
-  _getApiKeyForProvider(provider) {
+  _getApiKeyForProvider(provider, tier = 'PRIMARY') {
+    // First check tier-specific env var
+    const tierKey = this.envVars[`${tier}_LLM_API_KEY`];
+    if (tierKey) return tierKey;
+
+    // Fall back to legacy env vars
     switch (provider) {
       case 'anthropic':
         return process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY || '';
@@ -2541,21 +2658,27 @@ export class ExecuteTabScreen {
   }
 
   /**
-   * Cycle through LLM providers and update related settings
+   * Cycle through providers for PRIMARY tier
    * @private
    */
   _cycleProvider() {
-    this.selectedProvider = (this.selectedProvider + 1) % this.providerList.length;
-    const providerName = this.providerList[this.selectedProvider];
+    // Find current provider index
+    const currentProvider = this.envVars.PRIMARY_LLM_PROVIDER;
+    let currentIdx = this.providerList.indexOf(currentProvider);
+    if (currentIdx < 0) currentIdx = 0;
+
+    // Cycle to next
+    const nextIdx = (currentIdx + 1) % this.providerList.length;
+    const providerName = this.providerList[nextIdx];
     const providerConfig = this.providers[providerName];
 
-    // Update env vars with new provider defaults
-    this.envVars.LLM_PROVIDER = providerName;
-    this.envVars.LLM_ENDPOINT = providerConfig.endpoint;
-    this.envVars.LLM_MODEL = providerConfig.defaultModel;
-    this.envVars.LLM_API_KEY = this._getApiKeyForProvider(providerName);
+    // Update PRIMARY tier env vars
+    this.envVars.PRIMARY_LLM_PROVIDER = providerName;
+    this.envVars.PRIMARY_LLM_ENDPOINT = providerConfig.endpoint;
+    this.envVars.PRIMARY_LLM_MODEL = providerConfig.defaultModel;
+    this.envVars.PRIMARY_LLM_API_KEY = this._getApiKeyForProvider(providerName, 'PRIMARY');
 
-    this.logViewer.addLine('info', `Switched to provider: ${providerName}`);
+    this.logViewer.addLine('info', `PRIMARY provider: ${providerName}`);
     this.logViewer.addLine('info', `Endpoint: ${providerConfig.endpoint || '(custom)'}`);
     this.logViewer.addLine('info', `Model: ${providerConfig.defaultModel || '(custom)'}`);
   }
@@ -2964,6 +3087,12 @@ export class ExecuteTabScreen {
         const toolName = this._getToolName(task.tool);
         const toolText = toolName ? `${toolName} - [T] to change` : '(none) - [T] to select';
         screen.drawText(x + 20, line, toolText, isSelected ? styles.accent : styles.dim);
+      } else if (field === 'llmTier') {
+        // Show current LLM tier with available tiers hint
+        const tier = task.llmTier || 'PRIMARY';
+        const configuredTiers = this._getConfiguredLLMTiers();
+        const tierText = `${tier} (${configuredTiers.length} configured)`;
+        screen.drawText(x + 20, line, tierText, isSelected ? styles.accent : styles.dim);
       } else if (field === 'dependencies') {
         // Show dependency count and hint
         const deps = task.dependencies || [];
@@ -3056,6 +3185,7 @@ export class ExecuteTabScreen {
       title: 'Title',
       description: 'Description',
       tool: 'Tool',
+      llmTier: 'LLM Tier',
       priority: 'Priority (1-10)',
       sequenceNumber: 'Sequence #',
       scheduledAt: 'Schedule',
