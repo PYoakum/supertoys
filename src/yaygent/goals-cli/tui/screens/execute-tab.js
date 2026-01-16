@@ -92,7 +92,7 @@ export class ExecuteTabScreen {
     this.editToolMode = false;        // Editing tool selection
     this.availableTools = [];         // Cached list of available tools from server
     this.toolNavIndex = 0;            // Navigation index in tool selector
-    this.taskFields = ['title', 'description', 'tool', 'llmTier', 'priority', 'sequenceNumber', 'scheduledAt', 'dependencies'];
+    this.taskFields = ['title', 'description', 'tool', 'llmTier', 'priority', 'sequenceNumber', 'delay', 'scheduledAt', 'dependencies'];
 
     // Import mode state
     this.importMode = false;          // Currently entering import filename
@@ -1925,6 +1925,7 @@ export class ExecuteTabScreen {
       },
       priority: 5,
       sequenceNumber: tasks.length + 1,
+      delay: null,
       scheduledAt: null,
       dependencies: [],
       state: 'pending',
@@ -2042,6 +2043,7 @@ export class ExecuteTabScreen {
               const depId = typeof dep === 'string' ? dep : (dep.taskId || dep.id);
               return idToTitle.get(depId) || depId;
             }),
+            delay: t.delay || null,
             scheduledAt: t.scheduledAt || null
           };
         })
@@ -2153,6 +2155,7 @@ export class ExecuteTabScreen {
           sequenceNumber: existingTasks.length + imported + 1,
           dependencies: [], // Resolve after all imported
           state: 'pending',
+          delay: task.delay || null,
           scheduledAt: task.scheduledAt || null,
           goalId: this.selectedSession.goals?.items?.[0]?.id || null,
           createdAt: new Date().toISOString(),
@@ -3189,6 +3192,7 @@ export class ExecuteTabScreen {
       llmTier: 'LLM Tier',
       priority: 'Priority (1-10)',
       sequenceNumber: 'Sequence #',
+      delay: 'Delay (e.g. 5s, 500ms)',
       scheduledAt: 'Schedule',
       dependencies: 'Dependencies'
     };

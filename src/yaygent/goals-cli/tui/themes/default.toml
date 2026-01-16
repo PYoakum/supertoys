@@ -19,8 +19,8 @@ author = "Goals CLI"
 normal = "blue"
 panel = "black"
 selected = "cyan"
-header = "blue"
-footer = "blue"
+header = 54   # indigo (256-color mode)
+footer = 54   # indigo (256-color mode)
 error = 54   # indigo (256-color mode)
 success = "green"
 

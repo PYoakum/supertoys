@@ -42,6 +42,48 @@ function looksLikeTaskId(str) {
 }
 
 /**
+ * Parse delay value into milliseconds
+ * Supports:
+ * - Seconds: "5s", "30s"
+ * - Milliseconds: "500ms", "1000ms"
+ * - Minutes: "2m"
+ * @param {string} value - Delay value
+ * @returns {number|null} - Delay in milliseconds or null if invalid
+ */
+function parseDelay(value) {
+  if (!value || typeof value !== 'string') return null;
+
+  // Milliseconds format: "500ms", "1000ms"
+  const msMatch = value.match(/^(\d+)ms$/i);
+  if (msMatch) {
+    return parseInt(msMatch[1], 10);
+  }
+
+  // Seconds format: "5s", "30s"
+  const secMatch = value.match(/^(\d+)s$/i);
+  if (secMatch) {
+    return parseInt(secMatch[1], 10) * 1000;
+  }
+
+  // Minutes format: "2m"
+  const minMatch = value.match(/^(\d+)m$/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) * 60000;
+  }
+
+  return null;
+}
+
+/**
+ * Sleep for specified milliseconds
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Parse scheduledAt value into target execution time
  * Supports:
  * - Relative delays: "30s", "5m", "2h", "1d"
@@ -798,6 +840,15 @@ async function main(args) {
     const totalTasks = queueManager.getMetrics().totalTasks;
 
     display.printTaskStart(task, taskNumber, totalTasks);
+
+    // Apply task-level delay if specified (to help avoid rate limits)
+    if (task.delay) {
+      const delayMs = parseDelay(task.delay);
+      if (delayMs && delayMs > 0) {
+        console.log(`  ⏳ Waiting ${task.delay} before execution...`);
+        await sleep(delayMs);
+      }
+    }
 
     // Start task
     queueManager.startTask(task.id);

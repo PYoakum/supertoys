@@ -7,7 +7,7 @@ import { ANSI, writeStdout, getTerminalSize } from './ansi.js';
 import { Screen } from './screen.js';
 import { Input, stop, isStopped } from './input.js';
 import { createCharMapper } from './charset.js';
-import { CGA, UI, C, STYLES } from './colors.js';
+import { CGA, UI, C, STYLES, fg, bg } from './colors.js';
 import { loadThemeStyles } from './theme-loader.js';
 
 /**
@@ -77,35 +77,36 @@ export class App {
     }
 
     // Default styles (used if no theme or as fallback)
+    // Note: using fg() and bg() which auto-detect 16 vs 256 color mode
     const defaults = {
       // Panel styles
-      panel: screen.registerStyle(themeStyles.panel || { fg: C.fg(UI.FG_NORMAL), bg: C.bg(UI.BG_PANEL) }),
-      panelBg: screen.registerStyle(themeStyles.panel_bg || { bg: C.bg(UI.BG_PANEL) }),
+      panel: screen.registerStyle(themeStyles.panel || { fg: fg(UI.FG_NORMAL), bg: bg(UI.BG_PANEL) }),
+      panelBg: screen.registerStyle(themeStyles.panel_bg || { bg: bg(UI.BG_PANEL) }),
 
       // Header/Footer
-      header: screen.registerStyle(themeStyles.header || { fg: C.fg(UI.FG_TITLE), bg: C.bg(UI.BG_HEADER), bold: true }),
-      footer: screen.registerStyle(themeStyles.footer || { fg: C.fg(UI.FG_NORMAL), bg: C.bg(UI.BG_FOOTER) }),
+      header: screen.registerStyle(themeStyles.header || { fg: fg(UI.FG_TITLE), bg: bg(UI.BG_HEADER), bold: true }),
+      footer: screen.registerStyle(themeStyles.footer || { fg: fg(UI.FG_NORMAL), bg: bg(UI.BG_FOOTER) }),
 
       // Selection
-      selected: screen.registerStyle(themeStyles.selected || { fg: C.fg(UI.FG_SELECTED), bg: C.bg(UI.BG_SELECTED), bold: true }),
-      item: screen.registerStyle(themeStyles.item || { fg: C.fg(UI.FG_NORMAL), bg: C.bg(UI.BG_PANEL) }),
+      selected: screen.registerStyle(themeStyles.selected || { fg: fg(UI.FG_SELECTED), bg: bg(UI.BG_SELECTED), bold: true }),
+      item: screen.registerStyle(themeStyles.item || { fg: fg(UI.FG_NORMAL), bg: bg(UI.BG_PANEL) }),
 
       // Text
-      normal: screen.registerStyle(themeStyles.normal || { fg: C.fg(UI.FG_NORMAL), bg: C.bg(UI.BG_PANEL) }),
-      title: screen.registerStyle(themeStyles.title || { fg: C.fg(UI.FG_TITLE), bg: C.bg(UI.BG_PANEL), bold: true }),
-      dim: screen.registerStyle(themeStyles.dim || { fg: C.fg(UI.FG_DIM), bg: C.bg(UI.BG_PANEL) }),
-      accent: screen.registerStyle(themeStyles.accent || { fg: C.fg(UI.FG_ACCENT), bg: C.bg(UI.BG_PANEL) }),
-      bright: screen.registerStyle(themeStyles.bright || { fg: C.fg(UI.FG_BRIGHT), bg: C.bg(UI.BG_PANEL), bold: true }),
-      highlight: screen.registerStyle(themeStyles.highlight || { fg: C.fg(UI.FG_BRIGHT), bg: C.bg(UI.BG_PANEL), bold: true }),
+      normal: screen.registerStyle(themeStyles.normal || { fg: fg(UI.FG_NORMAL), bg: bg(UI.BG_PANEL) }),
+      title: screen.registerStyle(themeStyles.title || { fg: fg(UI.FG_TITLE), bg: bg(UI.BG_PANEL), bold: true }),
+      dim: screen.registerStyle(themeStyles.dim || { fg: fg(UI.FG_DIM), bg: bg(UI.BG_PANEL) }),
+      accent: screen.registerStyle(themeStyles.accent || { fg: fg(UI.FG_ACCENT), bg: bg(UI.BG_PANEL) }),
+      bright: screen.registerStyle(themeStyles.bright || { fg: fg(UI.FG_BRIGHT), bg: bg(UI.BG_PANEL), bold: true }),
+      highlight: screen.registerStyle(themeStyles.highlight || { fg: fg(UI.FG_BRIGHT), bg: bg(UI.BG_PANEL), bold: true }),
 
       // Status
-      error: screen.registerStyle(themeStyles.error || { fg: C.fg(UI.FG_ERROR), bg: C.bg(UI.BG_PANEL), bold: true }),
-      success: screen.registerStyle(themeStyles.success || { fg: C.fg(UI.FG_SUCCESS), bg: C.bg(UI.BG_PANEL), bold: true }),
-      warning: screen.registerStyle(themeStyles.warning || { fg: C.fg(UI.FG_WARNING), bg: C.bg(UI.BG_PANEL) }),
+      error: screen.registerStyle(themeStyles.error || { fg: fg(UI.FG_ERROR), bg: bg(UI.BG_PANEL), bold: true }),
+      success: screen.registerStyle(themeStyles.success || { fg: fg(UI.FG_SUCCESS), bg: bg(UI.BG_PANEL), bold: true }),
+      warning: screen.registerStyle(themeStyles.warning || { fg: fg(UI.FG_WARNING), bg: bg(UI.BG_PANEL) }),
 
       // Borders
-      border: screen.registerStyle(themeStyles.border || { fg: C.fg(UI.BORDER_NORMAL), bg: C.bg(UI.BG_PANEL) }),
-      borderActive: screen.registerStyle(themeStyles.border_active || { fg: C.fg(UI.BORDER_ACTIVE), bg: C.bg(UI.BG_PANEL) })
+      border: screen.registerStyle(themeStyles.border || { fg: fg(UI.BORDER_NORMAL), bg: bg(UI.BG_PANEL) }),
+      borderActive: screen.registerStyle(themeStyles.border_active || { fg: fg(UI.BORDER_ACTIVE), bg: bg(UI.BG_PANEL) })
     };
 
     // Override with custom styles (legacy support)

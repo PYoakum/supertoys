@@ -13,7 +13,7 @@ panel = "black"
 selected = "green"
 header = "black"
 footer = "black"
-error = "red"
+error = 54   # indigo (256-color)
 success = "green"
 
 [ui.foregrounds]
@@ -23,7 +23,7 @@ dim = "dark_gray"
 selected = "black"
 title = "light_green"
 accent = "light_green"
-error = "light_red"
+error = 99   # light indigo (256-color)
 success = "light_green"
 warning = "yellow"
 highlight = "light_green"

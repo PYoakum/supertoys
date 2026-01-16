@@ -41,9 +41,9 @@ const DEFAULT_UI = {
   bg_normal: 'blue',
   bg_panel: 'black',
   bg_selected: 'cyan',
-  bg_header: 'blue',
-  bg_footer: 'blue',
-  bg_error: 'red',
+  bg_header: 54,  // indigo (256-color)
+  bg_footer: 54,  // indigo (256-color)
+  bg_error: 54,  // indigo (256-color)
   bg_success: 'green',
 
   // Foregrounds
@@ -53,7 +53,7 @@ const DEFAULT_UI = {
   fg_selected: 'black',
   fg_title: 'yellow',
   fg_accent: 'light_cyan',
-  fg_error: 'light_red',
+  fg_error: 99,  // light indigo (256-color)
   fg_success: 'light_green',
   fg_warning: 'yellow',
   fg_highlight: 'white',
@@ -159,13 +159,14 @@ function parseToml(content) {
 }
 
 /**
- * Resolve a color name to CGA index
- * @param {string|number} color - Color name or index
- * @returns {number} CGA color index
+ * Resolve a color name to color index
+ * @param {string|number} color - Color name or index (0-255 for 256-color mode)
+ * @returns {number} Color index
  */
 function resolveColor(color) {
   if (typeof color === 'number') {
-    return Math.min(15, Math.max(0, color));
+    // Allow full 256-color range (0-255)
+    return Math.min(255, Math.max(0, color));
   }
   const lower = String(color).toLowerCase().replace(/-/g, '_');
   return CGA_COLORS[lower] ?? 7; // Default to light_gray
@@ -260,9 +261,11 @@ export function buildStyles(theme, uiColors) {
   }
 
   // Convert style definitions to color objects
+  // Auto-detect 16 vs 256 color mode based on color index
+  const colorObj = (n) => n > 15 ? { type: 'ansi256', n } : { type: 'ansi16', n };
   const C = {
-    fg: (n) => ({ type: 'ansi16', n }),
-    bg: (n) => ({ type: 'ansi16', n })
+    fg: colorObj,
+    bg: colorObj
   };
 
   const resolved = {};
