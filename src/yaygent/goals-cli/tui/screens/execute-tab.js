@@ -13,6 +13,7 @@ import { ProgressBar } from '../components/progress-bar.js';
 import { SplitPane } from '../components/split-pane.js';
 import { SessionServerClient } from '../services/session-server-client.js';
 import { ActionPlanRunner } from '../services/action-plan-runner.js';
+import { OutputEvalRunner } from '../services/output-eval-runner.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -109,6 +110,9 @@ export class ExecuteTabScreen {
     this.actionRunner = new ActionPlanRunner({
       outputDir: this.state.outputDir || './output'
     });
+    this.outputEvalRunner = new OutputEvalRunner({
+      outputDir: this.state.outputDir || './evaluation-output'
+    });
 
     // Server management
     this.serverProcess = null;
@@ -119,6 +123,7 @@ export class ExecuteTabScreen {
     this.dashboardMenu = new Menu({
       title: 'Actions',
       items: [
+        '☆ Run All ☆',
         'Start Server',
         'Create Session',
         'Prepare Session',
@@ -129,6 +134,10 @@ export class ExecuteTabScreen {
         'Refresh Status'
       ]
     });
+
+    // Run All state
+    this.runAllActive = false;
+    this.runAllPhase = null;  // 'server' | 'session' | 'prepare' | 'execute' | 'eval'
 
     this.sessionsMenu = new Menu({ title: 'Sessions', items: [] });
     this.logViewer = new LogViewer({ maxLines: 500 });  // Increased for verbose dependency output
@@ -209,6 +218,9 @@ export class ExecuteTabScreen {
     });
     this.actionRunner = new ActionPlanRunner({
       outputDir: state.outputDir || './output'
+    });
+    this.outputEvalRunner = new OutputEvalRunner({
+      outputDir: state.outputDir || './evaluation-output'
     });
     this.envVars.SESSION_SERVER_URL = state.serverUrl || 'http://localhost:3000';
     this.envVars.OUTPUT_DIR = state.outputDir || './output';
@@ -305,7 +317,7 @@ export class ExecuteTabScreen {
    */
   _updateServerMenuItem() {
     const items = this.dashboardMenu.items.slice();
-    items[0] = this.serverRunning ? 'Stop Server' : 'Start Server';
+    items[1] = this.serverRunning ? 'Stop Server' : 'Start Server';
     this.dashboardMenu.setItems(items);
   }
 
@@ -438,6 +450,197 @@ export class ExecuteTabScreen {
 
     this.logViewer.addLine('info', 'Stopping server...');
     this.serverProcess.kill('SIGTERM');
+  }
+
+  /**
+   * Run All - Sequential workflow: server → session → prepare → execute → eval
+   * @private
+   */
+  async _runAll() {
+    if (this.runAllActive) {
+      this.logViewer.addLine('warn', 'Run All is already in progress');
+      return;
+    }
+
+    // Validate prerequisites
+    if (!this.state.goals) {
+      this.logViewer.addLine('error', 'No goals loaded. Load goals first.');
+      return;
+    }
+
+    if (!this.envVars.LLM_API_KEY) {
+      this.logViewer.addLine('error', 'No API key configured!');
+      this.logViewer.addLine('warn', 'Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment.');
+      return;
+    }
+
+    this.runAllActive = true;
+    this.logViewer.clear();
+    this.logViewer.addLine('info', '════════════════════════════════════════');
+    this.logViewer.addLine('info', '      ☆ RUN ALL - Starting Workflow ☆');
+    this.logViewer.addLine('info', '════════════════════════════════════════');
+
+    try {
+      // Phase 1: Start Server (if not already running)
+      this.runAllPhase = 'server';
+      if (!this.serverStatus.connected) {
+        this.logViewer.addLine('info', '');
+        this.logViewer.addLine('info', '▶ Phase 1/5: Starting Server...');
+
+        if (!this.serverRunning) {
+          this._startServer();
+        }
+
+        // Wait for server to be ready (poll up to 30 seconds)
+        let serverReady = false;
+        for (let i = 0; i < 30; i++) {
+          await this._sleep(1000);
+          try {
+            await this.sessionClient.healthCheck();
+            serverReady = true;
+            break;
+          } catch (e) {
+            // Keep waiting
+          }
+        }
+
+        if (!serverReady) {
+          throw new Error('Server failed to start within 30 seconds');
+        }
+        this.logViewer.addLine('success', '✓ Server is running');
+      } else {
+        this.logViewer.addLine('info', '');
+        this.logViewer.addLine('info', '▶ Phase 1/5: Server already running');
+        this.logViewer.addLine('success', '✓ Server is connected');
+      }
+
+      // Phase 2: Create Session
+      this.runAllPhase = 'session';
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '▶ Phase 2/5: Creating Session...');
+
+      const context = this.state.context || {
+        files: [],
+        metadata: { source: 'tui-runall', createdAt: new Date().toISOString() }
+      };
+
+      const createResponse = await this.sessionClient.createSession(this.state.goals, context);
+      const createResult = createResponse.data || createResponse;
+
+      if (!createResult.sessionId) {
+        throw new Error('Failed to create session - no sessionId returned');
+      }
+
+      this.state.sessionId = createResult.sessionId;
+      const sessionId = createResult.sessionId;
+      this.logViewer.addLine('success', `✓ Session created: ${sessionId.slice(0, 8)}...`);
+
+      // Phase 3: Prepare Session (Evaluate + Generate Tasks)
+      this.runAllPhase = 'prepare';
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '▶ Phase 3/5: Preparing Session...');
+      this.logViewer.addLine('info', '  → Evaluating dependencies...');
+
+      const evalResponse = await this.sessionClient.evaluate(sessionId);
+      const evalResult = evalResponse.data || evalResponse;
+      this.logViewer.addLine('info', `  → Evaluation complete: ${evalResult.state}`);
+
+      this.logViewer.addLine('info', '  → Generating task list...');
+      const taskResponse = await this.sessionClient.generateTaskList(sessionId);
+      const taskResult = taskResponse.data || taskResponse;
+      const taskCount = taskResult.taskList?.tasks?.length || 0;
+      this.logViewer.addLine('success', `✓ Prepared ${taskCount} tasks`);
+
+      // Phase 4: Execute Action Plan
+      this.runAllPhase = 'execute';
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '▶ Phase 4/5: Executing Action Plan...');
+
+      // Clean sandbox if enabled
+      if (this.cleanSandbox && !this.dryRun) {
+        try {
+          const infoResponse = await this.sessionClient.getSandboxInfo(sessionId);
+          const info = infoResponse.data || infoResponse;
+          if (info.exists && info.size > 0) {
+            await this.sessionClient.cleanupSandbox(sessionId);
+            this.logViewer.addLine('info', '  → Sandbox cleaned');
+          }
+        } catch (e) {
+          // Non-fatal
+        }
+      }
+
+      this.mode = 'running';
+      this.executionProgress = { current: 0, total: taskCount };
+
+      const execResult = await this.actionRunner.run(sessionId, {
+        dryRun: this.dryRun,
+        verbose: this.verbose,
+        env: this.envVars,
+        onLog: (level, message) => {
+          this.logViewer.addLine(level, message);
+        },
+        onProgress: (current, total) => {
+          this.executionProgress = { current, total };
+          this.progressBar.setValue(current, total);
+        }
+      });
+
+      if (!execResult.success) {
+        this.logViewer.addLine('warn', `  → Execution completed with exit code: ${execResult.exitCode}`);
+      } else {
+        this.logViewer.addLine('success', '✓ All tasks completed');
+      }
+
+      // Phase 5: Run Output Eval
+      this.runAllPhase = 'eval';
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '▶ Phase 5/5: Running Output Evaluation...');
+
+      // Find the bundle path - it should be in the output directory
+      const outputDir = this.envVars.OUTPUT_DIR || './output';
+      const bundlePath = resolve(process.cwd(), outputDir, sessionId);
+
+      const evalRunResult = await this.outputEvalRunner.run(bundlePath, {
+        format: 'all',
+        verbose: this.verbose,
+        onLog: (level, message) => {
+          this.logViewer.addLine(level, message);
+        }
+      });
+
+      if (evalRunResult.scores) {
+        this.logViewer.addLine('success', `✓ Evaluation complete: ${evalRunResult.scores.overall}/100 (${evalRunResult.scores.grade})`);
+      } else {
+        this.logViewer.addLine('success', '✓ Evaluation complete');
+      }
+
+      // Complete!
+      this.logViewer.addLine('info', '');
+      this.logViewer.addLine('info', '════════════════════════════════════════');
+      this.logViewer.addLine('success', '   ☆ RUN ALL COMPLETE ☆');
+      this.logViewer.addLine('info', '════════════════════════════════════════');
+      this._setStatus('☆ Run All complete!', 'success', 10000);
+
+    } catch (err) {
+      this.logViewer.addLine('error', `Run All failed in phase "${this.runAllPhase}": ${err.message}`);
+      this._setStatus(`Run All failed: ${err.message}`, 'error', 10000);
+    } finally {
+      this.runAllActive = false;
+      this.runAllPhase = null;
+      this.mode = 'dashboard';
+      await this._loadSessions();
+    }
+  }
+
+  /**
+   * Sleep helper for async delays
+   * @param {number} ms
+   * @returns {Promise<void>}
+   * @private
+   */
+  _sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -1199,29 +1402,32 @@ export class ExecuteTabScreen {
    */
   _handleDashboardAction(index) {
     switch (index) {
-      case 0: // Start/Stop Server
+      case 0: // ☆ Run All ☆
+        this._runAll();
+        break;
+      case 1: // Start/Stop Server
         this._toggleServer();
         break;
-      case 1: // Create Session
+      case 2: // Create Session
         this._createSession();
         break;
-      case 2: // Prepare Session (Evaluate + Generate Tasks)
+      case 3: // Prepare Session (Evaluate + Generate Tasks)
         this._prepareSession();
         break;
-      case 3: // List Sessions
+      case 4: // List Sessions
         this._loadSessions();
         this.mode = 'sessions';
         break;
-      case 4: // Run Next Session
+      case 5: // Run Next Session
         this._runNextSession();
         break;
-      case 5: // Kill Session
+      case 6: // Kill Session
         this._killCurrentSession();
         break;
-      case 6: // Environment Config
+      case 7: // Environment Config
         this.mode = 'config';
         break;
-      case 7: // Refresh Status
+      case 8: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;

@@ -7,28 +7,38 @@
 
 /**
  * CGA color indices (standard ANSI 0-15)
+ * Note: RED and LIGHT_RED replaced with LAVENDER (256-color mode)
  */
 export const CGA = {
   BLACK: 0,
   BLUE: 1,
   GREEN: 2,
   CYAN: 3,
-  RED: 4,
+  RED: 4,           // Kept for compatibility but not used in UI
   MAGENTA: 5,
-  BROWN: 6,       // Also called "yellow" in some systems
+  BROWN: 6,         // Also called "yellow" in some systems
   LIGHT_GRAY: 7,
   DARK_GRAY: 8,
   LIGHT_BLUE: 9,
   LIGHT_GREEN: 10,
   LIGHT_CYAN: 11,
-  LIGHT_RED: 12,
+  LIGHT_RED: 12,    // Kept for compatibility but not used in UI
   LIGHT_MAGENTA: 13,
   YELLOW: 14,
   WHITE: 15
 };
 
 /**
+ * Extended 256-color palette additions
+ */
+export const EXTENDED = {
+  LAVENDER: 183,       // Light lavender (#d7afff)
+  LIGHT_LAVENDER: 189  // Lighter lavender (#d7d7ff)
+};
+
+/**
  * Semantic color aliases for UI elements
+ * Note: Error colors now use lavender instead of red
  */
 export const UI = {
   // Backgrounds
@@ -37,7 +47,7 @@ export const UI = {
   BG_SELECTED: CGA.CYAN,
   BG_HEADER: CGA.BLUE,
   BG_FOOTER: CGA.BLUE,
-  BG_ERROR: CGA.RED,
+  BG_ERROR: EXTENDED.LAVENDER,      // Changed from RED to LAVENDER
   BG_SUCCESS: CGA.GREEN,
 
   // Foregrounds
@@ -47,7 +57,7 @@ export const UI = {
   FG_SELECTED: CGA.BLACK,
   FG_TITLE: CGA.YELLOW,
   FG_ACCENT: CGA.LIGHT_CYAN,
-  FG_ERROR: CGA.LIGHT_RED,
+  FG_ERROR: EXTENDED.LIGHT_LAVENDER, // Changed from LIGHT_RED to LIGHT_LAVENDER
   FG_SUCCESS: CGA.LIGHT_GREEN,
   FG_WARNING: CGA.YELLOW,
 
@@ -71,21 +81,21 @@ export const UI = {
  */
 
 /**
- * Create foreground color object (CGA/ANSI 0-15)
- * @param {number} n - Color index 0-15
+ * Create foreground color object (auto-detects 16 vs 256 color mode)
+ * @param {number} n - Color index (0-15 for ANSI16, 16-255 for ANSI256)
  * @returns {Object}
  */
 export function fg(n) {
-  return { type: 'ansi16', n };
+  return n > 15 ? { type: 'ansi256', n } : { type: 'ansi16', n };
 }
 
 /**
- * Create background color object (CGA/ANSI 0-15)
- * @param {number} n - Color index 0-15
+ * Create background color object (auto-detects 16 vs 256 color mode)
+ * @param {number} n - Color index (0-15 for ANSI16, 16-255 for ANSI256)
  * @returns {Object}
  */
 export function bg(n) {
-  return { type: 'ansi16', n };
+  return n > 15 ? { type: 'ansi256', n } : { type: 'ansi16', n };
 }
 
 /**
@@ -179,4 +189,4 @@ export const STYLES = {
   borderActive: { fg: fg(UI.BORDER_ACTIVE), bg: bg(UI.BG_PANEL) }
 };
 
-export default { CGA, UI, C, fg, bg, styleToSgr, STYLES };
+export default { CGA, EXTENDED, UI, C, fg, bg, styleToSgr, STYLES };

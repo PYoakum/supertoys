@@ -21,7 +21,7 @@ panel = "black"
 selected = "cyan"
 header = "blue"
 footer = "blue"
-error = "red"
+error = 183  # lavender (256-color mode)
 success = "green"
 
 [ui.foregrounds]
@@ -31,7 +31,7 @@ dim = "dark_gray"
 selected = "black"
 title = "yellow"
 accent = "light_cyan"
-error = "light_red"
+error = 189  # light lavender (256-color mode)
 success = "light_green"
 warning = "yellow"
 highlight = "white"
