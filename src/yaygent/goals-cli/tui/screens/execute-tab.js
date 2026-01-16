@@ -191,7 +191,9 @@ export class ExecuteTabScreen {
       LLM_MODEL: process.env.LLM_MODEL || this.providers[currentProvider].defaultModel,
       ANTHROPIC_VERSION: process.env.ANTHROPIC_VERSION || '2023-06-01',
       // Output settings
-      OUTPUT_DIR: this.state.outputDir || './output'
+      OUTPUT_DIR: this.state.outputDir || './output',
+      // Retry settings
+      MAX_RETRIES: process.env.MAX_RETRIES || '3'
     };
     this.envVarKeys = Object.keys(this.envVars);
     this.selectedEnvVar = 0;
@@ -524,7 +526,10 @@ export class ExecuteTabScreen {
         metadata: { source: 'tui-runall', createdAt: new Date().toISOString() }
       };
 
-      const createResponse = await this.sessionClient.createSession(this.state.goals, context);
+      const createResponse = await this._withRetry(
+        () => this.sessionClient.createSession(this.state.goals, context),
+        'create session'
+      );
       const createResult = createResponse.data || createResponse;
 
       if (!createResult.sessionId) {
@@ -541,12 +546,18 @@ export class ExecuteTabScreen {
       this.logViewer.addLine('info', '▶ Phase 3/5: Preparing Session...');
       this.logViewer.addLine('info', '  → Evaluating dependencies...');
 
-      const evalResponse = await this.sessionClient.evaluate(sessionId);
+      const evalResponse = await this._withRetry(
+        () => this.sessionClient.evaluate(sessionId),
+        'evaluate session'
+      );
       const evalResult = evalResponse.data || evalResponse;
       this.logViewer.addLine('info', `  → Evaluation complete: ${evalResult.state}`);
 
       this.logViewer.addLine('info', '  → Generating task list...');
-      const taskResponse = await this.sessionClient.generateTaskList(sessionId);
+      const taskResponse = await this._withRetry(
+        () => this.sessionClient.generateTaskList(sessionId),
+        'generate task list'
+      );
       const taskResult = taskResponse.data || taskResponse;
       const taskCount = taskResult.taskList?.tasks?.length || 0;
       this.logViewer.addLine('success', `✓ Prepared ${taskCount} tasks`);
@@ -573,18 +584,22 @@ export class ExecuteTabScreen {
       this.mode = 'running';
       this.executionProgress = { current: 0, total: taskCount };
 
-      const execResult = await this.actionRunner.run(sessionId, {
-        dryRun: this.dryRun,
-        verbose: this.verbose,
-        env: this.envVars,
-        onLog: (level, message) => {
-          this.logViewer.addLine(level, message);
-        },
-        onProgress: (current, total) => {
-          this.executionProgress = { current, total };
-          this.progressBar.setValue(current, total);
-        }
-      });
+      // Action runner has internal task handling, but wrap for rate limit on startup
+      const execResult = await this._withRetry(
+        () => this.actionRunner.run(sessionId, {
+          dryRun: this.dryRun,
+          verbose: this.verbose,
+          env: { ...this.envVars, MAX_RETRIES: this.envVars.MAX_RETRIES },
+          onLog: (level, message) => {
+            this.logViewer.addLine(level, message);
+          },
+          onProgress: (current, total) => {
+            this.executionProgress = { current, total };
+            this.progressBar.setValue(current, total);
+          }
+        }),
+        'execute action plan'
+      );
 
       if (!execResult.success) {
         this.logViewer.addLine('warn', `  → Execution completed with exit code: ${execResult.exitCode}`);
@@ -601,13 +616,16 @@ export class ExecuteTabScreen {
       const outputDir = this.envVars.OUTPUT_DIR || './output';
       const bundlePath = resolve(process.cwd(), outputDir, sessionId);
 
-      const evalRunResult = await this.outputEvalRunner.run(bundlePath, {
-        format: 'all',
-        verbose: this.verbose,
-        onLog: (level, message) => {
-          this.logViewer.addLine(level, message);
-        }
-      });
+      const evalRunResult = await this._withRetry(
+        () => this.outputEvalRunner.run(bundlePath, {
+          format: 'all',
+          verbose: this.verbose,
+          onLog: (level, message) => {
+            this.logViewer.addLine(level, message);
+          }
+        }),
+        'run output evaluation'
+      );
 
       if (evalRunResult.scores) {
         this.logViewer.addLine('success', `✓ Evaluation complete: ${evalRunResult.scores.overall}/100 (${evalRunResult.scores.grade})`);
@@ -641,6 +659,45 @@ export class ExecuteTabScreen {
    */
   _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Execute an async function with retry logic and exponential backoff
+   * Handles 429 rate limit errors automatically
+   * @param {Function} fn - Async function to execute
+   * @param {string} operationName - Name of the operation for logging
+   * @returns {Promise<*>} - Result of the function
+   * @private
+   */
+  async _withRetry(fn, operationName) {
+    const maxRetries = parseInt(this.envVars.MAX_RETRIES, 10) || 3;
+    const baseDelay = 5000; // 5 seconds base delay
+
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        const isRateLimit = err.message?.includes('429') ||
+                           err.message?.includes('rate limit') ||
+                           err.message?.includes('Rate limit') ||
+                           err.status === 429;
+
+        if (!isRateLimit || attempt > maxRetries) {
+          throw err;
+        }
+
+        // Calculate exponential backoff delay: 5s, 10s, 20s, etc.
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        const delaySeconds = Math.round(delay / 1000);
+
+        this.logViewer.addLine('warn', `  ⏳ Rate limit hit for ${operationName}`);
+        this.logViewer.addLine('info', `  → Retry ${attempt}/${maxRetries} in ${delaySeconds}s...`);
+
+        await this._sleep(delay);
+
+        this.logViewer.addLine('info', `  → Retrying ${operationName}...`);
+      }
+    }
   }
 
   /**
