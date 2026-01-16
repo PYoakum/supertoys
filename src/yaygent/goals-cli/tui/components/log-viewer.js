@@ -162,10 +162,34 @@ export class LogViewer {
    * Handle events
    * @param {Object} ctx
    * @param {Object} evt
+   * @param {boolean} [allowUnfocused=false] - Allow handling even when not focused
    * @returns {boolean} True if handled
    */
-  onEvent(ctx, evt) {
-    if (!this.focused) return false;
+  onEvent(ctx, evt, allowUnfocused = false) {
+    // Handle +/- keys for scrolling even when not focused
+    if (evt.type === 'text') {
+      const entries = this.getFilteredEntries();
+      switch (evt.text) {
+        case '-':
+          // Page up (scroll back in history)
+          this.scrollOffset = Math.max(0, this.scrollOffset - 10);
+          this.autoScroll = false;
+          return true;
+
+        case '+':
+        case '=':  // Also handle = (unshifted +)
+          // Page down (scroll forward)
+          this.scrollOffset = Math.min(Math.max(0, entries.length - 1), this.scrollOffset + 10);
+          // Re-enable auto-scroll if we're at the bottom
+          const visibleCount = 20; // Approximate
+          if (this.scrollOffset >= entries.length - visibleCount) {
+            this.autoScroll = true;
+          }
+          return true;
+      }
+    }
+
+    if (!this.focused && !allowUnfocused) return false;
 
     if (evt.type === 'key') {
       switch (evt.key) {

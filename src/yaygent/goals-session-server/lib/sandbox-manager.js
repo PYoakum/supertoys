@@ -68,14 +68,15 @@ export class SandboxManager {
   }
 
   /**
-   * Ensure sandbox directory exists
+   * Ensure sandbox directory exists with proper permissions
    * @param {string} [sessionId] - Session ID
    * @returns {Promise<string>} Path to sandbox directory
    */
   async ensureSandbox(sessionId) {
     const sandboxPath = this.getSandboxPath(sessionId);
     if (!existsSync(sandboxPath)) {
-      await mkdir(sandboxPath, { recursive: true });
+      // Create with rwx for owner and group, rx for others (755)
+      await mkdir(sandboxPath, { recursive: true, mode: 0o755 });
     }
     return sandboxPath;
   }

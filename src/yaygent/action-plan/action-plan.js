@@ -42,6 +42,44 @@ function looksLikeTaskId(str) {
 }
 
 /**
+ * Parse scheduledAt value into target execution time
+ * Supports:
+ * - Relative delays: "30s", "5m", "2h", "1d"
+ * - Absolute ISO datetime: "2025-01-15T14:30:00"
+ * @param {string} value - Schedule value
+ * @param {number} [readyTime] - When task became ready (for relative delays)
+ * @returns {{type: string, targetTime: number}|null}
+ */
+function parseScheduledAt(value, readyTime = Date.now()) {
+  if (!value || typeof value !== 'string') return null;
+
+  // Relative format: "30s", "5m", "2h", "1d"
+  const relativeMatch = value.match(/^(\d+)(s|m|h|d)$/);
+  if (relativeMatch) {
+    const amount = parseInt(relativeMatch[1], 10);
+    const unit = relativeMatch[2];
+    const multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+    return {
+      type: 'delay',
+      targetTime: readyTime + (amount * multipliers[unit]),
+      original: value
+    };
+  }
+
+  // ISO datetime format
+  const date = new Date(value);
+  if (!isNaN(date.getTime())) {
+    return {
+      type: 'datetime',
+      targetTime: date.getTime(),
+      original: value
+    };
+  }
+
+  return null;
+}
+
+/**
  * Extract dependency ID from various formats
  * Dependencies can be: string, number, or object with various property names
  * @param {*} dep - Dependency in any format
@@ -278,18 +316,55 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
   const toolInvocations = [];
 
   if (toolUse) {
+    // Get predefined parameters from task as fallback
+    const predefinedParams = typeof task.tool === 'object'
+      ? (task.tool?.command?.parameters || {})
+      : {};
+
+    // Merge: LLM params override predefined, but use predefined as fallback for missing keys
+    // If LLM returned empty params, use predefined entirely
+    const hasLlmParams = Object.keys(toolUse.parameters).length > 0;
+    const mergedParams = hasLlmParams
+      ? { ...predefinedParams, ...toolUse.parameters }
+      : predefinedParams;
+
+    // Always ensure sessionId is included for sandbox isolation
+    const effectiveParams = { sessionId, ...mergedParams };
+
     // Log what we're about to execute
-    console.log(`      Tool: ${toolUse.toolName}`);
-    console.log(`      Params: ${JSON.stringify(toolUse.parameters).slice(0, 150)}...`);
+    console.log(`      Tool: ${toolUse.toolName}${hasLlmParams ? '' : ' (using predefined params)'}`);
+    console.log(`      Params: ${JSON.stringify(effectiveParams).slice(0, 150)}...`);
 
     // Execute the tool via session server
     const toolResult = await executeToolViaServer(
       sessionClient,
       sessionId,
       toolUse.toolName,
-      toolUse.parameters
+      effectiveParams
     );
     toolInvocations.push(toolResult);
+
+    // Log tool result for visibility
+    if (toolResult.result?.content) {
+      try {
+        const resultContent = toolResult.result.content[0]?.text;
+        if (resultContent) {
+          const parsed = JSON.parse(resultContent);
+          // Check for explicit failure - exitCode must exist and be non-zero
+          const hasExitCodeError = typeof parsed.exitCode === 'number' && parsed.exitCode !== 0;
+          if (parsed.success === false || hasExitCodeError) {
+            console.log(`      ❌ Tool returned error (exit code: ${parsed.exitCode ?? 'N/A'})`);
+            if (parsed.stderr) {
+              console.log(`      stderr: ${parsed.stderr.slice(0, 300)}${parsed.stderr.length > 300 ? '...' : ''}`);
+            }
+          } else if (parsed.stdout) {
+            console.log(`      stdout: ${parsed.stdout.slice(0, 200)}${parsed.stdout.length > 200 ? '...' : ''}`);
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
 
     // Log errors immediately
     if (!toolResult.success && toolResult.error) {
@@ -301,8 +376,21 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
     }
   } else {
     // No tool use detected, use the task's predefined parameters
-    const toolName = task.tool.toolName;
-    const params = task.tool.command.parameters;
+    // Handle both object and string formats for task.tool
+    const toolName = typeof task.tool === 'object'
+      ? (task.tool?.toolName || task.tool?.name || '')
+      : (task.tool || '');
+    const predefinedParams = typeof task.tool === 'object'
+      ? (task.tool?.command?.parameters || {})
+      : {};
+
+    if (!toolName) {
+      console.log(`      ⚠️  No tool specified for task, skipping execution`);
+      return { skipped: true, reason: 'no tool specified' };
+    }
+
+    // Always ensure sessionId is included for sandbox isolation
+    const params = { sessionId, ...predefinedParams };
 
     console.log(`      Tool: ${toolName} (predefined)`);
     console.log(`      Params: ${JSON.stringify(params).slice(0, 150)}...`);
@@ -314,6 +402,28 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
       params
     );
     toolInvocations.push(toolResult);
+
+    // Log tool result for visibility (predefined path)
+    if (toolResult.result?.content) {
+      try {
+        const resultContent = toolResult.result.content[0]?.text;
+        if (resultContent) {
+          const parsed = JSON.parse(resultContent);
+          // Check for explicit failure - exitCode must exist and be non-zero
+          const hasExitCodeError = typeof parsed.exitCode === 'number' && parsed.exitCode !== 0;
+          if (parsed.success === false || hasExitCodeError) {
+            console.log(`      ❌ Tool returned error (exit code: ${parsed.exitCode ?? 'N/A'})`);
+            if (parsed.stderr) {
+              console.log(`      stderr: ${parsed.stderr.slice(0, 300)}${parsed.stderr.length > 300 ? '...' : ''}`);
+            }
+          } else if (parsed.stdout) {
+            console.log(`      stdout: ${parsed.stdout.slice(0, 200)}${parsed.stdout.length > 200 ? '...' : ''}`);
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
 
     // Log errors immediately
     if (!toolResult.success && toolResult.error) {
@@ -581,6 +691,9 @@ async function main(args) {
   const logEntries = [];
   const previousOutputs = [];
 
+  // Track when tasks become ready (dependencies met) for relative scheduling
+  const taskReadyTimes = new Map();
+
   // Setup graceful shutdown
   let aborted = false;
   process.on('SIGINT', () => {
@@ -629,11 +742,63 @@ async function main(args) {
       continue;
     }
 
+    // Track when task became ready (for relative scheduling)
+    if (!taskReadyTimes.has(task.id)) {
+      taskReadyTimes.set(task.id, Date.now());
+    }
+
+    // Check if task has a schedule
+    if (task.scheduledAt) {
+      const readyTime = taskReadyTimes.get(task.id);
+      const schedule = parseScheduledAt(task.scheduledAt, readyTime);
+
+      if (schedule) {
+        const now = Date.now();
+        if (now < schedule.targetTime) {
+          // Task not ready yet - calculate wait time
+          const waitMs = schedule.targetTime - now;
+          const waitStr = waitMs >= 60000
+            ? `${Math.ceil(waitMs / 60000)}m`
+            : `${Math.ceil(waitMs / 1000)}s`;
+
+          display.info(`⏰ Task "${task.title || task.id.slice(0, 8)}" scheduled (${task.scheduledAt}), waiting ${waitStr}...`);
+
+          // Check if all remaining tasks are scheduled and waiting
+          const state = queueManager.getState();
+          const allScheduled = state.pendingTasks.every(t => {
+            if (!t.scheduledAt) return false;
+            const tReady = taskReadyTimes.get(t.id) || now;
+            const tSchedule = parseScheduledAt(t.scheduledAt, tReady);
+            return tSchedule && now < tSchedule.targetTime;
+          });
+
+          if (allScheduled && state.pendingTasks.length > 0) {
+            // Find the shortest wait time and sleep
+            let minWait = waitMs;
+            for (const t of state.pendingTasks) {
+              const tReady = taskReadyTimes.get(t.id) || now;
+              const tSchedule = parseScheduledAt(t.scheduledAt, tReady);
+              if (tSchedule) {
+                const tWait = tSchedule.targetTime - now;
+                if (tWait > 0 && tWait < minWait) {
+                  minWait = tWait;
+                }
+              }
+            }
+            display.info(`  All tasks scheduled, waiting ${Math.ceil(minWait / 1000)}s for next...`);
+            await new Promise(r => setTimeout(r, Math.min(minWait, 5000))); // Wait up to 5s at a time
+          }
+
+          continue; // Skip this task for now, try again later
+        }
+      }
+    }
+
     const taskNumber = queueManager.getMetrics().completedCount + queueManager.getMetrics().failedCount + 1;
     const totalTasks = queueManager.getMetrics().totalTasks;
 
     display.printTaskStart(task, taskNumber, totalTasks);
-    
+
     // Start task
     queueManager.startTask(task.id);
     const goal = goalMap.get(task.goalId);

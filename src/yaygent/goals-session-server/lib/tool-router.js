@@ -18,6 +18,13 @@ import { MakeGoalsTool } from './make-goals-tool.js';
 import { BashCommandTool } from './bash-command-tool.js';
 import { PythonRunnerTool } from './python-runner-tool.js';
 import { NetToolsTool } from './net-tools-tool.js';
+import { ProjectScaffoldTool } from './project-scaffold-tool.js';
+import { FrameworkExecTool } from './framework-exec-tool.js';
+import { DocxMdTool } from './docx-md-tool.js';
+import { TokenReplaceTool } from './token-replace-tool.js';
+import { MdDocxTool } from './md-docx-tool.js';
+import { PdfExportTool } from './pdf-export-tool.js';
+import { ComposeEmailTool } from './compose-email-tool.js';
 
 /**
  * Tool Router Class
@@ -514,10 +521,53 @@ export function createToolRouter(options = {}) {
     netTools.registerTools(router);
   }
 
+  // Initialize and register project scaffold tool
+  const projectScaffold = new ProjectScaffoldTool(sandboxManager, {
+    timeout: options.scaffoldTimeout || 300000,
+    preferredRuntime: options.scaffoldRuntime || 'bun'
+  });
+  projectScaffold.registerTools(router);
+
+  // Initialize and register framework execution tool (Bun-based)
+  const frameworkExec = new FrameworkExecTool(sandboxManager, {
+    timeout: options.frameworkExecTimeout || 120000
+  });
+  frameworkExec.registerTools(router);
+
+  // Initialize and register document conversion tools
+  const docxMd = new DocxMdTool(sandboxManager, {
+    extractImages: options.docxExtractImages !== false
+  });
+  docxMd.registerTools(router);
+
+  const mdDocx = new MdDocxTool(sandboxManager, {
+    defaultFont: options.docxDefaultFont || 'Arial'
+  });
+  mdDocx.registerTools(router);
+
+  // Initialize and register token replacement tool
+  const tokenReplace = new TokenReplaceTool(sandboxManager, {
+    delimiter: options.tokenDelimiter || '{{}}'
+  });
+  tokenReplace.registerTools(router);
+
+  // Initialize and register PDF export tool
+  const pdfExport = new PdfExportTool(sandboxManager, {
+    fontSize: options.pdfFontSize || 12,
+    pageSize: options.pdfPageSize || 'letter'
+  });
+  pdfExport.registerTools(router);
+
+  // Initialize and register email composition tool
+  const composeEmail = new ComposeEmailTool(sandboxManager, {
+    defaultAddresses: options.emailPlaceholders
+  });
+  composeEmail.registerTools(router);
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, SandboxManager, createToolRouter };

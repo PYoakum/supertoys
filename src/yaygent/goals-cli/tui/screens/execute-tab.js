@@ -6,6 +6,7 @@
 import { spawn } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { writeFile, readFile } from 'fs/promises';
 import { Menu } from '../components/menu.js';
 import { LogViewer } from '../components/log-viewer.js';
 import { ProgressBar } from '../components/progress-bar.js';
@@ -14,6 +15,56 @@ import { SessionServerClient } from '../services/session-server-client.js';
 import { ActionPlanRunner } from '../services/action-plan-runner.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Word wrap text to fit within a given width
+ * @param {string} text - Text to wrap
+ * @param {number} maxWidth - Maximum width in characters
+ * @returns {string[]} Array of wrapped lines
+ */
+function wordWrap(text, maxWidth) {
+  if (!text || maxWidth <= 0) return [''];
+
+  const lines = [];
+  const paragraphs = String(text).split('\n');
+
+  for (const para of paragraphs) {
+    if (para.length <= maxWidth) {
+      lines.push(para);
+      continue;
+    }
+
+    const words = para.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      if (currentLine.length + word.length + 1 <= maxWidth) {
+        currentLine += (currentLine ? ' ' : '') + word;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+        // Handle words longer than maxWidth
+        if (word.length > maxWidth) {
+          let remaining = word;
+          while (remaining.length > maxWidth) {
+            lines.push(remaining.slice(0, maxWidth));
+            remaining = remaining.slice(maxWidth);
+          }
+          currentLine = remaining;
+        } else {
+          currentLine = word;
+        }
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+  }
+
+  return lines.length > 0 ? lines : [''];
+}
 
 /**
  * Execute Tab Screen - Session management and workflow execution
@@ -40,7 +91,16 @@ export class ExecuteTabScreen {
     this.editToolMode = false;        // Editing tool selection
     this.availableTools = [];         // Cached list of available tools from server
     this.toolNavIndex = 0;            // Navigation index in tool selector
-    this.taskFields = ['title', 'description', 'tool', 'priority', 'sequenceNumber', 'dependencies'];
+    this.taskFields = ['title', 'description', 'tool', 'priority', 'sequenceNumber', 'scheduledAt', 'dependencies'];
+
+    // Import mode state
+    this.importMode = false;          // Currently entering import filename
+    this.importFilename = '';         // Import filename buffer
+
+    // Status message for edit-tasks mode feedback
+    this.statusMessage = '';          // Current status message
+    this.statusType = 'info';         // 'success', 'error', 'info'
+    this.statusExpiry = 0;            // Timestamp when message expires
 
     // Services
     this.sessionClient = new SessionServerClient({
@@ -181,10 +241,15 @@ export class ExecuteTabScreen {
 
   /**
    * Check if screen is in input/editing mode
+   * Used to prevent tab switching via number keys during text input or selection
    * @returns {boolean}
    */
   isInputMode() {
-    return this.editingEnvVar || (this.mode === 'edit-tasks' && this.editingField);
+    return this.editingEnvVar ||
+           this.importMode ||
+           this.editDepMode ||
+           this.editToolMode ||
+           (this.mode === 'edit-tasks' && this.editingField);
   }
 
   /**
@@ -194,15 +259,15 @@ export class ExecuteTabScreen {
   getHelpText() {
     switch (this.mode) {
       case 'dashboard':
-        return '[S] Server  [K] Kill Session  [D] Dry-run  [V] Verbose  [X] Clean Sandbox  [Enter] Select';
+        return '[S] Server  [K] Kill Session  [D] Dry-run  [V] Verbose  [X] Clean Sandbox  [+/-] Scroll  [Enter] Select';
       case 'sessions':
         return '[Enter] View  [K] Kill  [R] Refresh  [Esc] Back';
       case 'session-detail':
-        return '[E] Execute  [C] Clean Sandbox  [T] Edit Tasks  [G] Dep Graph  [K] Kill  [Esc] Back';
+        return '[E] Execute  [I] Import Tasks  [T] Edit Tasks  [C] Clean  [G] Graph  [K] Kill  [Esc] Back';
       case 'edit-tasks':
-        return '[↑↓] Task  [←→] Field  [Enter] Edit  [T] Tool  [D] Deps  [Ctrl+S] Save  [Esc] Back';
+        return '[N] New  [X] Delete  [E] Export  [I] Import  [↑↓] Task  [←→] Field  [Enter] Edit  [T] Tool  [D] Deps  [Ctrl+S] Save  [Esc] Back';
       case 'running':
-        return '[Esc] Abort';
+        return '[+/-] Scroll Log  [Esc] Abort';
       case 'config':
         return '[P] Provider  [Enter] Edit  [Esc] Back';
       default:
@@ -427,12 +492,21 @@ export class ExecuteTabScreen {
       // Provide default context if none exists
       const context = this.state.context || {
         files: [],
-        formattedContent: '',
         metadata: {
           source: 'tui',
           createdAt: new Date().toISOString()
         }
       };
+
+      // Log context info
+      const fileCount = context.files?.length || 0;
+      const totalSize = context.metadata?.totalSize || 0;
+      if (fileCount > 0) {
+        this.logViewer.addLine('info', `Context: ${fileCount} files, ${Math.round(totalSize / 1024)}KB`);
+      } else {
+        this.logViewer.addLine('warn', 'No context files loaded! LLM will have limited information.');
+        this.logViewer.addLine('info', 'Tip: Switch to Context tab and load files first.');
+      }
 
       const response = await this.sessionClient.createSession(
         this.state.goals,
@@ -474,10 +548,29 @@ export class ExecuteTabScreen {
     this.logViewer.addLine('info', `Preparing session: ${sessionId.slice(0, 8)}...`);
 
     try {
+      // Get session info for context details
+      const sessionInfo = await this.sessionClient.getSession(sessionId);
+      const sessionData = sessionInfo.data || sessionInfo;
+      const contextFiles = sessionData.context?.files?.length || sessionData.context?.fileCount || 0;
+      const goalsCount = sessionData.goals?.items?.length || 0;
+
       // Step 1: Evaluate the session
       this.logViewer.addLine('info', '── Step 1/2: Evaluating dependencies ──');
+      this.logViewer.addLine('info', `[LLM] → Sending evaluation request...`);
+      this.logViewer.addLine('debug', `[LLM]   Goals: ${goalsCount}, Context files: ${contextFiles}`);
+
+      const evalStartTime = Date.now();
       const evalResponse = await this.sessionClient.evaluate(sessionId);
+      const evalDuration = Date.now() - evalStartTime;
       const evalResult = evalResponse.data || evalResponse;
+
+      this.logViewer.addLine('info', `[LLM] ← Response received (${evalDuration}ms)`);
+
+      // Show token usage if available
+      if (evalResult.evaluation?.tokenUsage) {
+        const usage = evalResult.evaluation.tokenUsage;
+        this.logViewer.addLine('debug', `[LLM]   Tokens: ${usage.inputTokens || 0} in / ${usage.outputTokens || 0} out`);
+      }
 
       if (evalResult.evaluation) {
         this.logViewer.addLine('success', `Evaluation complete. State: ${evalResult.state}`);
@@ -521,8 +614,21 @@ export class ExecuteTabScreen {
 
       // Step 2: Generate task list
       this.logViewer.addLine('info', '── Step 2/2: Generating tasks ──');
+      this.logViewer.addLine('info', `[LLM] → Sending task generation request...`);
+      this.logViewer.addLine('debug', `[LLM]   Processing ${goalsCount} goals (batched per goal)`);
+
+      const taskStartTime = Date.now();
       const taskResponse = await this.sessionClient.generateTaskList(sessionId);
+      const taskDuration = Date.now() - taskStartTime;
       const taskResult = taskResponse.data || taskResponse;
+
+      this.logViewer.addLine('info', `[LLM] ← Response received (${taskDuration}ms)`);
+
+      // Show token usage if available
+      if (taskResult.taskList?.tokenUsage) {
+        const usage = taskResult.taskList.tokenUsage;
+        this.logViewer.addLine('debug', `[LLM]   Tokens: ${usage.inputTokens || 0} in / ${usage.outputTokens || 0} out`);
+      }
 
       if (taskResult.taskList) {
         const tasks = taskResult.taskList.tasks || [];
@@ -862,7 +968,9 @@ export class ExecuteTabScreen {
         },
         onComplete: (success, result) => {
           if (success) {
-            this.logViewer.addLine('success', 'Execution completed successfully!');
+            this.logViewer.addLine('success', '════════════════════════════════════════');
+            this.logViewer.addLine('success', '✓ ALL TASKS COMPLETED SUCCESSFULLY');
+            this.logViewer.addLine('success', '════════════════════════════════════════');
           } else if (result.aborted) {
             this.logViewer.addLine('warn', 'Execution aborted by user');
           } else {
@@ -871,10 +979,20 @@ export class ExecuteTabScreen {
         }
       });
 
+      // Refresh session data after execution
+      try {
+        const sessionData = await this.sessionClient.getSession(sessionId);
+        this.selectedSession = sessionData.data || sessionData;
+      } catch (e) {
+        // Session may have been deleted - ignore
+      }
+
       this.mode = 'dashboard';
+      this._setStatus(result.success ? '✓ Execution complete' : '✗ Execution failed', result.success ? 'success' : 'error', 5000);
     } catch (err) {
       this.logViewer.addLine('error', `Execution error: ${err.message}`);
       this.mode = 'dashboard';
+      this._setStatus(`Execution error: ${err.message}`, 'error', 5000);
     }
   }
 
@@ -910,12 +1028,24 @@ export class ExecuteTabScreen {
         },
         onProgress: (current, total) => {
           this.executionProgress = { current, total };
+        },
+        onComplete: (success, res) => {
+          if (success) {
+            this.logViewer.addLine('success', '════════════════════════════════════════');
+            this.logViewer.addLine('success', '✓ ALL TASKS COMPLETED SUCCESSFULLY');
+            this.logViewer.addLine('success', '════════════════════════════════════════');
+          } else if (res.aborted) {
+            this.logViewer.addLine('warn', 'Execution aborted by user');
+          } else if (res.exitCode !== 0) {
+            this.logViewer.addLine('error', `Execution failed with exit code: ${res.exitCode}`);
+          }
         }
       });
 
       if (result.sessionId) {
-        this.logViewer.addLine('success', `Executed session: ${result.sessionId}`);
-      } else if (result.exitCode === 0) {
+        this.logViewer.addLine('info', `Session: ${result.sessionId}`);
+        this._setStatus(result.success ? '✓ Execution complete' : '✗ Execution failed', result.success ? 'success' : 'error', 5000);
+      } else if (result.exitCode === 0 && !result.sessionId) {
         this.logViewer.addLine('info', 'No sessions ready for execution');
       }
 
@@ -923,6 +1053,7 @@ export class ExecuteTabScreen {
     } catch (err) {
       this.logViewer.addLine('error', `Error: ${err.message}`);
       this.mode = 'dashboard';
+      this._setStatus(`Error: ${err.message}`, 'error', 5000);
     }
   }
 
@@ -1020,6 +1151,11 @@ export class ExecuteTabScreen {
    * @private
    */
   _handleDashboardEvent(ctx, evt) {
+    // Pass scroll events (+/-) to log viewer first
+    if (this.logViewer.onEvent(ctx, evt)) {
+      return;
+    }
+
     if (evt.type === 'key') {
       const result = this.dashboardMenu.onKey(evt.key);
       if (result?.action === 'select') {
@@ -1192,14 +1328,18 @@ export class ExecuteTabScreen {
           }
           break;
         case 't':
-          if (this.selectedSession?.taskList) {
+          if (this.selectedSession) {
             this._startEditTasks();
-          } else {
-            this.logViewer.addLine('warn', 'No tasks to edit. Run "Prepare Session" first.');
           }
           break;
         case 'g':
           this._showDependencyGraph();
+          break;
+        case 'i':
+          // Import tasks directly (skip prepare step)
+          if (this.selectedSession) {
+            this._startImportFromSessionDetail();
+          }
           break;
         case 'k':
           if (this.selectedSession) {
@@ -1215,11 +1355,37 @@ export class ExecuteTabScreen {
   }
 
   /**
+   * Start import mode from session-detail view
+   * Allows importing tasks without running "Prepare Session" first
+   * @private
+   */
+  _startImportFromSessionDetail() {
+    // Initialize taskList if it doesn't exist
+    if (!this.selectedSession.taskList) {
+      this.selectedSession.taskList = { tasks: [] };
+    }
+
+    // Enter edit-tasks mode with import mode active
+    this.mode = 'edit-tasks';
+    this.editTaskIndex = 0;
+    this.editFieldIndex = 0;
+    this.editingField = false;
+    this.importMode = true;
+    this.importFilename = '';
+    this.logViewer.addLine('info', 'Enter filename to import (or Esc to cancel)');
+  }
+
+  /**
    * Start editing tasks in form mode
    * @private
    */
   async _startEditTasks() {
-    if (!this.selectedSession?.taskList) return;
+    if (!this.selectedSession) return;
+
+    // Initialize taskList if it doesn't exist
+    if (!this.selectedSession.taskList) {
+      this.selectedSession.taskList = { tasks: [] };
+    }
 
     this.mode = 'edit-tasks';
     this.editTaskIndex = 0;
@@ -1251,7 +1417,6 @@ export class ExecuteTabScreen {
    */
   _handleEditTasksEvent(ctx, evt) {
     const tasks = this.selectedSession?.taskList?.tasks || [];
-    if (tasks.length === 0) return;
 
     // Handle dependency selection mode
     if (this.editDepMode) {
@@ -1262,6 +1427,12 @@ export class ExecuteTabScreen {
     // Handle tool selection mode
     if (this.editToolMode) {
       this._handleToolSelectEvent(ctx, evt, tasks);
+      return;
+    }
+
+    // Handle import filename input mode
+    if (this.importMode) {
+      this._handleImportEvent(ctx, evt);
       return;
     }
 
@@ -1281,10 +1452,14 @@ export class ExecuteTabScreen {
           this.mode = 'session-detail';
           return;
         case 'up':
-          this.editTaskIndex = Math.max(0, this.editTaskIndex - 1);
+          if (tasks.length > 0) {
+            this.editTaskIndex = Math.max(0, this.editTaskIndex - 1);
+          }
           return;
         case 'down':
-          this.editTaskIndex = Math.min(tasks.length - 1, this.editTaskIndex + 1);
+          if (tasks.length > 0) {
+            this.editTaskIndex = Math.min(tasks.length - 1, this.editTaskIndex + 1);
+          }
           return;
         case 'left':
           this.editFieldIndex = Math.max(0, this.editFieldIndex - 1);
@@ -1293,20 +1468,49 @@ export class ExecuteTabScreen {
           this.editFieldIndex = Math.min(this.taskFields.length - 1, this.editFieldIndex + 1);
           return;
         case 'enter':
-          this._startFieldEdit(tasks);
+          if (tasks.length > 0) {
+            this._startFieldEdit(tasks);
+          }
+          return;
+        case 'delete':
+          if (tasks.length > 0) {
+            this._deleteCurrentTask(tasks);
+          }
           return;
       }
     }
 
     if (evt.type === 'text') {
       switch (evt.text.toLowerCase()) {
+        case 'n':
+          // Create new task
+          this._createNewTask();
+          return;
         case 'd':
           // Quick toggle dependency mode
-          this._startDepEdit(tasks);
+          if (tasks.length > 0) {
+            this._startDepEdit(tasks);
+          }
           return;
         case 't':
           // Quick toggle tool selection mode
-          this._startToolEdit(tasks);
+          if (tasks.length > 0) {
+            this._startToolEdit(tasks);
+          }
+          return;
+        case 'x':
+          // Delete current task
+          if (tasks.length > 0) {
+            this._deleteCurrentTask(tasks);
+          }
+          return;
+        case 'e':
+          // Export tasks to file
+          this._exportTasks();
+          return;
+        case 'i':
+          // Import tasks from file
+          this._startImport();
           return;
       }
     }
@@ -1333,7 +1537,314 @@ export class ExecuteTabScreen {
 
     this.editingField = true;
     const value = task[field];
-    this.editFieldValue = value !== undefined ? String(value) : '';
+    // Handle object values (e.g., description: { text: '...' })
+    if (value === undefined || value === null) {
+      this.editFieldValue = '';
+    } else if (typeof value === 'object') {
+      this.editFieldValue = value.text || value.description || '';
+    } else {
+      this.editFieldValue = String(value);
+    }
+  }
+
+  /**
+   * Create a new task with default values
+   * @private
+   */
+  _createNewTask() {
+    if (!this.selectedSession?.taskList) {
+      // Initialize task list if it doesn't exist
+      this.selectedSession.taskList = { tasks: [] };
+    }
+
+    const tasks = this.selectedSession.taskList.tasks;
+
+    // Generate a unique ID for the new task
+    const newTaskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // Create new task with default values
+    const newTask = {
+      id: newTaskId,
+      title: 'New Task',
+      description: '',
+      tool: {
+        toolName: '',
+        command: { action: 'execute', parameters: {}, expectedOutput: '' }
+      },
+      priority: 5,
+      sequenceNumber: tasks.length + 1,
+      scheduledAt: null,
+      dependencies: [],
+      state: 'pending',
+      goalId: this.selectedSession.goals?.items?.[0]?.id || null,
+      createdAt: new Date().toISOString()
+    };
+
+    // Add the new task to the list
+    tasks.push(newTask);
+
+    // Select the new task for editing
+    this.editTaskIndex = tasks.length - 1;
+    this.editFieldIndex = 0; // Start at title field
+
+    this.logViewer.addLine('info', `Created new task: ${newTaskId.slice(0, 12)}...`);
+    this.logViewer.addLine('info', 'Edit the task fields, then press [Ctrl+S] to save');
+  }
+
+  /**
+   * Delete the currently selected task
+   * @param {Object[]} tasks
+   * @private
+   */
+  _deleteCurrentTask(tasks) {
+    if (tasks.length === 0) return;
+
+    const taskToDelete = tasks[this.editTaskIndex];
+    const taskId = taskToDelete.id;
+    const taskTitle = taskToDelete.title || '(untitled)';
+
+    // Remove the task
+    tasks.splice(this.editTaskIndex, 1);
+
+    // Adjust selection index if needed
+    if (this.editTaskIndex >= tasks.length) {
+      this.editTaskIndex = Math.max(0, tasks.length - 1);
+    }
+
+    // Remove any dependencies pointing to this task
+    for (const task of tasks) {
+      if (task.dependencies && task.dependencies.length > 0) {
+        task.dependencies = task.dependencies.filter(dep => {
+          const depId = typeof dep === 'string' ? dep : (dep.taskId || dep.id);
+          return depId !== taskId;
+        });
+      }
+    }
+
+    this.logViewer.addLine('warn', `Deleted task: ${taskTitle}`);
+    this.logViewer.addLine('info', 'Press [Ctrl+S] to save changes');
+  }
+
+  /**
+   * Set a temporary status message for edit-tasks mode
+   * @param {string} message
+   * @param {string} type - 'success', 'error', 'info'
+   * @param {number} [durationMs=3000] - How long to show the message
+   * @private
+   */
+  _setStatus(message, type = 'info', durationMs = 3000) {
+    this.statusMessage = message;
+    this.statusType = type;
+    this.statusExpiry = Date.now() + durationMs;
+  }
+
+  /**
+   * Export tasks to a JSON file
+   * @private
+   */
+  async _exportTasks() {
+    const tasks = this.selectedSession?.taskList?.tasks || [];
+    if (tasks.length === 0) {
+      this._setStatus('No tasks to export', 'error');
+      return;
+    }
+
+    try {
+      // Build ID to title map for dependency resolution
+      const idToTitle = new Map();
+      for (const task of tasks) {
+        idToTitle.set(task.id, task.title || '(untitled)');
+      }
+
+      // Generate filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const sessionId = (this.selectedSession.id || 'unknown').slice(0, 8);
+      const filename = `tasks-${sessionId}-${timestamp}.json`;
+      const exportPath = resolve(process.cwd(), filename);
+
+      // Build export data with portable format (titles for dependencies)
+      const exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        tasks: tasks.map(t => {
+          // Extract tool info - preserve full structure for reimport
+          let toolExport;
+          if (typeof t.tool === 'object' && t.tool) {
+            toolExport = {
+              toolName: t.tool.toolName || '',
+              command: t.tool.command || { action: 'execute', parameters: {}, expectedOutput: '' }
+            };
+          } else {
+            toolExport = {
+              toolName: t.tool || '',
+              command: { action: 'execute', parameters: {}, expectedOutput: '' }
+            };
+          }
+
+          return {
+            title: t.title || '',
+            description: typeof t.description === 'object' ? (t.description.text || t.description.description || '') : (t.description || ''),
+            tool: toolExport,
+            priority: t.priority || 5,
+            dependencies: (t.dependencies || []).map(dep => {
+              const depId = typeof dep === 'string' ? dep : (dep.taskId || dep.id);
+              return idToTitle.get(depId) || depId;
+            }),
+            scheduledAt: t.scheduledAt || null
+          };
+        })
+      };
+
+      await writeFile(exportPath, JSON.stringify(exportData, null, 2));
+      this._setStatus(`✓ Exported ${tasks.length} tasks to ${filename}`, 'success', 4000);
+      this.logViewer.addLine('success', `Exported ${tasks.length} tasks to ${filename}`);
+    } catch (err) {
+      this._setStatus(`Export failed: ${err.message}`, 'error', 4000);
+      this.logViewer.addLine('error', `Export failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Start import mode - prompt for filename
+   * @private
+   */
+  _startImport() {
+    this.importMode = true;
+    this.importFilename = '';
+    this.logViewer.addLine('info', 'Enter filename to import (or Esc to cancel)');
+  }
+
+  /**
+   * Handle import filename input events
+   * @param {Object} ctx
+   * @param {Object} evt
+   * @private
+   */
+  _handleImportEvent(ctx, evt) {
+    if (evt.type === 'key') {
+      switch (evt.key) {
+        case 'enter':
+          if (this.importFilename.trim()) {
+            this._importTasks(this.importFilename.trim());
+          }
+          this.importMode = false;
+          this.importFilename = '';
+          return;
+        case 'esc':
+          this.importMode = false;
+          this.importFilename = '';
+          this.logViewer.addLine('info', 'Import cancelled');
+          return;
+        case 'backspace':
+          this.importFilename = this.importFilename.slice(0, -1);
+          return;
+        case 'space':
+          this.importFilename += ' ';
+          return;
+      }
+    }
+
+    if (evt.type === 'text') {
+      this.importFilename += evt.text;
+    }
+  }
+
+  /**
+   * Import tasks from a JSON file
+   * @param {string} filename
+   * @private
+   */
+  async _importTasks(filename) {
+    try {
+      const filepath = resolve(process.cwd(), filename);
+      const content = await readFile(filepath, 'utf-8');
+      const data = JSON.parse(content);
+
+      if (!data.tasks || !Array.isArray(data.tasks)) {
+        throw new Error('Invalid task file format: missing tasks array');
+      }
+
+      // Initialize taskList if needed
+      if (!this.selectedSession.taskList) {
+        this.selectedSession.taskList = { tasks: [] };
+      }
+
+      const existingTasks = this.selectedSession.taskList.tasks;
+      let imported = 0;
+
+      for (const task of data.tasks) {
+        // Handle tool - can be string (legacy) or object (full structure)
+        let toolObj;
+        if (typeof task.tool === 'object' && task.tool) {
+          toolObj = {
+            toolName: task.tool.toolName || '',
+            command: task.tool.command || { action: 'execute', parameters: {}, expectedOutput: '' }
+          };
+        } else if (typeof task.tool === 'string' && task.tool) {
+          toolObj = {
+            toolName: task.tool,
+            command: { action: 'execute', parameters: {}, expectedOutput: '' }
+          };
+        } else {
+          toolObj = {
+            toolName: '',
+            command: { action: 'execute', parameters: {}, expectedOutput: '' }
+          };
+        }
+
+        const newTask = {
+          id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          title: task.title || 'Imported Task',
+          description: task.description || '',
+          tool: toolObj,
+          priority: task.priority || 5,
+          sequenceNumber: existingTasks.length + imported + 1,
+          dependencies: [], // Resolve after all imported
+          state: 'pending',
+          scheduledAt: task.scheduledAt || null,
+          goalId: this.selectedSession.goals?.items?.[0]?.id || null,
+          createdAt: new Date().toISOString(),
+          _importedDeps: task.dependencies || [] // Store for resolution
+        };
+        existingTasks.push(newTask);
+        imported++;
+      }
+
+      // Resolve dependencies by title matching
+      this._resolveImportedDependencies(existingTasks);
+
+      this._setStatus(`✓ Imported ${imported} tasks from ${filename}`, 'success', 4000);
+      this.logViewer.addLine('success', `Imported ${imported} tasks from ${filename}`);
+      this.logViewer.addLine('info', 'Press [Ctrl+S] to save changes');
+    } catch (err) {
+      this._setStatus(`Import failed: ${err.message}`, 'error', 4000);
+      this.logViewer.addLine('error', `Import failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Resolve imported dependencies by matching task titles to IDs
+   * @param {Object[]} tasks
+   * @private
+   */
+  _resolveImportedDependencies(tasks) {
+    // Build title to ID map
+    const titleToId = new Map();
+    for (const task of tasks) {
+      if (task.title) {
+        titleToId.set(task.title, task.id);
+      }
+    }
+
+    // Resolve _importedDeps to actual task IDs
+    for (const task of tasks) {
+      if (task._importedDeps && task._importedDeps.length > 0) {
+        task.dependencies = task._importedDeps
+          .map(depTitle => titleToId.get(depTitle))
+          .filter(id => id != null);
+        delete task._importedDeps;
+      }
+    }
   }
 
   /**
@@ -1376,6 +1887,14 @@ export class ExecuteTabScreen {
         case 'backspace':
           this.editFieldValue = this.editFieldValue.slice(0, -1);
           return;
+        case 'space':
+          // Space key
+          this.editFieldValue += ' ';
+          return;
+        case 'delete':
+          // Delete key - remove character at cursor (for now, same as backspace)
+          this.editFieldValue = this.editFieldValue.slice(0, -1);
+          return;
       }
     }
 
@@ -1399,7 +1918,19 @@ export class ExecuteTabScreen {
         task[field] = num;
       }
     } else {
-      task[field] = this.editFieldValue;
+      // Preserve object structure if original was an object
+      const originalValue = task[field];
+      if (typeof originalValue === 'object' && originalValue !== null) {
+        if ('text' in originalValue) {
+          task[field] = { ...originalValue, text: this.editFieldValue };
+        } else if ('description' in originalValue) {
+          task[field] = { ...originalValue, description: this.editFieldValue };
+        } else {
+          task[field] = this.editFieldValue;
+        }
+      } else {
+        task[field] = this.editFieldValue;
+      }
     }
   }
 
@@ -1431,7 +1962,7 @@ export class ExecuteTabScreen {
           if (!this._depNavIndex) this._depNavIndex = 0;
           this._depNavIndex = Math.min(otherTasks.length - 1, this._depNavIndex + 1);
           return;
-        case ' ':
+        case 'space':
           // Toggle selection
           if (otherTasks.length > 0 && this._depNavIndex !== undefined) {
             const depTask = otherTasks[this._depNavIndex];
@@ -1565,14 +2096,19 @@ export class ExecuteTabScreen {
     const selectedTool = this.availableTools[this.toolNavIndex];
     if (!selectedTool) return;
 
-    // Update task.tool - maintain object structure if it was an object
+    // Update task.tool - ensure full structure for execution
     if (typeof task.tool === 'object' && task.tool !== null) {
       task.tool.toolName = selectedTool.name;
       task.tool.name = selectedTool.name;
+      // Ensure command structure exists
+      if (!task.tool.command) {
+        task.tool.command = { action: 'execute', parameters: {}, expectedOutput: '' };
+      }
     } else {
       task.tool = {
         toolName: selectedTool.name,
-        name: selectedTool.name
+        name: selectedTool.name,
+        command: { action: 'execute', parameters: {}, expectedOutput: '' }
       };
     }
 
@@ -1594,13 +2130,16 @@ export class ExecuteTabScreen {
 
       this.logViewer.addLine('info', `Saving ${taskList.tasks.length} tasks...`);
 
-      const response = await this.sessionClient.updateTaskList(
+      // Use importTaskList which bypasses state checks and sets state to GENERATED
+      const response = await this.sessionClient.importTaskList(
         this.selectedSession.id,
         taskList
       );
 
       const result = response.data || response;
       this.selectedSession.taskList = result.taskList || taskList;
+      // Update local session state to match server
+      this.selectedSession.state = result.state || 'GENERATED';
 
       this.logViewer.addLine('success', `Tasks saved successfully`);
       this.mode = 'session-detail';
@@ -1848,8 +2387,19 @@ export class ExecuteTabScreen {
     screen.drawText(x + 20, optionsY, verboseText, this.verbose ? styles.highlight : styles.dim);
     screen.drawText(x + 38, optionsY, cleanText, this.cleanSandbox ? styles.success : styles.dim);
 
+    // Status message (execution completion feedback)
+    let menuStartY = optionsY + 2;
+    if (this.statusMessage && Date.now() < this.statusExpiry) {
+      const statusStyle = this.statusType === 'success' ? styles.success
+        : this.statusType === 'error' ? styles.error
+        : styles.highlight;
+      const statusBg = this.statusType === 'success' ? '  ' : this.statusType === 'error' ? '  ' : '  ';
+      screen.drawText(x + 2, optionsY + 2, `${statusBg}${this.statusMessage}${statusBg}`.padEnd(w - 4), statusStyle);
+      menuStartY = optionsY + 3;
+    }
+
     // Menu on left
-    const menuRect = { x: x + 1, y: optionsY + 2, w: Math.floor(w / 2) - 2, h: h - 5 };
+    const menuRect = { x: x + 1, y: menuStartY, w: Math.floor(w / 2) - 2, h: h - (menuStartY - y) - 1 };
     this.dashboardMenu.render(ctx, menuRect);
 
     // Log viewer on right
@@ -1907,7 +2457,17 @@ export class ExecuteTabScreen {
         ? styles.warning : styles.success;
       screen.drawText(x + 35, line, sandboxStr, sandboxStyle);
     }
-    line += 2;
+    line += 1;
+
+    // Status message (execution completion feedback)
+    if (this.statusMessage && Date.now() < this.statusExpiry) {
+      const statusStyle = this.statusType === 'success' ? styles.success
+        : this.statusType === 'error' ? styles.error
+        : styles.highlight;
+      screen.drawText(x + 2, line, this.statusMessage.padEnd(w - 4), statusStyle);
+      line += 1;
+    }
+    line += 1;
 
     // Tasks preview section
     if (session.taskList?.tasks && session.taskList.tasks.length > 0) {
@@ -2006,8 +2566,18 @@ export class ExecuteTabScreen {
     const title = ` Edit Tasks (${tasks.length}) - Ctrl+S to Save `;
     screen.drawBox(x, y, w, h, charset, styles.border, title);
 
+    // Import mode - show filename input (check BEFORE empty tasks check)
+    if (this.importMode) {
+      // Show import prompt even if no tasks yet
+      screen.drawText(x + 2, y + 2, 'Import tasks from file:', styles.accent);
+      screen.drawText(x + 2, y + 4, 'Filename: ' + this.importFilename + '█', styles.highlight);
+      screen.drawText(x + 2, y + 6, '[Enter] Import  [Esc] Cancel', styles.dim);
+      return;
+    }
+
     if (tasks.length === 0) {
-      screen.drawText(x + 2, y + 2, 'No tasks to edit', styles.dim);
+      screen.drawText(x + 2, y + 2, 'No tasks yet. Press [N] to create first task, or [I] to import.', styles.dim);
+      screen.drawText(x + 2, y + 4, '[Esc] Back', styles.dim);
       return;
     }
 
@@ -2037,6 +2607,15 @@ export class ExecuteTabScreen {
 
     // Right panel: Selected task editor
     this._renderTaskEditor(ctx, { x: x + leftWidth + 2, y: y + 1, w: rightWidth, h: h - 2 }, tasks);
+
+    // Show status message if active
+    if (this.statusMessage && Date.now() < this.statusExpiry) {
+      const statusStyle = this.statusType === 'success' ? styles.success :
+                          this.statusType === 'error' ? styles.error : styles.accent;
+      // Draw status bar at bottom
+      const statusText = ` ${this.statusMessage} `.slice(0, w - 4);
+      screen.drawText(x + 2, y + h - 1, statusText, statusStyle);
+    }
   }
 
   /**
@@ -2146,8 +2725,43 @@ export class ExecuteTabScreen {
         const maxLen = w - 22;
         const displayVal = this.editFieldValue.slice(0, maxLen);
         screen.drawText(x + 20, line, displayVal + '█', styles.highlight);
+      } else if (field === 'description') {
+        // Word wrap description across multiple lines
+        const value = task[field];
+        let textVal = '';
+        if (value === undefined || value === null || value === '') {
+          textVal = '(empty)';
+        } else if (typeof value === 'object') {
+          textVal = value.text || value.description || JSON.stringify(value);
+        } else {
+          textVal = String(value);
+        }
+
+        const maxWidth = w - 22;
+        const maxDescLines = 4; // Limit to 4 lines for description
+        const wrappedLines = wordWrap(textVal, maxWidth);
+        const displayLines = wrappedLines.slice(0, maxDescLines);
+
+        // Show first line on same line as label
+        screen.drawText(x + 20, line, displayLines[0] || '(empty)', isSelected ? styles.normal : styles.dim);
+
+        // Show additional wrapped lines below
+        for (let j = 1; j < displayLines.length && line + j < y + h - 3; j++) {
+          screen.drawText(x + 20, line + j, displayLines[j], styles.dim);
+        }
+
+        // If there are more lines, show ellipsis
+        if (wrappedLines.length > maxDescLines) {
+          const lastLineIdx = Math.min(displayLines.length, maxDescLines);
+          if (line + lastLineIdx < y + h - 3) {
+            screen.drawText(x + 20, line + lastLineIdx, '...', styles.dim);
+          }
+        }
+
+        // Advance line by number of wrapped lines displayed
+        line += Math.max(0, displayLines.length - 1);
       } else {
-        // Show current value
+        // Show current value (non-description fields)
         const value = task[field];
         let displayVal = '';
         if (value === undefined || value === null || value === '') {
@@ -2181,6 +2795,7 @@ export class ExecuteTabScreen {
       tool: 'Tool',
       priority: 'Priority (1-10)',
       sequenceNumber: 'Sequence #',
+      scheduledAt: 'Schedule',
       dependencies: 'Dependencies'
     };
     return labels[field] || field;

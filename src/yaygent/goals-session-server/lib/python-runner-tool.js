@@ -3,7 +3,7 @@
  * @module python-runner-tool
  */
 
-import { writeFile, unlink, mkdir, readFile } from 'fs/promises';
+import { writeFile, unlink, mkdir, readFile, chmod } from 'fs/promises';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { join } from 'path';
@@ -106,9 +106,9 @@ export class PythonRunnerTool {
     const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
     const cwd = workingDir ? join(sandboxPath, workingDir) : sandboxPath;
 
-    // Ensure working directory exists
+    // Ensure working directory exists with proper permissions
     if (!existsSync(cwd)) {
-      await mkdir(cwd, { recursive: true });
+      await mkdir(cwd, { recursive: true, mode: 0o755 });
     }
 
     // Determine Python executable
@@ -171,7 +171,10 @@ export class PythonRunnerTool {
         stdout: result.stdout,
         stderr: result.stderr,
         duration: result.duration,
-        timedOut: result.timedOut || false
+        timedOut: result.timedOut || false,
+        sandboxPath,
+        workingDir: cwd,
+        pythonExecutable: pythonExe
       });
     } finally {
       // Cleanup temp script
@@ -285,9 +288,22 @@ export class PythonRunnerTool {
       const venvPython = join(cwd, '.venv', 'bin', 'python');
       const actualPython = existsSync(venvPython) ? venvPython : pythonExe;
 
+      // Merge environment with proper PATH
+      // Set CI=true to help with non-interactive execution
+      const mergedEnv = {
+        ...process.env,
+        ...env,
+        PATH: `${process.env.PATH}:/usr/local/bin:/usr/bin:/bin`,
+        HOME: process.env.HOME || '/tmp',
+        TERM: 'xterm-256color',
+        CI: 'true',
+        PYTHONDONTWRITEBYTECODE: '1',
+        FORCE_COLOR: '0'
+      };
+
       const proc = spawn(actualPython, [scriptPath, ...args], {
         cwd,
-        env: { ...process.env, ...env },
+        env: mergedEnv,
         stdio: ['pipe', 'pipe', 'pipe']
       });
 

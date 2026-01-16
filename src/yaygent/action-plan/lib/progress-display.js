@@ -55,7 +55,10 @@ Status: Running
   printTaskStart(task, current, total) {
     this.printSeparator();
     console.log(`[${current}/${total}] Executing: ${task.title}`);
-    console.log(`      Tool: ${task.tool.toolName}`);
+    const toolName = typeof task.tool === 'object'
+      ? (task.tool?.toolName || task.tool?.name || '(none)')
+      : (task.tool || '(none)');
+    console.log(`      Tool: ${toolName}`);
     console.log(`      Status: ⏳ In Progress...`);
   }
 

@@ -124,15 +124,15 @@ ${task.description}
 
 ## Tool Binding
 
-- **Tool:** ${task.tool.toolName}
-- **Action:** ${task.tool.command.action}
+- **Tool:** ${typeof task.tool === 'object' ? (task.tool?.toolName || task.tool?.name || '(none)') : (task.tool || '(none)')}
+- **Action:** ${task.tool?.command?.action || 'execute'}
 - **Parameters:**
 
 \`\`\`json
-${JSON.stringify(task.tool.command.parameters, null, 2)}
+${JSON.stringify(task.tool?.command?.parameters || {}, null, 2)}
 \`\`\`
 
-- **Expected Output:** ${task.tool.command.expectedOutput}
+- **Expected Output:** ${task.tool?.command?.expectedOutput || '(not specified)'}
 
 ## Execution Output
 

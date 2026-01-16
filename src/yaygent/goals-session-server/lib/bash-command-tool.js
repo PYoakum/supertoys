@@ -3,7 +3,7 @@
  * @module bash-command-tool
  */
 
-import { writeFile, unlink, mkdir, readFile } from 'fs/promises';
+import { writeFile, unlink, mkdir, readFile, chmod } from 'fs/promises';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { join } from 'path';
@@ -108,9 +108,9 @@ export class BashCommandTool {
     const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
     const cwd = workingDir ? join(sandboxPath, workingDir) : sandboxPath;
 
-    // Ensure working directory exists
+    // Ensure working directory exists with proper permissions
     if (!existsSync(cwd)) {
-      await mkdir(cwd, { recursive: true });
+      await mkdir(cwd, { recursive: true, mode: 0o755 });
     }
 
     // Determine what to run
@@ -118,9 +118,20 @@ export class BashCommandTool {
     let actualCommand = command;
 
     if (script) {
-      // Write script to temp file
+      // Write script to temp file with execute permissions
       scriptPath = join(sandboxPath, `.tmp-script-${randomUUID()}.sh`);
-      await writeFile(scriptPath, script, { mode: 0o755 });
+
+      // Add shebang if not present
+      let scriptContent = script;
+      if (!scriptContent.startsWith('#!')) {
+        scriptContent = `#!/bin/bash\nset -e\n${scriptContent}`;
+      }
+
+      await writeFile(scriptPath, scriptContent, { mode: 0o755 });
+
+      // Ensure execute permission (in case umask overrides)
+      await chmod(scriptPath, 0o755);
+
       actualCommand = scriptPath;
     }
 
@@ -151,7 +162,10 @@ export class BashCommandTool {
         stdout: result.stdout,
         stderr: result.stderr,
         duration: result.duration,
-        timedOut: result.timedOut || false
+        timedOut: result.timedOut || false,
+        sandboxPath,
+        workingDir: cwd,
+        command: command || '(script)'
       });
     } finally {
       // Cleanup temp script
@@ -207,10 +221,28 @@ export class BashCommandTool {
       let stderr = '';
       let timedOut = false;
 
+      // Build command string - handle script files vs commands
+      const cmdStr = command.endsWith('.sh')
+        ? command  // Script file - run directly
+        : `${command} ${args.join(' ')}`;
+
+      // Merge environment, ensuring PATH includes common locations
+      // Set CI=true to help with non-interactive execution of tools like npm create
+      const mergedEnv = {
+        ...process.env,
+        ...env,
+        PATH: `${process.env.PATH}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
+        HOME: process.env.HOME || '/tmp',
+        TERM: 'xterm-256color',
+        CI: 'true',
+        NPM_CONFIG_YES: 'true',  // npm: auto-accept prompts
+        FORCE_COLOR: '0'         // Disable color output for cleaner logs
+      };
+
       // Spawn the process
-      const proc = spawn(shell, ['-c', `${command} ${args.join(' ')}`], {
+      const proc = spawn(shell, ['-c', cmdStr], {
         cwd,
-        env: { ...process.env, ...env },
+        env: mergedEnv,
         stdio: ['pipe', 'pipe', 'pipe']
       });
 

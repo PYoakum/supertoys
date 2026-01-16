@@ -87,19 +87,55 @@ export class ContextTabScreen {
 
       this.files = entries
         .filter(e => e.isFile())
-        .map(e => ({
-          name: e.name,
-          path: join(absPath, e.name),
-          ext: extname(e.name),
-          size: statSync(join(absPath, e.name)).size
-        }))
+        .map(e => {
+          const filePath = join(absPath, e.name);
+          let content = '';
+          try {
+            content = readFileSync(filePath, 'utf-8');
+          } catch (readErr) {
+            // Skip files that can't be read
+          }
+          return {
+            name: e.name,
+            path: filePath,
+            ext: extname(e.name),
+            size: statSync(filePath).size,
+            content
+          };
+        })
+        .filter(f => f.content.length > 0) // Only include readable files
         .sort((a, b) => a.name.localeCompare(b.name));
 
       this._updateFilesList();
+      this._updateStateContext();
     } catch (err) {
       this.files = [];
       this.filesList.setItems(['(No context directory or empty)']);
     }
+  }
+
+  /**
+   * Update shared state with context files for session creation
+   * @private
+   */
+  _updateStateContext() {
+    if (!this.state) return;
+
+    // Build context bundle with file contents for LLM
+    this.state.context = {
+      files: this.files.map(f => ({
+        path: f.name, // Use relative path/filename
+        content: f.content,
+        extension: f.ext,
+        size: f.size
+      })),
+      metadata: {
+        source: this.contextPath,
+        totalFiles: this.files.length,
+        totalSize: this.files.reduce((sum, f) => sum + f.size, 0),
+        loadedAt: new Date().toISOString()
+      }
+    };
   }
 
   /**

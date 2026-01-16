@@ -240,6 +240,16 @@ export class SessionServerClient {
   async getTool(toolName) {
     return this._request('GET', `/api/tools/${toolName}`);
   }
+
+  /**
+   * Import tasks - bypasses state checks for importing pre-defined task lists
+   * @param {string} sessionId
+   * @param {Object} taskList - Task list object with tasks array
+   * @returns {Promise<Object>}
+   */
+  async importTaskList(sessionId, taskList) {
+    return this._request('POST', '/api/tasklist/import', { sessionId, taskList });
+  }
 }
 
 export default SessionServerClient;

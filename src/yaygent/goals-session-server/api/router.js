@@ -25,6 +25,7 @@ import {
   collectContentStringPaths,
   shouldIncludePath
 } from '../lib/path-utils.js';
+import { SessionState } from '../lib/session-manager.js';
 
 /**
  * Simple router for HTTP request handling
@@ -251,6 +252,7 @@ export function createApiHandler(services) {
   // Task list
   router.post('/api/tasklist/generate', tasklistRoutes.generate);
   router.put('/api/tasklist/update', tasklistRoutes.update);
+  router.post('/api/tasklist/import', tasklistRoutes.import);
 
   // Tools
   router.get('/api/tools', toolRoutes.list);
@@ -976,6 +978,47 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
       const updatedSession = sessionManager.setTaskList(sessionId, taskList);
 
       console.log(`[TaskList] Updated: ${taskList.tasks.length} tasks for session ${sessionId.slice(0, 8)}`);
+
+      return jsonResponse({
+        success: true,
+        data: {
+          sessionId,
+          state: updatedSession.state,
+          taskList: updatedSession.taskList
+        }
+      });
+    },
+
+    /**
+     * Import tasks - allows setting tasks from any session state
+     * Bypasses normal state checks for importing pre-defined task lists
+     */
+    async import(ctx) {
+      const { sessionId, taskList } = ctx.body || {};
+
+      if (!sessionId) {
+        throw new ValidationError('sessionId is required', 'sessionId');
+      }
+
+      if (!taskList) {
+        throw new ValidationError('taskList is required', 'taskList');
+      }
+
+      // Validate taskList structure
+      if (!taskList.tasks || !Array.isArray(taskList.tasks)) {
+        throw new ValidationError('taskList.tasks must be an array', 'taskList.tasks');
+      }
+
+      // Get session to verify it exists
+      const session = sessionManager.getSession(sessionId);
+
+      // Import bypasses state checks - directly update to GENERATED state with tasks
+      const updatedSession = sessionManager.store.update(sessionId, {
+        state: SessionState.GENERATED,
+        taskList
+      });
+
+      console.log(`[TaskList] Imported: ${taskList.tasks.length} tasks for session ${sessionId.slice(0, 8)} (state → GENERATED)`);
 
       return jsonResponse({
         success: true,
