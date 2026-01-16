@@ -27,6 +27,7 @@ import { PdfExportTool } from './pdf-export-tool.js';
 import { ComposeEmailTool } from './compose-email-tool.js';
 import { GolangExecTool } from './golang-exec-tool.js';
 import { ContextResearchBrowserTool } from './context-research-browser-tool.js';
+import { TablemakerTool } from './tablemaker-tool.js';
 
 /**
  * Tool Router Class
@@ -584,10 +585,14 @@ export function createToolRouter(options = {}) {
   );
   contextResearchBrowser.registerTools(router);
 
+  // Initialize and register tablemaker tool
+  const tablemaker = new TablemakerTool(sandboxManager);
+  tablemaker.registerTools(router);
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, SandboxManager, createToolRouter };

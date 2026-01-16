@@ -25,6 +25,7 @@ import { FrameworkExecTool } from '../lib/framework-exec-tool.js';
 import { ComposeEmailTool } from '../lib/compose-email-tool.js';
 import { GolangExecTool } from '../lib/golang-exec-tool.js';
 import { ContextResearchBrowserTool } from '../lib/context-research-browser-tool.js';
+import { TablemakerTool } from '../lib/tablemaker-tool.js';
 
 // Test constants
 const TEST_SESSION_ID = 'test-workstream-' + Date.now();
@@ -900,6 +901,248 @@ func main() {
     });
   });
 
+  describe('TablemakerTool', () => {
+    let tablemakerTool;
+
+    beforeAll(() => {
+      tablemakerTool = new TablemakerTool(sandboxManager);
+    });
+
+    test('should create HTML table from JSON input', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/json-table.html',
+        inputFormat: 'json',
+        data: {
+          headers: ['Name', 'Email', 'Status'],
+          rows: [
+            ['Alice', 'alice@example.com', 'Active'],
+            ['Bob', 'bob@example.com', 'Pending'],
+            ['Charlie', 'charlie@example.com', 'Inactive']
+          ]
+        },
+        options: {
+          title: 'User Directory',
+          theme: 'default'
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.rowCount).toBe(3);
+      expect(parsed.columnCount).toBe(3);
+      expect(parsed.headers).toEqual(['Name', 'Email', 'Status']);
+
+      // Verify HTML file exists
+      const htmlPath = join(sandboxPath, 'tables', 'json-table.html');
+      expect(existsSync(htmlPath)).toBe(true);
+
+      // Verify HTML content
+      const htmlContent = await readFile(htmlPath, 'utf-8');
+      expect(htmlContent).toContain('<!DOCTYPE html>');
+      expect(htmlContent).toContain('User Directory');
+      expect(htmlContent).toContain('Alice');
+      expect(htmlContent).toContain('alice@example.com');
+      expect(htmlContent).toContain('data-table');
+    });
+
+    test('should create HTML table from CSV input', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/csv-table.html',
+        inputFormat: 'csv',
+        data: `Product,Price,Quantity
+Widget,25.00,100
+Gadget,50.00,50
+Gizmo,15.00,200`,
+        options: {
+          title: 'Inventory List',
+          theme: 'minimal'
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.rowCount).toBe(3);
+      expect(parsed.columnCount).toBe(3);
+      expect(parsed.headers).toEqual(['Product', 'Price', 'Quantity']);
+    });
+
+    test('should create HTML table from object array input', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/object-table.html',
+        inputFormat: 'object',
+        data: [
+          { id: 1, task: 'Write tests', complete: true },
+          { id: 2, task: 'Review code', complete: false },
+          { id: 3, task: 'Deploy', complete: false }
+        ],
+        options: {
+          title: 'Task List'
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.rowCount).toBe(3);
+      expect(parsed.headers).toContain('id');
+      expect(parsed.headers).toContain('task');
+      expect(parsed.headers).toContain('complete');
+    });
+
+    test('should support dark theme', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/dark-table.html',
+        inputFormat: 'json',
+        data: {
+          headers: ['Col1', 'Col2'],
+          rows: [['A', 'B']]
+        },
+        options: {
+          title: 'Dark Theme Test',
+          theme: 'dark'
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const htmlPath = join(sandboxPath, 'tables', 'dark-table.html');
+      const htmlContent = await readFile(htmlPath, 'utf-8');
+      expect(htmlContent).toContain('#1a1a2e'); // Dark theme background
+    });
+
+    test('should disable editable and sortable options', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/static-table.html',
+        inputFormat: 'json',
+        data: {
+          headers: ['X', 'Y'],
+          rows: [['1', '2']]
+        },
+        options: {
+          title: 'Static Table',
+          editable: false,
+          sortable: false,
+          exportCsv: false
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const htmlPath = join(sandboxPath, 'tables', 'static-table.html');
+      const htmlContent = await readFile(htmlPath, 'utf-8');
+      // Should not have input elements when not editable
+      expect(htmlContent).not.toContain('<input type="text"');
+      // Should not have sortable class when not sortable
+      expect(htmlContent).not.toContain('class="sortable"');
+      // Should not have export button
+      expect(htmlContent).not.toContain('export-csv');
+    });
+
+    test('should handle CSV with quoted values', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/quoted-csv.html',
+        inputFormat: 'csv',
+        data: `Name,Description,Value
+"Widget, Large","A large widget with ""special"" features",100
+"Gadget",Simple gadget,50`,
+        options: {
+          title: 'Quoted CSV Test'
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const htmlPath = join(sandboxPath, 'tables', 'quoted-csv.html');
+      const htmlContent = await readFile(htmlPath, 'utf-8');
+      expect(htmlContent).toContain('Widget, Large');
+      expect(htmlContent).toContain('&quot;special&quot;'); // Escaped quotes in HTML
+    });
+
+    test('should require path parameter', async () => {
+      try {
+        await tablemakerTool.execute({
+          sessionId: TEST_SESSION_ID,
+          data: { headers: ['A'], rows: [] }
+        });
+        expect(true).toBe(false); // Should not reach here
+      } catch (err) {
+        expect(err.message).toContain('path is required');
+      }
+    });
+
+    test('should require data parameter', async () => {
+      try {
+        await tablemakerTool.execute({
+          sessionId: TEST_SESSION_ID,
+          path: 'test.html'
+        });
+        expect(true).toBe(false); // Should not reach here
+      } catch (err) {
+        expect(err.message).toContain('data is required');
+      }
+    });
+
+    test('should reject invalid input format', async () => {
+      try {
+        await tablemakerTool.execute({
+          sessionId: TEST_SESSION_ID,
+          path: 'test.html',
+          inputFormat: 'xml',
+          data: '<data/>'
+        });
+        expect(true).toBe(false); // Should not reach here
+      } catch (err) {
+        expect(err.message).toContain('Unknown input format');
+      }
+    });
+
+    test('should reject invalid JSON input (missing headers)', async () => {
+      try {
+        await tablemakerTool.execute({
+          sessionId: TEST_SESSION_ID,
+          path: 'test.html',
+          inputFormat: 'json',
+          data: { rows: [['a', 'b']] }
+        });
+        expect(true).toBe(false); // Should not reach here
+      } catch (err) {
+        expect(err.message).toContain('headers');
+      }
+    });
+
+    test('should escape HTML in cell values', async () => {
+      const result = await tablemakerTool.execute({
+        sessionId: TEST_SESSION_ID,
+        path: 'tables/escaped-table.html',
+        inputFormat: 'json',
+        data: {
+          headers: ['Script Test'],
+          rows: [['<script>alert("xss")</script>']]
+        }
+      });
+
+      expect(result.isError).toBeFalsy();
+
+      const htmlPath = join(sandboxPath, 'tables', 'escaped-table.html');
+      const htmlContent = await readFile(htmlPath, 'utf-8');
+      // The cell value should be escaped (page itself has legit script tags)
+      expect(htmlContent).toContain('&lt;script&gt;alert');
+      // Verify no unescaped alert() in table values
+      expect(htmlContent).not.toContain('value="<script>');
+    });
+  });
+
   describe('Integration: Document Processing Pipeline', () => {
 
     test('should complete full document pipeline: MD -> DOCX -> MD -> PDF', async () => {
@@ -1036,6 +1279,7 @@ console.log('  - FrameworkExecTool (Bun framework execution)');
 console.log('  - ComposeEmailTool (Email composition with .eml export)');
 console.log('  - GolangExecTool (Go code execution with sandbox)');
 console.log('  - ContextResearchBrowserTool (Web research to context)');
+console.log('  - TablemakerTool (HTML table generation from JSON/CSV/objects)');
 console.log('\nPlaceholder addresses for email:');
 console.log('  - Sender: SENDER@SENDER.SEND');
 console.log('  - Recipient: RECIPIENT@RECIPIENT.RECEIVE');
