@@ -155,8 +155,12 @@ export class FrameworkExecTool {
       extraArgs = [],
       env = {},
       timeout = this.defaultTimeout,
-      background = false
+      background: requestedBackground = false
     } = args;
+
+    // Auto-enable background mode for long-running server actions
+    const longRunningActions = ['dev', 'start'];
+    const background = longRunningActions.includes(action) ? true : requestedBackground;
 
     // Validate required fields
     if (!sessionId) {
@@ -226,6 +230,9 @@ export class FrameworkExecTool {
         stderr: result.stderr,
         duration: result.duration,
         timedOut: result.timedOut || false,
+        background,
+        backgroundAutoEnabled: longRunningActions.includes(action) && !requestedBackground,
+        pid: result.pid,
         sandboxPath,
         projectDir: cwd
       });
@@ -499,7 +506,7 @@ export class FrameworkExecTool {
             background: {
               type: 'boolean',
               default: false,
-              description: 'Run process in background (for dev servers)'
+              description: 'Run process in background. Auto-enabled for dev/start actions since they run indefinitely'
             }
           },
           required: ['sessionId', 'action']
