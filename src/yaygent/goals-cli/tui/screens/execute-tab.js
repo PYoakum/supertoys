@@ -127,6 +127,7 @@ export class ExecuteTabScreen {
       title: 'Actions',
       items: [
         '☆ Run All ☆',
+        '♻ Run in Memory Mode',
         'Start Server',
         'Create Session',
         'Prepare Session',
@@ -762,6 +763,29 @@ export class ExecuteTabScreen {
       this.runAllPhase = null;
       this.mode = 'dashboard';
       await this._loadSessions();
+    }
+  }
+
+  /**
+   * Run All with Memory Mode - Enables memory mode for this run
+   * Uses previous attempt logs as additional context
+   * @private
+   */
+  async _runAllWithMemory() {
+    // Store original memory state
+    const wasMemoryEnabled = this.memoryEnabled;
+
+    // Enable memory mode for this run
+    this.memoryEnabled = true;
+    this.logViewer.addLine('info', '♻ Memory mode enabled for this run');
+    this.logViewer.addLine('info', `  Directory: ${this.memoryDir}`);
+
+    try {
+      // Run the standard workflow (which will use memoryEnabled flag)
+      await this._runAll();
+    } finally {
+      // Restore original memory state after run completes
+      this.memoryEnabled = wasMemoryEnabled;
     }
   }
 
@@ -1659,29 +1683,32 @@ export class ExecuteTabScreen {
       case 0: // ☆ Run All ☆
         this._runAll();
         break;
-      case 1: // Start/Stop Server
+      case 1: // ♻ Run in Memory Mode
+        this._runAllWithMemory();
+        break;
+      case 2: // Start/Stop Server
         this._toggleServer();
         break;
-      case 2: // Create Session
+      case 3: // Create Session
         this._createSession();
         break;
-      case 3: // Prepare Session (Evaluate + Generate Tasks)
+      case 4: // Prepare Session (Evaluate + Generate Tasks)
         this._prepareSession();
         break;
-      case 4: // List Sessions
+      case 5: // List Sessions
         this._loadSessions();
         this.mode = 'sessions';
         break;
-      case 5: // Run Next Session
+      case 6: // Run Next Session
         this._runNextSession();
         break;
-      case 6: // Kill Session
+      case 7: // Kill Session
         this._killCurrentSession();
         break;
-      case 7: // Environment Config
+      case 8: // Environment Config
         this.mode = 'config';
         break;
-      case 8: // Refresh Status
+      case 9: // Refresh Status
         this._checkServerStatus();
         this.logViewer.addLine('info', 'Status refreshed');
         break;

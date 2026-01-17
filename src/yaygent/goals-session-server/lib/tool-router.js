@@ -454,7 +454,7 @@ export class NotepadTool {
  * @param {string[]} [options.tcpAllowedHosts=[]] - Allowed hosts for tcp_connect
  * @param {number[]} [options.tcpAllowedPorts=[]] - Allowed ports for tcp_connect
  * @param {number} [options.tcpTimeout=10000] - Default timeout for tcp_connect
- * @param {string[]} [options.browserAllowedHosts=[]] - Allowed hosts for browser_request
+ * @param {string[]} [options.browserAllowedHosts] - Additional allowed hosts for browser_request (localhost, 127.0.0.1, 0.0.0.0 are always allowed)
  * @param {number} [options.browserTimeout=30000] - Default timeout for browser_request
  * @param {boolean} [options.browserHeadless=true] - Run browser in headless mode
  * @param {import('./llm-client.js').LLMClient} [options.llmClient] - LLM client for make_goals tool
@@ -529,8 +529,14 @@ export function createToolRouter(options = {}) {
   tcpConnect.registerTools(router);
 
   // Initialize and register browser request tool
+  // Default to allowing localhost for sandbox dev server verification
+  const defaultBrowserAllowedHosts = ['localhost', '127.0.0.1', '0.0.0.0'];
+  const browserAllowedHosts = options.browserAllowedHosts
+    ? [...defaultBrowserAllowedHosts, ...options.browserAllowedHosts]
+    : defaultBrowserAllowedHosts;
+
   const browserRequest = new BrowserRequestTool({
-    allowedHosts: options.browserAllowedHosts || [],
+    allowedHosts: browserAllowedHosts,
     defaultTimeout: options.browserTimeout || 30000,
     headless: options.browserHeadless !== false
   });
