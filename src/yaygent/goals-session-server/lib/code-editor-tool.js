@@ -58,7 +58,8 @@ export class CodeEditorTool {
       patch: () => this.patch(sessionId, rest),
       delete: () => this.delete(sessionId, rest),
       list: () => this.list(sessionId, rest),
-      stat: () => this.stat(sessionId, rest)
+      stat: () => this.stat(sessionId, rest),
+      explore: () => this.explore(sessionId, rest)
     };
 
     const op = operations[operation];
@@ -523,6 +524,330 @@ export class CodeEditorTool {
   }
 
   /**
+   * Explore a directory to understand its structure before writing
+   * This helps prevent errors by providing context about existing files
+   * @param {string} [sessionId]
+   * @param {Object} args
+   * @param {string} args.path - Directory path to explore (or file path to explore its parent)
+   * @param {number} [args.maxDepth=3] - Maximum depth to traverse
+   * @param {boolean} [args.includeContent=false] - Include file content previews
+   * @param {number} [args.contentPreviewLength=200] - Characters to preview per file
+   * @returns {Promise<Object>}
+   */
+  async explore(sessionId, { path, maxDepth = 3, includeContent = false, contentPreviewLength = 200 }) {
+    if (!path) {
+      throw new Error('path is required for explore operation');
+    }
+
+    const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
+    const absPath = await this.sandboxManager.resolvePath(sessionId, path);
+
+    // Determine if path is a file or directory
+    let targetDir;
+    let targetFile = null;
+
+    if (existsSync(absPath)) {
+      const stats = await stat(absPath);
+      if (stats.isDirectory()) {
+        targetDir = absPath;
+      } else {
+        // Path is a file - explore its parent directory
+        targetDir = join(absPath, '..');
+        targetFile = path;
+      }
+    } else {
+      // Path doesn't exist - explore the parent directory where it would be created
+      targetDir = join(absPath, '..');
+      targetFile = path;
+
+      // If parent doesn't exist either, go up until we find an existing directory
+      while (!existsSync(targetDir) && targetDir !== sandboxPath) {
+        targetDir = join(targetDir, '..');
+      }
+
+      // Default to sandbox root if nothing exists
+      if (!existsSync(targetDir)) {
+        targetDir = sandboxPath;
+      }
+    }
+
+    // Build directory tree
+    const tree = await this.buildDirectoryTree(targetDir, sandboxPath, maxDepth, includeContent, contentPreviewLength);
+
+    // Get relative path for target directory
+    const relativeTargetDir = relative(sandboxPath, targetDir) || '.';
+
+    // Analyze the structure
+    const analysis = this.analyzeStructure(tree);
+
+    // Build response with helpful context
+    const response = {
+      success: true,
+      operation: 'explore',
+      targetPath: path,
+      targetExists: existsSync(absPath),
+      exploredDirectory: relativeTargetDir,
+      structure: tree,
+      analysis: {
+        totalFiles: analysis.totalFiles,
+        totalDirectories: analysis.totalDirectories,
+        totalSize: analysis.totalSize,
+        fileTypes: analysis.fileTypes,
+        deepestPath: analysis.deepestPath
+      },
+      suggestions: []
+    };
+
+    // Add contextual suggestions
+    if (!existsSync(absPath)) {
+      response.suggestions.push(`Path "${path}" does not exist yet. It will be created.`);
+
+      // Check for similar files that might be related
+      const similarFiles = this.findSimilarFiles(tree, path);
+      if (similarFiles.length > 0) {
+        response.suggestions.push(`Similar existing files: ${similarFiles.slice(0, 5).join(', ')}`);
+      }
+    }
+
+    // If it's a file path, show sibling files
+    if (targetFile) {
+      const siblings = this.getSiblingFiles(tree, targetFile);
+      if (siblings.length > 0) {
+        response.siblingFiles = siblings.slice(0, 20);
+      }
+    }
+
+    return this.formatResponse(response);
+  }
+
+  /**
+   * Build a directory tree structure
+   * @param {string} dirPath - Absolute directory path
+   * @param {string} sandboxPath - Sandbox root for relative paths
+   * @param {number} maxDepth - Maximum depth
+   * @param {boolean} includeContent - Include content previews
+   * @param {number} contentPreviewLength - Preview length
+   * @param {number} currentDepth - Current depth
+   * @returns {Promise<Object>}
+   */
+  async buildDirectoryTree(dirPath, sandboxPath, maxDepth, includeContent, contentPreviewLength, currentDepth = 0) {
+    const relativePath = relative(sandboxPath, dirPath) || '.';
+    const tree = {
+      name: relativePath === '.' ? '.' : dirPath.split('/').pop(),
+      path: relativePath,
+      type: 'directory',
+      children: []
+    };
+
+    if (currentDepth >= maxDepth || !existsSync(dirPath)) {
+      if (currentDepth >= maxDepth) {
+        tree.truncated = true;
+      }
+      return tree;
+    }
+
+    try {
+      const entries = await readdir(dirPath, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const entryAbsPath = join(dirPath, entry.name);
+        const entryRelPath = join(relativePath, entry.name);
+
+        if (entry.isDirectory()) {
+          const subTree = await this.buildDirectoryTree(
+            entryAbsPath,
+            sandboxPath,
+            maxDepth,
+            includeContent,
+            contentPreviewLength,
+            currentDepth + 1
+          );
+          tree.children.push(subTree);
+        } else if (entry.isFile()) {
+          const fileStats = await stat(entryAbsPath);
+          const fileInfo = {
+            name: entry.name,
+            path: entryRelPath,
+            type: 'file',
+            size: fileStats.size,
+            modified: fileStats.mtime.toISOString(),
+            extension: entry.name.includes('.') ? entry.name.split('.').pop() : null
+          };
+
+          // Include content preview if requested
+          if (includeContent && fileStats.size < 50000) { // Only preview files under 50KB
+            try {
+              const content = await readFile(entryAbsPath, 'utf-8');
+              fileInfo.preview = content.slice(0, contentPreviewLength);
+              if (content.length > contentPreviewLength) {
+                fileInfo.preview += '...';
+              }
+            } catch (e) {
+              fileInfo.preview = '[binary or unreadable]';
+            }
+          }
+
+          tree.children.push(fileInfo);
+        }
+      }
+
+      // Sort: directories first, then files, alphabetically
+      tree.children.sort((a, b) => {
+        if (a.type === 'directory' && b.type !== 'directory') return -1;
+        if (a.type !== 'directory' && b.type === 'directory') return 1;
+        return a.name.localeCompare(b.name);
+      });
+    } catch (e) {
+      tree.error = e.message;
+    }
+
+    return tree;
+  }
+
+  /**
+   * Analyze directory structure
+   * @param {Object} tree - Directory tree
+   * @returns {Object}
+   */
+  analyzeStructure(tree) {
+    let totalFiles = 0;
+    let totalDirectories = 0;
+    let totalSize = 0;
+    const fileTypes = {};
+    let deepestPath = '';
+    let maxDepth = 0;
+
+    const traverse = (node, depth = 0) => {
+      if (node.type === 'directory') {
+        totalDirectories++;
+        if (node.children) {
+          for (const child of node.children) {
+            traverse(child, depth + 1);
+          }
+        }
+      } else if (node.type === 'file') {
+        totalFiles++;
+        totalSize += node.size || 0;
+        if (node.extension) {
+          fileTypes[node.extension] = (fileTypes[node.extension] || 0) + 1;
+        }
+        if (depth > maxDepth) {
+          maxDepth = depth;
+          deepestPath = node.path;
+        }
+      }
+    };
+
+    traverse(tree);
+
+    return { totalFiles, totalDirectories, totalSize, fileTypes, deepestPath };
+  }
+
+  /**
+   * Find files with similar names
+   * @param {Object} tree - Directory tree
+   * @param {string} targetPath - Target file path
+   * @returns {string[]}
+   */
+  findSimilarFiles(tree, targetPath) {
+    const targetName = targetPath.split('/').pop().toLowerCase();
+    const targetBase = targetName.replace(/\.[^.]+$/, '');
+    const similar = [];
+
+    const traverse = (node) => {
+      if (node.type === 'file') {
+        const nodeName = node.name.toLowerCase();
+        const nodeBase = nodeName.replace(/\.[^.]+$/, '');
+
+        // Check for similar names
+        if (nodeName.includes(targetBase) || targetBase.includes(nodeBase) ||
+            this.levenshteinDistance(nodeBase, targetBase) <= 3) {
+          similar.push(node.path);
+        }
+      } else if (node.children) {
+        for (const child of node.children) {
+          traverse(child);
+        }
+      }
+    };
+
+    traverse(tree);
+    return similar;
+  }
+
+  /**
+   * Get sibling files in the same directory
+   * @param {Object} tree - Directory tree
+   * @param {string} targetPath - Target file path
+   * @returns {string[]}
+   */
+  getSiblingFiles(tree, targetPath) {
+    const targetDir = targetPath.split('/').slice(0, -1).join('/') || '.';
+    const siblings = [];
+
+    const findDir = (node, path) => {
+      if (node.path === path || (path === '.' && node.path === '.')) {
+        return node;
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          const found = findDir(child, path);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const dirNode = findDir(tree, targetDir);
+    if (dirNode && dirNode.children) {
+      for (const child of dirNode.children) {
+        if (child.type === 'file') {
+          siblings.push(child.path);
+        }
+      }
+    }
+
+    return siblings;
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   * @param {string} a
+   * @param {string} b
+   * @returns {number}
+   */
+  levenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+
+    const matrix = [];
+
+    for (let i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+
+    return matrix[b.length][a.length];
+  }
+
+  /**
    * Encode content to buffer
    * @param {string} content
    * @param {string} encoding
@@ -574,7 +899,7 @@ export class CodeEditorTool {
       this.execute.bind(this),
       {
         name: 'code_editor',
-        description: 'Edit code files in a sandboxed workspace. Supports create, read, write, patch, delete, list, and stat operations.',
+        description: 'Edit code files in a sandboxed workspace. Supports create, read, write, patch, delete, list, stat, and explore operations. IMPORTANT: Before creating or writing files, use the "explore" operation first to understand the directory structure and avoid errors.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -584,8 +909,8 @@ export class CodeEditorTool {
             },
             operation: {
               type: 'string',
-              enum: ['create', 'read', 'write', 'patch', 'delete', 'list', 'stat'],
-              description: 'The operation to perform'
+              enum: ['create', 'read', 'write', 'patch', 'delete', 'list', 'stat', 'explore'],
+              description: 'The operation to perform. Use "explore" before create/write to understand the directory structure.'
             },
             path: {
               type: 'string',
@@ -637,6 +962,21 @@ export class CodeEditorTool {
               type: 'string',
               default: '**',
               description: 'Glob pattern for list operation (** matches all files)'
+            },
+            maxDepth: {
+              type: 'integer',
+              default: 3,
+              description: 'Maximum directory depth to traverse (for explore operation)'
+            },
+            includeContent: {
+              type: 'boolean',
+              default: false,
+              description: 'Include file content previews (for explore operation)'
+            },
+            contentPreviewLength: {
+              type: 'integer',
+              default: 200,
+              description: 'Characters to preview per file (for explore operation, when includeContent is true)'
             }
           },
           required: ['operation']
