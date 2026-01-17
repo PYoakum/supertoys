@@ -217,13 +217,14 @@ export class ComposeEmailTool {
    * Sync email content to notepad for cross-tool access
    * @param {string} sessionId
    * @param {Object} notepad - Email notepad data
+   * @param {string} [notepadFilename='email_draft'] - Filename to use in notepad
    * @private
    */
-  async _syncToNotepad(sessionId, notepad) {
+  async _syncToNotepad(sessionId, notepad, notepadFilename = 'email_draft') {
     if (!this.notepadTool) return;
 
     try {
-      // Write full email content to notepad as email_draft
+      // Write full email content to notepad
       const emailContent = [
         `Subject: ${notepad.subject || '(No Subject)'}`,
         `From: ${notepad.fromName ? `${notepad.fromName} <${notepad.from}>` : notepad.from}`,
@@ -236,13 +237,16 @@ export class ComposeEmailTool {
 
       await this.notepadTool.write({
         sessionId,
-        filename: 'email_draft',
+        filename: notepadFilename,
         content: emailContent,
         append: false
       });
+
+      return notepadFilename;
     } catch (err) {
       // Log but don't fail - notepad sync is optional
       console.error(`[compose_email] Failed to sync to notepad: ${err.message}`);
+      return null;
     }
   }
 
@@ -306,7 +310,8 @@ export class ComposeEmailTool {
       bcc,
       replyTo,
       importance,
-      usePlaceholders = true
+      usePlaceholders = true,
+      notepadFilename = 'email_draft'
     } = args;
 
     const notepad = {
@@ -320,6 +325,7 @@ export class ComposeEmailTool {
       bcc,
       replyTo,
       importance,
+      notepadFilename, // Store the filename for subsequent syncs
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -327,7 +333,7 @@ export class ComposeEmailTool {
     emailNotepads.set(sessionId, notepad);
 
     // Sync to notepad for cross-tool access
-    await this._syncToNotepad(sessionId, notepad);
+    const syncedFilename = await this._syncToNotepad(sessionId, notepad, notepadFilename);
 
     return this.formatResponse({
       success: true,
@@ -340,15 +346,22 @@ export class ComposeEmailTool {
         bodyLength: notepad.body.length,
         hasPlaceholders: usePlaceholders
       },
-      syncedToNotepad: !!this.notepadTool,
+      syncedToNotepad: !!syncedFilename,
+      notepadFilename: syncedFilename,
+      notepadAccess: syncedFilename ? {
+        tool: 'notepad_read',
+        sessionId: sessionId,
+        filename: syncedFilename,
+        hint: `Use notepad_read with sessionId="${sessionId}" and filename="${syncedFilename}" to read this email`
+      } : null,
       instructions: [
         'Use action="append" with text="..." to add content to the body',
         'Use action="set" with field="subject" and value="..." to update fields',
         'Use action="preview" to see the full email',
         'Use action="export" to save as .eml file',
         'Placeholder addresses can be replaced with token_replace tool',
-        'Email content is also available via notepad_read with filename="email_draft"'
-      ]
+        syncedFilename ? `Email content is available via notepad_read with sessionId="${sessionId}" and filename="${syncedFilename}"` : null
+      ].filter(Boolean)
     });
   }
 
@@ -381,15 +394,16 @@ export class ComposeEmailTool {
     notepad.body += text + (newline ? '\n' : '');
     notepad.updatedAt = new Date().toISOString();
 
-    // Sync to notepad for cross-tool access
-    await this._syncToNotepad(sessionId, notepad);
+    // Sync to notepad for cross-tool access (use stored filename)
+    await this._syncToNotepad(sessionId, notepad, notepad.notepadFilename || 'email_draft');
 
     return this.formatResponse({
       success: true,
       action: 'append',
       message: `Appended ${text.length} characters to body`,
       bodyLength: notepad.body.length,
-      lineCount: notepad.body.split('\n').length
+      lineCount: notepad.body.split('\n').length,
+      notepadFilename: notepad.notepadFilename || 'email_draft'
     });
   }
 
@@ -417,15 +431,16 @@ export class ComposeEmailTool {
     notepad[field] = value;
     notepad.updatedAt = new Date().toISOString();
 
-    // Sync to notepad for cross-tool access
-    await this._syncToNotepad(sessionId, notepad);
+    // Sync to notepad for cross-tool access (use stored filename)
+    await this._syncToNotepad(sessionId, notepad, notepad.notepadFilename || 'email_draft');
 
     return this.formatResponse({
       success: true,
       action: 'set',
       field,
       message: `Updated ${field}`,
-      preview: field === 'body' ? `${String(value).slice(0, 50)}...` : value
+      preview: field === 'body' ? `${String(value).slice(0, 50)}...` : value,
+      notepadFilename: notepad.notepadFilename || 'email_draft'
     });
   }
 
@@ -628,6 +643,12 @@ export class ComposeEmailTool {
         name: 'compose_email',
         description: `Compose emails by streaming text to a notepad resource, then export as .eml file.
 
+CROSS-TOOL ACCESS (IMPORTANT):
+- Email content is automatically saved to notepad for other tools to access
+- Default notepad filename: "email_draft" (customizable via notepadFilename parameter)
+- To read email content from another task, use: notepad_read with the SAME sessionId and filename="email_draft"
+- The response includes notepadAccess object with exact parameters needed to read the email
+
 IMPORTANT EMAIL FORMATTING:
 - Uses placeholder addresses by default for template-style composition
 - Default sender: SENDER@SENDER.SEND
@@ -635,9 +656,9 @@ IMPORTANT EMAIL FORMATTING:
 - Replace placeholders using token_replace tool before sending
 
 WORKFLOW:
-1. action="compose" - Start new email with subject, optional body
-2. action="append" - Stream/add text to body incrementally
-3. action="set" - Update specific fields (to, from, subject, etc.)
+1. action="compose" - Start new email with subject, optional body (saves to notepad automatically)
+2. action="append" - Stream/add text to body incrementally (updates notepad)
+3. action="set" - Update specific fields (to, from, subject, etc.) (updates notepad)
 4. action="preview" - View email before export
 5. action="export" - Save as .eml file
 
@@ -704,6 +725,11 @@ The exported .eml file can be:
               type: 'boolean',
               default: true,
               description: 'Use placeholder addresses (SENDER@SENDER.SEND, RECIPIENT@RECIPIENT.RECEIVE)'
+            },
+            notepadFilename: {
+              type: 'string',
+              default: 'email_draft',
+              description: 'Filename for notepad cross-tool access. Email content is automatically saved to notepad and can be read via notepad_read with this filename and the same sessionId.'
             },
             // For append action
             text: {
