@@ -905,7 +905,7 @@ async function runPipeline(options) {
 
     const proc = spawn(runtime, [runAllPath, ...args], {
       env: { ...process.env, ...env },
-      cwd: process.cwd(),
+      cwd: dirname(runAllPath),
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
