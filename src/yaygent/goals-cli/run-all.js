@@ -760,26 +760,64 @@ async function main() {
     result.phases.prepare = { success: false };
 
     logger.info('Evaluating dependencies...');
+    logger.debug(`[eval] Requesting evaluation for session ${sessionId.slice(0, 8)}...`);
+    const evalStartTime = Date.now();
     const evalResponse = await withRetry(
       () => client.evaluate(sessionId),
       'evaluate session',
       maxRetries,
       logger
     );
-    logger.debug(`Evaluation state: ${evalResponse.data?.state || evalResponse.state}`);
+    const evalDuration = ((Date.now() - evalStartTime) / 1000).toFixed(1);
+    const evalData = evalResponse.data || evalResponse;
+    logger.debug(`[eval] State: ${evalData.state} (${evalDuration}s)`);
+    if (evalData.executionOrder) {
+      logger.debug(`[eval] Execution order: ${evalData.executionOrder.join(' → ')}`);
+    }
+    if (evalData.inferredDependencies?.length > 0) {
+      logger.debug(`[eval] Inferred ${evalData.inferredDependencies.length} dependencies`);
+      evalData.inferredDependencies.forEach(dep => {
+        logger.debug(`[eval]   ${dep.goalId} → ${dep.dependsOn} (${dep.type})`);
+      });
+    }
+    if (evalData.warnings?.length > 0) {
+      evalData.warnings.forEach(w => logger.warn(`[eval] ${w.code}: ${w.message}`));
+    }
 
     logger.info('Generating task list...');
+    logger.debug(`[taskgen] Starting task generation for ${evalData.executionOrder?.length || '?'} goals`);
+    const taskStartTime = Date.now();
     const taskResponse = await withRetry(
       () => client.generateTaskList(sessionId),
       'generate tasks',
       maxRetries,
       logger
     );
+    const taskDuration = ((Date.now() - taskStartTime) / 1000).toFixed(1);
+    const taskData = taskResponse.data || taskResponse;
+    const taskList = taskData.taskList || {};
+    const tasks = taskList.tasks || [];
 
-    const taskCount = taskResponse.data?.taskList?.tasks?.length ||
-                      taskResponse.taskList?.tasks?.length || 0;
+    const taskCount = tasks.length;
     result.phases.prepare.taskCount = taskCount;
     result.phases.prepare.success = true;
+    logger.debug(`[taskgen] Generated ${taskCount} tasks in ${taskDuration}s`);
+
+    // Log task summary by goal
+    const tasksByGoal = {};
+    tasks.forEach(t => {
+      const goalId = t.goalId || 'unknown';
+      if (!tasksByGoal[goalId]) tasksByGoal[goalId] = [];
+      tasksByGoal[goalId].push(t);
+    });
+    Object.entries(tasksByGoal).forEach(([goalId, goalTasks]) => {
+      logger.debug(`[taskgen] Goal "${goalId}": ${goalTasks.length} tasks`);
+      goalTasks.forEach(t => {
+        const tool = t.tool?.toolName || t.toolName || 'unknown';
+        logger.debug(`[taskgen]   ${t.id}: ${t.title} [${tool}]`);
+      });
+    });
+
     logger.success(`Prepared ${taskCount} tasks`);
 
     // Phase 4: Execute
