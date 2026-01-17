@@ -27,9 +27,10 @@ export class BundleGenerator {
    * @param {Object} params.session - Full session data
    * @param {Object} params.queueState - Final queue state
    * @param {string} params.executionOutputDir - Path to execution outputs
+   * @param {string} [params.sandboxDir] - Path to sandbox directory for this session
    * @returns {Promise<Object>}
    */
-  async generateBundle({ sessionId, session, queueState, executionOutputDir }) {
+  async generateBundle({ sessionId, session, queueState, executionOutputDir, sandboxDir }) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const bundleId = `bundle-${sessionId.slice(0, 8)}-${timestamp}`;
     const bundleDir = join(this.outputDir, bundleId);
@@ -47,8 +48,11 @@ export class BundleGenerator {
       // Copy execution outputs
       const executionFiles = await this.copyExecutionOutputs(bundleDir, executionOutputDir);
 
-      // Copy artifacts
+      // Copy artifacts from execution output
       const artifactFiles = await this.copyArtifacts(bundleDir, executionOutputDir);
+
+      // Copy sandbox contents (generated project files, etc.)
+      const sandboxFiles = await this.copySandbox(bundleDir, sandboxDir);
 
       // Generate manifest
       const manifest = await this.generateManifest({
@@ -58,6 +62,7 @@ export class BundleGenerator {
         sessionFiles,
         executionFiles,
         artifactFiles,
+        sandboxFiles,
         queueState
       });
 
@@ -198,11 +203,57 @@ export class BundleGenerator {
   }
 
   /**
+   * Copy sandbox contents to bundle (recursively)
+   * @private
+   */
+  async copySandbox(bundleDir, sandboxDir) {
+    const files = [];
+
+    if (!sandboxDir || !existsSync(sandboxDir)) {
+      return files;
+    }
+
+    const sandboxDestDir = join(bundleDir, 'sandbox');
+    await mkdir(sandboxDestDir, { recursive: true });
+
+    // Recursively copy all files from sandbox
+    const copyRecursive = async (srcDir, destDir, relativePath = '') => {
+      const entries = await readdir(srcDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const srcPath = join(srcDir, entry.name);
+        const destPath = join(destDir, entry.name);
+        const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+        if (entry.isDirectory()) {
+          // Skip node_modules to save space
+          if (entry.name === 'node_modules' || entry.name === '.git') {
+            continue;
+          }
+          await mkdir(destPath, { recursive: true });
+          await copyRecursive(srcPath, destPath, relPath);
+        } else {
+          await copyFile(srcPath, destPath);
+          const stats = await stat(srcPath);
+          files.push({
+            path: `sandbox/${relPath}`,
+            type: 'sandbox',
+            size: stats.size
+          });
+        }
+      }
+    };
+
+    await copyRecursive(sandboxDir, sandboxDestDir);
+    return files;
+  }
+
+  /**
    * Generate bundle manifest
    * @private
    */
-  async generateManifest({ bundleId, sessionId, bundleDir, sessionFiles, executionFiles, artifactFiles, queueState }) {
-    const allFiles = [...sessionFiles, ...executionFiles, ...artifactFiles];
+  async generateManifest({ bundleId, sessionId, bundleDir, sessionFiles, executionFiles, artifactFiles, sandboxFiles = [], queueState }) {
+    const allFiles = [...sessionFiles, ...executionFiles, ...artifactFiles, ...sandboxFiles];
     let totalSize = 0;
 
     // Calculate sizes and checksums
@@ -231,6 +282,7 @@ export class BundleGenerator {
         sessionFiles: sessionFiles,
         executionFiles: executionFiles,
         artifactFiles: artifactFiles,
+        sandboxFiles: sandboxFiles,
         totalFiles: allFiles.length,
         totalSize
       },
@@ -276,7 +328,9 @@ ${manifest.bundleId}/
 │   ├── execution-log.json    # Complete log
 │   └── summary.md            # Execution summary
 │
-└── artifacts/                # Generated files
+├── artifacts/                # Generated files
+│
+└── sandbox/                  # Project files (code, configs, etc.)
 \`\`\`
 
 ## Execution Summary

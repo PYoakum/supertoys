@@ -996,11 +996,23 @@ async function main(args) {
   if (queueManager.isSuccessful() && !args['no-bundle']) {
     display.info('Generating bundle...');
 
+    // Get sandbox path to include project files in bundle
+    let sandboxPath = null;
+    try {
+      const sandboxInfo = await sessionClient.getSandboxInfo(sessionId);
+      if (sandboxInfo.exists) {
+        sandboxPath = sandboxInfo.path;
+      }
+    } catch (err) {
+      display.warn(`Could not get sandbox info: ${err.message}`);
+    }
+
     const bundleResult = await bundleGenerator.generateBundle({
       sessionId: sessionId,
       session,
       queueState: queueManager.getState(),
-      executionOutputDir: outputWriter.getOutputDir()
+      executionOutputDir: outputWriter.getOutputDir(),
+      sandboxDir: sandboxPath
     });
 
     bundlePath = bundleResult.path;
