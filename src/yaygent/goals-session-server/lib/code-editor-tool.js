@@ -532,9 +532,10 @@ export class CodeEditorTool {
    * @param {number} [args.maxDepth=3] - Maximum depth to traverse
    * @param {boolean} [args.includeContent=false] - Include file content previews
    * @param {number} [args.contentPreviewLength=200] - Characters to preview per file
+   * @param {boolean} [args.summary=false] - Return compact summary instead of full tree
    * @returns {Promise<Object>}
    */
-  async explore(sessionId, { path, maxDepth = 3, includeContent = false, contentPreviewLength = 200 }) {
+  async explore(sessionId, { path, maxDepth = 3, includeContent = false, contentPreviewLength = 200, summary = false }) {
     if (!path) {
       throw new Error('path is required for explore operation');
     }
@@ -587,7 +588,6 @@ export class CodeEditorTool {
       targetPath: path,
       targetExists: existsSync(absPath),
       exploredDirectory: relativeTargetDir,
-      structure: tree,
       analysis: {
         totalFiles: analysis.totalFiles,
         totalDirectories: analysis.totalDirectories,
@@ -597,6 +597,13 @@ export class CodeEditorTool {
       },
       suggestions: []
     };
+
+    // In summary mode, provide a flat file list instead of full tree
+    if (summary) {
+      response.files = this.flattenTree(tree);
+    } else {
+      response.structure = tree;
+    }
 
     // Add contextual suggestions
     if (!existsSync(absPath)) {
@@ -618,6 +625,28 @@ export class CodeEditorTool {
     }
 
     return this.formatResponse(response);
+  }
+
+  /**
+   * Flatten tree to a simple list of file paths
+   * @param {Object} tree - Directory tree
+   * @returns {string[]} List of file paths
+   */
+  flattenTree(tree) {
+    const files = [];
+
+    const traverse = (node) => {
+      if (node.type === 'file') {
+        files.push(node.path);
+      } else if (node.children) {
+        for (const child of node.children) {
+          traverse(child);
+        }
+      }
+    };
+
+    traverse(tree);
+    return files;
   }
 
   /**
@@ -977,6 +1006,11 @@ export class CodeEditorTool {
               type: 'integer',
               default: 200,
               description: 'Characters to preview per file (for explore operation, when includeContent is true)'
+            },
+            summary: {
+              type: 'boolean',
+              default: false,
+              description: 'Return a compact flat file list instead of full tree structure (for explore operation). Use this for large directories to avoid truncation.'
             }
           },
           required: ['operation']
