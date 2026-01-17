@@ -1143,6 +1143,16 @@ function createErrorAssessmentGoal(errorSummary, attempt) {
 function injectErrorAssessmentGoal(goals, errorGoal) {
   const updatedGoals = JSON.parse(JSON.stringify(goals)); // Deep clone
 
+  // Remove any existing error-assessment goals to prevent stacking
+  updatedGoals.goals = updatedGoals.goals.filter(g => !g.id?.startsWith('error-assessment-'));
+
+  // Also remove error-assessment dependencies from all goals
+  for (const goal of updatedGoals.goals) {
+    if (goal.dependencies && Array.isArray(goal.dependencies)) {
+      goal.dependencies = goal.dependencies.filter(d => !d?.startsWith?.('error-assessment-'));
+    }
+  }
+
   // Add error assessment goal at the beginning
   updatedGoals.goals.unshift(errorGoal);
 
@@ -1353,8 +1363,16 @@ async function cmdVigilant(args, logger) {
     const goalsContent = await readFile(currentGoalsPath, 'utf-8');
     const goals = JSON.parse(goalsContent);
 
+    logger.info(`[vigilant] Loaded goals file with ${goals.goals?.length || 0} goals`);
+    const existingErrorGoals = (goals.goals || []).filter(g => g.id?.startsWith('error-assessment-'));
+    if (existingErrorGoals.length > 0) {
+      logger.warn(`[vigilant] Found ${existingErrorGoals.length} existing error-assessment goal(s) - will be removed`);
+    }
+
     const errorGoal = createErrorAssessmentGoal(errorSummary, nextAttempt);
     const updatedGoals = injectErrorAssessmentGoal(goals, errorGoal);
+
+    logger.info(`[vigilant] After injection: ${updatedGoals.goals.length} goals (1 error-assessment + ${updatedGoals.goals.length - 1} original)`);
 
     await writeFile(currentGoalsPath, JSON.stringify(updatedGoals, null, 2), 'utf-8');
     logger.info(`Injected error-assessment goal with ${updatedGoals.goals.length - 1} dependent goals`);
