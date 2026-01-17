@@ -195,11 +195,16 @@ Do not include any text before or after the JSON.`;
 <execution_result success="${executionResult.success}">
   <output>${executionResult.output || 'No output'}</output>
   <tool_invocations>
-    ${(executionResult.toolInvocations || []).map(t => `
+    ${(executionResult.toolInvocations || []).map(t => {
+      const resultStr = JSON.stringify(t.result || {});
+      const maxLen = 4000; // Increased from 500 to allow full content evaluation
+      const truncated = resultStr.length > maxLen;
+      return `
     <invocation tool="${t.toolName}" success="${t.success}">
-      <result>${JSON.stringify(t.result || {}).slice(0, 500)}</result>
+      <result${truncated ? ' truncated="true"' : ''}>${resultStr.slice(0, maxLen)}${truncated ? '...' : ''}</result>
       ${t.error ? `<error>${t.error}</error>` : ''}
-    </invocation>`).join('\n')}
+    </invocation>`;
+    }).join('\n')}
   </tool_invocations>
 </execution_result>
 
