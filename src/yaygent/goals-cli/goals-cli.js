@@ -916,18 +916,26 @@ async function isPortInUse(port) {
  */
 async function waitForPortFree(port, timeoutMs = 10000, intervalMs = 500, logger = null) {
   const startTime = Date.now();
+  let checkCount = 0;
 
   while (Date.now() - startTime < timeoutMs) {
+    checkCount++;
     const inUse = await isPortInUse(port);
     if (!inUse) {
+      if (logger) {
+        logger.info(`[waitForPortFree] Port ${port} is free after ${checkCount} checks`);
+      }
       return true;
     }
     if (logger) {
-      logger.debug(`Port ${port} still in use, waiting...`);
+      logger.info(`[waitForPortFree] Check ${checkCount}: Port ${port} still in use, waiting ${intervalMs}ms...`);
     }
     await new Promise(r => setTimeout(r, intervalMs));
   }
 
+  if (logger) {
+    logger.info(`[waitForPortFree] Timeout after ${checkCount} checks`);
+  }
   return false;
 }
 
@@ -947,13 +955,31 @@ async function runPipeline(options) {
   const runAllPath = resolve(dirname(import.meta.url.replace('file://', '')), './run-all.js');
   const runtime = typeof Bun !== 'undefined' ? 'bun' : 'node';
 
+  logger.info(`[runPipeline] Starting...`);
+  logger.info(`[runPipeline] Runtime: ${runtime}`);
+  logger.info(`[runPipeline] run-all.js path: ${runAllPath}`);
+  logger.info(`[runPipeline] Goals: ${goalsPath}`);
+  logger.info(`[runPipeline] Context: ${contextPath}`);
+  logger.info(`[runPipeline] Output: ${outputPath}`);
+  logger.info(`[runPipeline] CWD: ${dirname(runAllPath)}`);
+
   const args = ['--goals', goalsPath];
   if (contextPath) args.push('--context', contextPath);
   if (outputPath) args.push('--output', outputPath);
   args.push('--verbose');
 
+  logger.info(`[runPipeline] Spawn args: ${runtime} ${runAllPath} ${args.join(' ')}`);
+
+  // Log key env vars (not the full API key)
+  logger.info(`[runPipeline] Env PRIMARY_LLM_PROVIDER: ${env.PRIMARY_LLM_PROVIDER || '(not set)'}`);
+  logger.info(`[runPipeline] Env PRIMARY_LLM_API_KEY: ${env.PRIMARY_LLM_API_KEY ? '(set, ' + env.PRIMARY_LLM_API_KEY.length + ' chars)' : '(not set)'}`);
+  logger.info(`[runPipeline] Env LLM_REQUEST_DELAY_MS: ${env.LLM_REQUEST_DELAY_MS || '(not set)'}`);
+
   return new Promise((resolve) => {
     let output = '';
+    let hasReceivedData = false;
+
+    logger.info(`[runPipeline] Spawning process...`);
 
     const proc = spawn(runtime, [runAllPath, ...args], {
       env: { ...process.env, ...env },
@@ -961,12 +987,18 @@ async function runPipeline(options) {
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
+    logger.info(`[runPipeline] Process spawned with PID: ${proc.pid}`);
+
     proc.stdout.on('data', (data) => {
       const text = data.toString();
       output += text;
+      if (!hasReceivedData) {
+        hasReceivedData = true;
+        logger.info(`[runPipeline] First stdout data received`);
+      }
       if (debug) {
         text.split('\n').filter(l => l.trim()).forEach(line => {
-          logger.debug(line);
+          logger.info(`[pipeline] ${line}`);
         });
       }
     });
@@ -976,17 +1008,27 @@ async function runPipeline(options) {
       output += text;
       if (debug) {
         text.split('\n').filter(l => l.trim()).forEach(line => {
-          logger.error(line);
+          logger.error(`[pipeline:err] ${line}`);
         });
       }
     });
 
+    proc.on('spawn', () => {
+      logger.info(`[runPipeline] Process spawn event fired`);
+    });
+
     proc.on('close', (code) => {
+      logger.info(`[runPipeline] Process closed with code: ${code}`);
       resolve({ success: code === 0, output, exitCode: code });
     });
 
     proc.on('error', (err) => {
+      logger.error(`[runPipeline] Process error: ${err.message}`);
       resolve({ success: false, output: output + '\n' + err.message, exitCode: 1 });
+    });
+
+    proc.on('exit', (code, signal) => {
+      logger.info(`[runPipeline] Process exit event - code: ${code}, signal: ${signal}`);
     });
   });
 }
@@ -1197,13 +1239,21 @@ async function cmdVigilant(args, logger) {
 
     // Ensure server port is free before starting
     const serverPort = 3000;
-    logger.debug(`Checking if port ${serverPort} is free...`);
-    const portFree = await waitForPortFree(serverPort, 15000, 500, logger);
-    if (!portFree) {
-      logger.warn(`Port ${serverPort} still in use after timeout, proceeding anyway...`);
-    } else {
-      logger.debug(`Port ${serverPort} is free`);
+    logger.info(`[vigilant] Checking if port ${serverPort} is free...`);
+    const portInUse = await isPortInUse(serverPort);
+    logger.info(`[vigilant] Port ${serverPort} in use: ${portInUse}`);
+
+    if (portInUse) {
+      logger.info(`[vigilant] Waiting for port ${serverPort} to be free (max 15s)...`);
+      const portFree = await waitForPortFree(serverPort, 15000, 500, logger);
+      if (!portFree) {
+        logger.warn(`[vigilant] Port ${serverPort} still in use after timeout, proceeding anyway...`);
+      } else {
+        logger.info(`[vigilant] Port ${serverPort} is now free`);
+      }
     }
+
+    logger.info(`[vigilant] About to call runPipeline...`);
 
     // Run the pipeline
     const result = await runPipeline({
