@@ -87,11 +87,9 @@ function showCursor() {
 }
 
 function printHeader() {
-  const border = "─".repeat(44);
-  console.log(c("cyan", `┌${border}┐`));
-  console.log(c("cyan", "│") + c("bold", "         Goals Generator TUI              ") + c("cyan", "│"));
-  console.log(c("cyan", "│") + c("dim", "  Generate goals.json using LLM providers ") + c("cyan", "│"));
-  console.log(c("cyan", `└${border}┘`));
+  console.log();
+  console.log(c("bold", "Goals Generator TUI"));
+  console.log(c("dim", "Generate goals.json using LLM providers"));
   console.log();
 }
 
@@ -105,6 +103,73 @@ function printBox(title, content, color = "green") {
     console.log(c(color, "│ ") + line.padEnd(maxLen) + c(color, " │"));
   }
   console.log(c(color, `└${border}┘`));
+}
+
+/**
+ * Print content as a form field with label (no border)
+ * @param {string} label - Field label
+ * @param {string} content - Content to display
+ * @param {string} [labelColor='cyan'] - Color for label
+ */
+function printFormField(label, content, labelColor = "cyan") {
+  console.log(c(labelColor, `${label}:`));
+  console.log();
+  const lines = content.split("\n");
+  for (const line of lines) {
+    console.log(`  ${line}`);
+  }
+  console.log();
+}
+
+/**
+ * Format goals as a readable summary
+ * @param {Object} goals - Goals object
+ * @returns {string} Formatted summary
+ */
+function formatGoalsSummary(goals) {
+  const lines = [];
+
+  // Metadata
+  if (goals.metadata) {
+    if (goals.metadata.name) {
+      lines.push(`${c("bold", "Name:")} ${goals.metadata.name}`);
+    }
+    if (goals.metadata.description) {
+      lines.push(`${c("bold", "Description:")} ${goals.metadata.description}`);
+    }
+    if (goals.metadata.tags && goals.metadata.tags.length > 0) {
+      lines.push(`${c("bold", "Tags:")} ${goals.metadata.tags.join(", ")}`);
+    }
+    lines.push("");
+  }
+
+  // Goals list
+  lines.push(`${c("bold", "Goals:")} (${goals.goals.length} total)`);
+  lines.push("");
+
+  for (let i = 0; i < goals.goals.length; i++) {
+    const goal = goals.goals[i];
+    const num = `${i + 1}.`;
+
+    lines.push(`  ${c("cyan", num)} ${c("bold", goal.id)}`);
+    lines.push(`     ${goal.objective}`);
+
+    if (goal.priority) {
+      lines.push(`     ${c("dim", `Priority: ${goal.priority}`)}`);
+    }
+
+    if (goal.dependencies && goal.dependencies.length > 0) {
+      lines.push(`     ${c("dim", `Depends on: ${goal.dependencies.join(", ")}`)}`);
+    }
+
+    if (goal.criteria && goal.criteria.success) {
+      lines.push(`     ${c("dim", `Success criteria: ${goal.criteria.success.length} items`)}`);
+    }
+
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 // Interactive prompt utilities
@@ -876,11 +941,14 @@ async function getGoalsDescription() {
   printHeader();
   console.log(c("bold", "Step 2: Describe Your Goals\n"));
 
-  printBox(
-    "Instructions",
-    "Enter a description of what you want to accomplish.\nBe as detailed as possible - include objectives,\npriorities, success criteria, and any constraints.\n\nType .done on a new line when finished.",
-    "cyan"
-  );
+  console.log(c("cyan", "Instructions"));
+  console.log(c("dim", "─".repeat(40)));
+  console.log();
+  console.log("  Enter a description of what you want to accomplish.");
+  console.log("  Be as detailed as possible - include objectives,");
+  console.log("  priorities, success criteria, and any constraints.");
+  console.log();
+  console.log(c("dim", "  Type .done on a new line when finished."));
   console.log();
 
   const description = await promptMultiline("Goals description:", "Type .done on a new line when finished");
@@ -923,7 +991,11 @@ async function generateAndValidateGoals(config, description) {
     console.log();
   }
 
-  printBox("Generated Goals", JSON.stringify(goals, null, 2), "green");
+  // Display goals summary as a form field (clean, no border)
+  console.log(c("green", "Generated Goals"));
+  console.log(c("dim", "─".repeat(40)));
+  console.log();
+  console.log(formatGoalsSummary(goals));
 
   return goals;
 }
