@@ -1097,8 +1097,8 @@ async function cmdVigilant(args, logger) {
     logger.info(`Created context directory: ${contextPath}`);
   }
 
-  // Build environment with LLM config
-  const env = {
+  // Base environment with LLM config
+  const baseEnv = {
     LLM_API_KEY: process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
     LLM_PROVIDER: process.env.LLM_PROVIDER || 'anthropic',
     LLM_MODEL: process.env.LLM_MODEL || '',
@@ -1106,7 +1106,6 @@ async function cmdVigilant(args, logger) {
     LLM_TIMEOUT: '300000',
     LLM_MAX_RETRIES: '5',
     LLM_BACKOFF_MS: '10000',
-    LLM_REQUEST_DELAY_MS: '3000',
     CONTINUE_ON_EVAL_FAILURE: 'true'
   };
 
@@ -1115,10 +1114,18 @@ async function cmdVigilant(args, logger) {
   let success = false;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Use throttled delay (5s) for retry attempts to avoid rate limits
+    const isRetry = attempt > 1;
+    const requestDelay = isRetry ? '5000' : '3000';
+    const env = { ...baseEnv, LLM_REQUEST_DELAY_MS: requestDelay };
+
     logger.info('');
     logger.info(`${'='.repeat(60)}`);
-    logger.info(`VIGILANT MODE - Attempt ${attempt}/${maxAttempts}`);
+    logger.info(`VIGILANT MODE - Attempt ${attempt}/${maxAttempts}${isRetry ? ' (throttled)' : ''}`);
     logger.info(`${'='.repeat(60)}`);
+    if (isRetry) {
+      logger.info('Using 5s delay between LLM requests for retry attempt');
+    }
     logger.info('');
 
     // Run the pipeline
