@@ -606,8 +606,10 @@ export function createToolRouter(options = {}) {
   pdfExport.registerTools(router);
 
   // Initialize and register email composition tool
+  // Pass notepad tool for cross-tool access (email_draft can be read via notepad_read)
   const composeEmail = new ComposeEmailTool(sandboxManager, {
-    defaultAddresses: options.emailPlaceholders
+    defaultAddresses: options.emailPlaceholders,
+    notepadTool: notepad
   });
   composeEmail.registerTools(router);
 

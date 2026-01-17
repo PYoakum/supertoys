@@ -193,6 +193,7 @@ export class ComposeEmailTool {
   /**
    * @param {import('./sandbox-manager.js').SandboxManager} sandboxManager
    * @param {Object} [config]
+   * @param {import('./tool-router.js').NotepadTool} [config.notepadTool] - Optional notepad tool for cross-tool access
    */
   constructor(sandboxManager, config = {}) {
     if (!sandboxManager) {
@@ -202,11 +203,47 @@ export class ComposeEmailTool {
     /** @type {import('./sandbox-manager.js').SandboxManager} */
     this.sandboxManager = sandboxManager;
 
+    /** @type {import('./tool-router.js').NotepadTool|null} */
+    this.notepadTool = config.notepadTool || null;
+
     /** @type {Object} */
     this.defaultAddresses = {
       ...PLACEHOLDER_ADDRESSES,
       ...config.defaultAddresses
     };
+  }
+
+  /**
+   * Sync email content to notepad for cross-tool access
+   * @param {string} sessionId
+   * @param {Object} notepad - Email notepad data
+   * @private
+   */
+  async _syncToNotepad(sessionId, notepad) {
+    if (!this.notepadTool) return;
+
+    try {
+      // Write full email content to notepad as email_draft
+      const emailContent = [
+        `Subject: ${notepad.subject || '(No Subject)'}`,
+        `From: ${notepad.fromName ? `${notepad.fromName} <${notepad.from}>` : notepad.from}`,
+        `To: ${notepad.toName ? `${notepad.toName} <${notepad.to}>` : notepad.to}`,
+        notepad.cc ? `Cc: ${notepad.cc}` : null,
+        notepad.bcc ? `Bcc: ${notepad.bcc}` : null,
+        '',
+        notepad.body || ''
+      ].filter(line => line !== null).join('\n');
+
+      await this.notepadTool.write({
+        sessionId,
+        filename: 'email_draft',
+        content: emailContent,
+        append: false
+      });
+    } catch (err) {
+      // Log but don't fail - notepad sync is optional
+      console.error(`[compose_email] Failed to sync to notepad: ${err.message}`);
+    }
   }
 
   /**
@@ -289,6 +326,9 @@ export class ComposeEmailTool {
 
     emailNotepads.set(sessionId, notepad);
 
+    // Sync to notepad for cross-tool access
+    await this._syncToNotepad(sessionId, notepad);
+
     return this.formatResponse({
       success: true,
       action: 'compose',
@@ -300,12 +340,14 @@ export class ComposeEmailTool {
         bodyLength: notepad.body.length,
         hasPlaceholders: usePlaceholders
       },
+      syncedToNotepad: !!this.notepadTool,
       instructions: [
         'Use action="append" with text="..." to add content to the body',
         'Use action="set" with field="subject" and value="..." to update fields',
         'Use action="preview" to see the full email',
         'Use action="export" to save as .eml file',
-        'Placeholder addresses can be replaced with token_replace tool'
+        'Placeholder addresses can be replaced with token_replace tool',
+        'Email content is also available via notepad_read with filename="email_draft"'
       ]
     });
   }
@@ -339,6 +381,9 @@ export class ComposeEmailTool {
     notepad.body += text + (newline ? '\n' : '');
     notepad.updatedAt = new Date().toISOString();
 
+    // Sync to notepad for cross-tool access
+    await this._syncToNotepad(sessionId, notepad);
+
     return this.formatResponse({
       success: true,
       action: 'append',
@@ -371,6 +416,9 @@ export class ComposeEmailTool {
 
     notepad[field] = value;
     notepad.updatedAt = new Date().toISOString();
+
+    // Sync to notepad for cross-tool access
+    await this._syncToNotepad(sessionId, notepad);
 
     return this.formatResponse({
       success: true,
