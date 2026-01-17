@@ -28,6 +28,7 @@ import { ComposeEmailTool } from './compose-email-tool.js';
 import { GolangExecTool } from './golang-exec-tool.js';
 import { ContextResearchBrowserTool } from './context-research-browser-tool.js';
 import { TablemakerTool } from './tablemaker-tool.js';
+import { PersonaComposeTool } from './persona-compose-tool.js';
 
 /**
  * Tool Router Class
@@ -119,24 +120,29 @@ export class NotepadTool {
 
   /**
    * Ensure base directory exists
+   * @param {string} [sessionId] - Optional session ID for session-specific directory
    * @private
    */
-  async ensureBaseDir() {
-    if (!existsSync(this.baseDir)) {
-      await mkdir(this.baseDir, { recursive: true });
+  async ensureBaseDir(sessionId) {
+    const dir = sessionId ? join(this.baseDir, sessionId) : this.baseDir;
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
     }
+    return dir;
   }
 
   /**
    * Get safe file path
    * @param {string} filename
+   * @param {string} [sessionId] - Optional session ID for session-specific storage
    * @returns {string}
    * @private
    */
-  getFilePath(filename) {
+  getFilePath(filename, sessionId) {
     // Sanitize filename to prevent directory traversal
     const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    return join(this.baseDir, safeName);
+    const dir = sessionId ? join(this.baseDir, sessionId) : this.baseDir;
+    return join(dir, safeName);
   }
 
   /**
@@ -144,23 +150,24 @@ export class NotepadTool {
    * @param {Object} args
    * @param {string} args.filename - Note filename
    * @param {string} [args.content] - Initial content
+   * @param {string} [args.sessionId] - Session ID for isolation
    * @returns {Promise<Object>}
    */
   async create(args) {
-    const { filename, content } = args;
+    const { filename, content, sessionId } = args;
     if (!filename) {
       throw new Error('filename is required');
     }
 
-    const filePath = this.getFilePath(filename);
-    await this.ensureBaseDir();
+    const filePath = this.getFilePath(filename, sessionId);
+    await this.ensureBaseDir(sessionId);
     await writeFile(filePath, content || '', 'utf-8');
 
     return {
       content: [
         {
           type: 'text',
-          text: `Successfully created note: ${filename}\nPath: ${filePath}`
+          text: `Successfully created note: ${filename}${sessionId ? ` (session: ${sessionId.slice(0, 8)}...)` : ''}`
         }
       ]
     };
@@ -172,10 +179,11 @@ export class NotepadTool {
    * @param {string} args.filename - Note filename
    * @param {string} args.content - Content to write
    * @param {boolean} [args.append=false] - Append to existing content
+   * @param {string} [args.sessionId] - Session ID for isolation
    * @returns {Promise<Object>}
    */
   async write(args) {
-    const { filename, content, append = false } = args;
+    const { filename, content, append = false, sessionId } = args;
     if (!filename) {
       throw new Error('filename is required');
     }
@@ -183,7 +191,8 @@ export class NotepadTool {
       throw new Error('content is required');
     }
 
-    const filePath = this.getFilePath(filename);
+    await this.ensureBaseDir(sessionId);
+    const filePath = this.getFilePath(filename, sessionId);
 
     if (append && existsSync(filePath)) {
       const existing = await readFile(filePath, 'utf-8');
@@ -206,17 +215,18 @@ export class NotepadTool {
    * Read a note
    * @param {Object} args
    * @param {string} args.filename - Note filename
+   * @param {string} [args.sessionId] - Session ID for isolation
    * @returns {Promise<Object>}
    */
   async read(args) {
-    const { filename } = args;
+    const { filename, sessionId } = args;
     if (!filename) {
       throw new Error('filename is required');
     }
 
-    const filePath = this.getFilePath(filename);
+    const filePath = this.getFilePath(filename, sessionId);
     if (!existsSync(filePath)) {
-      throw new Error(`Note not found: ${filename}`);
+      throw new Error(`Note not found: ${filename}${sessionId ? ` (session: ${sessionId.slice(0, 8)}...)` : ''}`);
     }
 
     const content = await readFile(filePath, 'utf-8');
@@ -233,12 +243,24 @@ export class NotepadTool {
 
   /**
    * List all notes
+   * @param {Object} [args]
+   * @param {string} [args.sessionId] - Session ID for isolation
    * @returns {Promise<Object>}
    */
-  async list() {
-    await this.ensureBaseDir();
-    const files = await readdir(this.baseDir);
-    const fileList = files.join('\n');
+  async list(args = {}) {
+    const { sessionId } = args;
+    const dir = await this.ensureBaseDir(sessionId);
+    const files = await readdir(dir);
+    // Filter out directories (session subdirs) if listing root
+    const noteFiles = [];
+    for (const file of files) {
+      const filePath = join(dir, file);
+      const stats = await import('fs').then(fs => fs.statSync(filePath));
+      if (stats.isFile()) {
+        noteFiles.push(file);
+      }
+    }
+    const fileList = noteFiles.join('\n');
 
     return {
       content: [
@@ -254,15 +276,16 @@ export class NotepadTool {
    * Delete a note
    * @param {Object} args
    * @param {string} args.filename - Note filename
+   * @param {string} [args.sessionId] - Session ID for isolation
    * @returns {Promise<Object>}
    */
   async delete(args) {
-    const { filename } = args;
+    const { filename, sessionId } = args;
     if (!filename) {
       throw new Error('filename is required');
     }
 
-    const filePath = this.getFilePath(filename);
+    const filePath = this.getFilePath(filename, sessionId);
     if (!existsSync(filePath)) {
       throw new Error(`Note not found: ${filename}`);
     }
@@ -292,10 +315,14 @@ export class NotepadTool {
       this.create.bind(this),
       {
         name: 'notepad_create',
-        description: 'Create a new note file',
+        description: 'Create a new note file. Notes are session-scoped when sessionId is provided.',
         inputSchema: {
           type: 'object',
           properties: {
+            sessionId: {
+              type: 'string',
+              description: 'Session ID for note isolation (notes are stored per-session)'
+            },
             filename: {
               type: 'string',
               description: 'Name of the note file'
@@ -316,10 +343,14 @@ export class NotepadTool {
       this.write.bind(this),
       {
         name: 'notepad_write',
-        description: 'Write or append content to a note',
+        description: 'Write or append content to a note. Notes are session-scoped when sessionId is provided.',
         inputSchema: {
           type: 'object',
           properties: {
+            sessionId: {
+              type: 'string',
+              description: 'Session ID for note isolation (notes are stored per-session)'
+            },
             filename: {
               type: 'string',
               description: 'Name of the note file'
@@ -344,10 +375,14 @@ export class NotepadTool {
       this.read.bind(this),
       {
         name: 'notepad_read',
-        description: 'Read the content of a note',
+        description: 'Read the content of a note. Notes are session-scoped when sessionId is provided.',
         inputSchema: {
           type: 'object',
           properties: {
+            sessionId: {
+              type: 'string',
+              description: 'Session ID for note isolation (notes are stored per-session)'
+            },
             filename: {
               type: 'string',
               description: 'Name of the note file to read'
@@ -364,10 +399,15 @@ export class NotepadTool {
       this.list.bind(this),
       {
         name: 'notepad_list',
-        description: 'List all available notes',
+        description: 'List all available notes in the session.',
         inputSchema: {
           type: 'object',
-          properties: {}
+          properties: {
+            sessionId: {
+              type: 'string',
+              description: 'Session ID for note isolation (lists notes in the session)'
+            }
+          }
         }
       }
     );
@@ -378,10 +418,14 @@ export class NotepadTool {
       this.delete.bind(this),
       {
         name: 'notepad_delete',
-        description: 'Delete a note file',
+        description: 'Delete a note file.',
         inputSchema: {
           type: 'object',
           properties: {
+            sessionId: {
+              type: 'string',
+              description: 'Session ID for note isolation'
+            },
             filename: {
               type: 'string',
               description: 'Name of the note file to delete'
@@ -589,10 +633,22 @@ export function createToolRouter(options = {}) {
   const tablemaker = new TablemakerTool(sandboxManager);
   tablemaker.registerTools(router);
 
+  // Initialize and register persona compose tool
+  const personaCompose = new PersonaComposeTool(
+    sandboxManager,
+    options.llmClient || null,
+    {
+      defaultPersonasFile: options.personasFile || 'PERSONAS.yml',
+      maxPersonasFileSize: options.maxPersonasFileSize || 1048576,
+      maxOutputSize: options.maxOutputSize || 102400
+    }
+  );
+  personaCompose.registerTools(router);
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, SandboxManager, createToolRouter };
