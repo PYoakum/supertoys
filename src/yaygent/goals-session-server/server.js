@@ -59,10 +59,11 @@ function initializeServices() {
     logger.info('Set LLM_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY to enable LLM features');
   }
 
-  // Initialize tool router (pass llmClient for make_goals tool)
+  // Initialize tool router (pass llmClient for make_goals tool, sessionManager for read_file)
   const toolRouter = createToolRouter({
     notepadDir: config.toolRouter.notepadDir,
-    llmClient: llmClient
+    llmClient: llmClient,
+    sessionManager: sessionManager
   });
   logger.info(`Tool router initialized with ${toolRouter.getAllTools().length} tools`);
 

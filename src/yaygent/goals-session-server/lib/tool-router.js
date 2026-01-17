@@ -29,6 +29,7 @@ import { GolangExecTool } from './golang-exec-tool.js';
 import { ContextResearchBrowserTool } from './context-research-browser-tool.js';
 import { TablemakerTool } from './tablemaker-tool.js';
 import { PersonaComposeTool } from './persona-compose-tool.js';
+import { ReadFileTool } from './read-file-tool.js';
 
 /**
  * Tool Router Class
@@ -651,10 +652,21 @@ export function createToolRouter(options = {}) {
   );
   personaCompose.registerTools(router);
 
+  // Initialize and register read file tool (requires sessionManager)
+  if (options.sessionManager) {
+    const readFile = new ReadFileTool(options.sessionManager, {
+      maxFileSize: options.readFileMaxSize || 1024 * 1024,
+      maxFiles: options.readFileMaxFiles || 50,
+      allowedPaths: options.readFileAllowedPaths || [],
+      allowAbsolutePaths: options.readFileAllowAbsolutePaths !== false
+    });
+    readFile.registerTools(router);
+  }
+
   // Store sandbox manager reference for other tools to use
   router.sandboxManager = sandboxManager;
 
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, SandboxManager, createToolRouter };
