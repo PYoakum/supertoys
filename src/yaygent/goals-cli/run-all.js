@@ -26,7 +26,7 @@ import { parseArgs } from 'util';
 import { spawn } from 'child_process';
 import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, stat, mkdir, unlink, copyFile } from 'fs/promises';
 import { existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -298,6 +298,92 @@ async function loadContext(contextPath, logger) {
 }
 
 /**
+ * Load memory files from directory (previous attempt logs)
+ * Only loads files with "previous_attempt_" prefix
+ */
+async function loadMemory(memoryDir, logger) {
+  logger.debug(`[memory] Loading from: ${memoryDir}`);
+
+  if (!existsSync(memoryDir)) {
+    logger.debug(`[memory] Directory not found, creating: ${memoryDir}`);
+    await mkdir(memoryDir, { recursive: true });
+    return [];
+  }
+
+  const files = [];
+  const entries = await readdir(memoryDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    // Only load files with previous_attempt_ prefix
+    if (entry.isFile() && entry.name.startsWith('previous_attempt_')) {
+      const filePath = resolve(memoryDir, entry.name);
+      try {
+        const content = await readFile(filePath, 'utf-8');
+        files.push({
+          path: `memory/${entry.name}`,
+          content,
+          type: 'memory',
+          size: Buffer.byteLength(content, 'utf-8')
+        });
+        logger.debug(`[memory] Loaded: ${entry.name} (${files[files.length - 1].size} bytes)`);
+      } catch (err) {
+        logger.warn(`[memory] Failed to read ${entry.name}: ${err.message}`);
+      }
+    }
+  }
+
+  logger.info(`[memory] Loaded ${files.length} previous attempt files`);
+  return files;
+}
+
+/**
+ * Copy session logs to memory directory with previous_attempt_ prefix
+ */
+async function copyLogsToMemory(sessionId, outputDir, memoryDir, logger) {
+  const sessionOutputDir = resolve(outputDir, sessionId);
+
+  if (!existsSync(sessionOutputDir)) {
+    logger.debug(`[memory] No session output to copy: ${sessionOutputDir}`);
+    return;
+  }
+
+  // Ensure memory directory exists
+  await mkdir(memoryDir, { recursive: true });
+
+  // Clear existing previous_attempt_ files first
+  const existingEntries = await readdir(memoryDir, { withFileTypes: true });
+  for (const entry of existingEntries) {
+    if (entry.isFile() && entry.name.startsWith('previous_attempt_')) {
+      const oldPath = resolve(memoryDir, entry.name);
+      await unlink(oldPath);
+      logger.debug(`[memory] Removed old: ${entry.name}`);
+    }
+  }
+
+  // Copy new session logs with prefix
+  const sessionEntries = await readdir(sessionOutputDir, { withFileTypes: true });
+  let copiedCount = 0;
+
+  for (const entry of sessionEntries) {
+    if (entry.isFile() && (entry.name.endsWith('.txt') || entry.name.endsWith('.log') || entry.name.endsWith('.json'))) {
+      const srcPath = resolve(sessionOutputDir, entry.name);
+      const destName = `previous_attempt_${entry.name}`;
+      const destPath = resolve(memoryDir, destName);
+
+      try {
+        await copyFile(srcPath, destPath);
+        copiedCount++;
+        logger.debug(`[memory] Copied: ${entry.name} → ${destName}`);
+      } catch (err) {
+        logger.warn(`[memory] Failed to copy ${entry.name}: ${err.message}`);
+      }
+    }
+  }
+
+  logger.info(`[memory] Saved ${copiedCount} logs to memory for next attempt`);
+}
+
+/**
  * Start the session server
  */
 async function startServer(port, logger, env) {
@@ -488,6 +574,8 @@ ${colors.bold}OPTIONS:${colors.reset}
   --server-url, -s <url>  Session server URL (default: start local server)
   --port, -p <port>       Server port if starting locally (default: 3000)
   --max-retries <n>       Max retries on rate limit (default: 3)
+  --memory, -m            Enable memory mode - use previous attempt logs as context
+  --memory-dir <dir>      Memory directory (default: ./memory)
   --dry-run, -d           Dry run mode - no actual execution
   --no-eval               Skip output evaluation
   --no-server             Don't start server (requires --server-url)
@@ -552,6 +640,8 @@ function parseCliArgs() {
     'server-url': { type: 'string', short: 's' },
     port: { type: 'string', short: 'p', default: '3000' },
     'max-retries': { type: 'string', default: '3' },
+    memory: { type: 'boolean', short: 'm', default: false },
+    'memory-dir': { type: 'string', default: './memory' },
     'dry-run': { type: 'boolean', short: 'd', default: false },
     'no-eval': { type: 'boolean', default: false },
     'no-server': { type: 'boolean', default: false },
@@ -736,6 +826,21 @@ async function main() {
       const contextPath = resolve(process.cwd(), args.context);
       context = await loadContext(contextPath, logger);
       logger.info(`Context: ${context.files.length} files`);
+    }
+
+    // Memory mode: load previous attempt logs and merge with context
+    const memoryDir = resolve(process.cwd(), args['memory-dir'] || './memory');
+    if (args.memory) {
+      logger.info('[memory] Memory mode enabled');
+      const memoryFiles = await loadMemory(memoryDir, logger);
+      if (memoryFiles.length > 0) {
+        context.files = [...context.files, ...memoryFiles];
+        context.metadata.memoryEnabled = true;
+        context.metadata.memoryFiles = memoryFiles.length;
+        logger.debug(`[memory] Merged ${memoryFiles.length} memory files with context`);
+      } else {
+        logger.info('[memory] No previous attempt files found (first run)');
+      }
     }
 
     const createResponse = await withRetry(
@@ -926,6 +1031,16 @@ async function main() {
     result.exitCode = exitCode;
 
   } finally {
+    // Copy logs to memory if memory mode is enabled
+    if (args.memory && sessionId) {
+      try {
+        const outputDir = resolve(process.cwd(), args.output);
+        await copyLogsToMemory(sessionId, outputDir, memoryDir, logger);
+      } catch (err) {
+        logger.warn(`[memory] Failed to save logs: ${err.message}`);
+      }
+    }
+
     // Cleanup
     if (serverProcess) {
       logger.debug('Stopping server...');

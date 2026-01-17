@@ -6,7 +6,8 @@
 import { spawn } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { writeFile, readFile } from 'fs/promises';
+import { writeFile, readFile, readdir, mkdir, copyFile, unlink } from 'fs/promises';
+import { existsSync } from 'fs';
 import { Menu } from '../components/menu.js';
 import { LogViewer } from '../components/log-viewer.js';
 import { ProgressBar } from '../components/progress-bar.js';
@@ -140,6 +141,10 @@ export class ExecuteTabScreen {
     // Run All state
     this.runAllActive = false;
     this.runAllPhase = null;  // 'server' | 'session' | 'prepare' | 'execute' | 'eval'
+
+    // Memory mode - uses previous attempt logs as additional context
+    this.memoryEnabled = false;
+    this.memoryDir = './memory';
 
     this.sessionsMenu = new Menu({ title: 'Sessions', items: [] });
     this.logViewer = new LogViewer({ maxLines: 500 });  // Increased for verbose dependency output
@@ -612,6 +617,20 @@ export class ExecuteTabScreen {
         metadata: { source: 'tui-runall', createdAt: new Date().toISOString() }
       };
 
+      // Memory mode: load and merge previous attempt files
+      if (this.memoryEnabled) {
+        this.logViewer.addLine('info', '  → Memory mode enabled');
+        const memoryFiles = await this._loadMemoryFiles();
+        if (memoryFiles.length > 0) {
+          context.files = [...context.files, ...memoryFiles];
+          context.metadata.memoryEnabled = true;
+          context.metadata.memoryFiles = memoryFiles.length;
+          this.logViewer.addLine('info', `  → Merged ${memoryFiles.length} previous attempt files`);
+        } else {
+          this.logViewer.addLine('info', '  → No previous attempt files (first run)');
+        }
+      }
+
       const createResponse = await this._withRetry(
         () => this.sessionClient.createSession(this.state.goals, context),
         'create session'
@@ -730,6 +749,15 @@ export class ExecuteTabScreen {
       this.logViewer.addLine('error', `Run All failed in phase "${this.runAllPhase}": ${err.message}`);
       this._setStatus(`Run All failed: ${err.message}`, 'error', 10000);
     } finally {
+      // Copy logs to memory if enabled
+      if (this.memoryEnabled && this.state.sessionId) {
+        try {
+          await this._copyLogsToMemory(this.state.sessionId);
+        } catch (err) {
+          this.logViewer.addLine('warn', `[memory] Failed to save logs: ${err.message}`);
+        }
+      }
+
       this.runAllActive = false;
       this.runAllPhase = null;
       this.mode = 'dashboard';
@@ -784,6 +812,89 @@ export class ExecuteTabScreen {
         this.logViewer.addLine('info', `  → Retrying ${operationName}...`);
       }
     }
+  }
+
+  /**
+   * Load memory files from previous attempts
+   * @private
+   * @returns {Promise<Array>} Memory files array
+   */
+  async _loadMemoryFiles() {
+    const memoryDir = resolve(process.cwd(), this.memoryDir);
+
+    if (!existsSync(memoryDir)) {
+      this.logViewer.addLine('debug', `[memory] Creating directory: ${memoryDir}`);
+      await mkdir(memoryDir, { recursive: true });
+      return [];
+    }
+
+    const files = [];
+    const entries = await readdir(memoryDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.startsWith('previous_attempt_')) {
+        const filePath = resolve(memoryDir, entry.name);
+        try {
+          const content = await readFile(filePath, 'utf-8');
+          files.push({
+            path: `memory/${entry.name}`,
+            content,
+            type: 'memory',
+            size: Buffer.byteLength(content, 'utf-8')
+          });
+          this.logViewer.addLine('debug', `[memory] Loaded: ${entry.name}`);
+        } catch (err) {
+          this.logViewer.addLine('warn', `[memory] Failed to read ${entry.name}: ${err.message}`);
+        }
+      }
+    }
+
+    return files;
+  }
+
+  /**
+   * Copy session logs to memory directory for next attempt
+   * @private
+   * @param {string} sessionId - Session ID
+   */
+  async _copyLogsToMemory(sessionId) {
+    const outputDir = this.envVars.OUTPUT_DIR || './output';
+    const sessionOutputDir = resolve(process.cwd(), outputDir, sessionId);
+    const memoryDir = resolve(process.cwd(), this.memoryDir);
+
+    if (!existsSync(sessionOutputDir)) {
+      this.logViewer.addLine('debug', '[memory] No session output to copy');
+      return;
+    }
+
+    await mkdir(memoryDir, { recursive: true });
+
+    // Clear old previous_attempt_ files
+    const existingEntries = await readdir(memoryDir, { withFileTypes: true });
+    for (const entry of existingEntries) {
+      if (entry.isFile() && entry.name.startsWith('previous_attempt_')) {
+        await unlink(resolve(memoryDir, entry.name));
+      }
+    }
+
+    // Copy new logs with prefix
+    const sessionEntries = await readdir(sessionOutputDir, { withFileTypes: true });
+    let copiedCount = 0;
+
+    for (const entry of sessionEntries) {
+      if (entry.isFile() && (entry.name.endsWith('.txt') || entry.name.endsWith('.log') || entry.name.endsWith('.json'))) {
+        const srcPath = resolve(sessionOutputDir, entry.name);
+        const destPath = resolve(memoryDir, `previous_attempt_${entry.name}`);
+        try {
+          await copyFile(srcPath, destPath);
+          copiedCount++;
+        } catch (err) {
+          this.logViewer.addLine('warn', `[memory] Failed to copy ${entry.name}: ${err.message}`);
+        }
+      }
+    }
+
+    this.logViewer.addLine('info', `[memory] Saved ${copiedCount} logs for next attempt`);
   }
 
   /**
@@ -2735,6 +2846,14 @@ export class ExecuteTabScreen {
           // Cycle through providers
           this._cycleProvider();
           break;
+        case 'm':
+          // Toggle memory mode
+          this.memoryEnabled = !this.memoryEnabled;
+          this.logViewer.addLine('info', `Memory mode: ${this.memoryEnabled ? 'ENABLED' : 'DISABLED'}`);
+          if (this.memoryEnabled) {
+            this.logViewer.addLine('info', `  Directory: ${this.memoryDir}`);
+          }
+          break;
       }
     }
   }
@@ -3537,6 +3656,16 @@ export class ExecuteTabScreen {
     const providerLabel = providerName.charAt(0).toUpperCase() + providerName.slice(1);
     screen.drawText(x + 2, line, '[P] Provider:', styles.normal);
     screen.drawText(x + 17, line, providerLabel, styles.highlight);
+    line++;
+
+    // Memory mode toggle
+    const memoryStatus = this.memoryEnabled ? 'ON' : 'OFF';
+    const memoryStyle = this.memoryEnabled ? styles.success : styles.dim;
+    screen.drawText(x + 2, line, '[M] Memory Mode:', styles.normal);
+    screen.drawText(x + 20, line, memoryStatus, memoryStyle);
+    if (this.memoryEnabled) {
+      screen.drawText(x + 25, line, `(${this.memoryDir})`, styles.dim);
+    }
     line += 2;
 
     // Environment variables
@@ -3562,7 +3691,7 @@ export class ExecuteTabScreen {
     }
 
     line++;
-    screen.drawText(x + 2, line, '[P] Switch Provider  [Enter] Edit  [Esc] Back', styles.dim);
+    screen.drawText(x + 2, line, '[P] Provider  [M] Memory  [Enter] Edit  [Esc] Back', styles.dim);
   }
 }
 
