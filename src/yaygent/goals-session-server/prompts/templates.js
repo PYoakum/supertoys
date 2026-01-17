@@ -112,7 +112,32 @@ CRITICAL REQUIREMENTS:
     ? previousTasks.map(t => `  - ${t.id}: ${t.title} (${t.tool.toolName})`).join('\n')
     : '';
 
-  const toolList = toolManifest.tools.map(t => `  - ${t.name}: ${t.description || 'No description'}`).join('\n');
+  // Build detailed tool list with key parameters
+  const toolList = toolManifest.tools.map(t => {
+    let entry = `  - ${t.name}: ${t.description?.split('\n')[0] || 'No description'}`;
+    // Add key parameters from inputSchema if available
+    if (t.inputSchema?.properties) {
+      const params = Object.entries(t.inputSchema.properties)
+        .filter(([name]) => name !== 'sessionId') // sessionId is always added automatically
+        .slice(0, 5) // Limit to 5 key params to save tokens
+        .map(([name, schema]) => `${name}${t.inputSchema.required?.includes(name) ? '*' : ''}`)
+        .join(', ');
+      if (params) {
+        entry += `\n    Params: ${params}`;
+      }
+    }
+    return entry;
+  }).join('\n');
+
+  // Cross-tool conventions that the LLM must follow
+  const crossToolConventions = `
+CROSS-TOOL CONVENTIONS (CRITICAL - follow exactly):
+1. compose_email automatically saves content to notepad with filename "email_draft"
+   - To read composed email content, use: notepad_read with filename="email_draft"
+   - The parameter name is "filename", NOT "noteId"
+2. notepad_read/notepad_write use parameter "filename" (required)
+3. code_editor uses "path" for file paths, "operation" for action type
+4. sessionId is added automatically to all tool calls - don't invent custom session names`;
 
   const userPrompt = `<goal index="${goalIndex + 1}" total="${totalGoals}">
 ${goalJson}
@@ -125,6 +150,10 @@ ${formattedContext}
 <available_tools>
 ${toolList}
 </available_tools>
+
+<cross_tool_conventions>
+${crossToolConventions}
+</cross_tool_conventions>
 
 ${previousTasksSummary ? `<previous_tasks>
 These tasks were already generated for previous goals. You may reference their IDs for dependencies:
