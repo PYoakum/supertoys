@@ -1098,11 +1098,26 @@ async function cmdVigilant(args, logger) {
   }
 
   // Base environment with LLM config
+  const apiKey = process.env.PRIMARY_LLM_API_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY;
+  const provider = process.env.PRIMARY_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic';
+  const model = process.env.PRIMARY_LLM_MODEL || process.env.LLM_MODEL || '';
+  const endpoint = process.env.PRIMARY_LLM_ENDPOINT || process.env.LLM_ENDPOINT || '';
+
   const baseEnv = {
-    LLM_API_KEY: process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
-    LLM_PROVIDER: process.env.LLM_PROVIDER || 'anthropic',
-    LLM_MODEL: process.env.LLM_MODEL || '',
-    LLM_ENDPOINT: process.env.LLM_ENDPOINT || '',
+    // Primary LLM config (preferred by run-all.js)
+    PRIMARY_LLM_API_KEY: apiKey,
+    PRIMARY_LLM_PROVIDER: provider,
+    PRIMARY_LLM_MODEL: model,
+    PRIMARY_LLM_ENDPOINT: endpoint,
+    // Legacy fallbacks
+    LLM_API_KEY: apiKey,
+    LLM_PROVIDER: provider,
+    LLM_MODEL: model,
+    LLM_ENDPOINT: endpoint,
+    // Pass through original env vars if set
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+    // Timeouts and retry config
     LLM_TIMEOUT: '300000',
     LLM_MAX_RETRIES: '5',
     LLM_BACKOFF_MS: '10000',
