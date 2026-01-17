@@ -9,6 +9,7 @@ import { writeFile, readFile, mkdir, readdir, copyFile } from 'fs/promises';
 import { resolve, dirname, basename, extname, join } from 'path';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
+import net from 'net';
 
 import { parseArguments, validateRequiredArgs, getVersion, getHelpText, formatErrors } from './lib/argument-parser.js';
 import { GoalManager } from './lib/goal-manager.js';
@@ -880,6 +881,57 @@ async function runTuiEditPreview(args, logger, edits, project, goalsList) {
 }
 
 /**
+ * Check if a port is in use
+ * @param {number} port - Port to check
+ * @returns {Promise<boolean>} True if port is in use
+ */
+async function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+
+    server.once('listening', () => {
+      server.close();
+      resolve(false);
+    });
+
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+/**
+ * Wait for a port to be free
+ * @param {number} port - Port to wait for
+ * @param {number} timeoutMs - Maximum time to wait
+ * @param {number} intervalMs - Poll interval
+ * @param {Object} logger - Logger instance
+ * @returns {Promise<boolean>} True if port is free, false if timeout
+ */
+async function waitForPortFree(port, timeoutMs = 10000, intervalMs = 500, logger = null) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    const inUse = await isPortInUse(port);
+    if (!inUse) {
+      return true;
+    }
+    if (logger) {
+      logger.debug(`Port ${port} still in use, waiting...`);
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+
+  return false;
+}
+
+/**
  * Run the run-all.js pipeline and capture result
  * @param {Object} options - Pipeline options
  * @param {string} options.goalsPath - Path to goals file
@@ -1142,6 +1194,16 @@ async function cmdVigilant(args, logger) {
       logger.info('Using 5s delay between LLM requests for retry attempt');
     }
     logger.info('');
+
+    // Ensure server port is free before starting
+    const serverPort = 3000;
+    logger.debug(`Checking if port ${serverPort} is free...`);
+    const portFree = await waitForPortFree(serverPort, 15000, 500, logger);
+    if (!portFree) {
+      logger.warn(`Port ${serverPort} still in use after timeout, proceeding anyway...`);
+    } else {
+      logger.debug(`Port ${serverPort} is free`);
+    }
 
     // Run the pipeline
     const result = await runPipeline({
