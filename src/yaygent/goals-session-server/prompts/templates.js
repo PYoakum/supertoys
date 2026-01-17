@@ -135,9 +135,16 @@ CROSS-TOOL CONVENTIONS (CRITICAL - follow exactly):
 1. compose_email automatically saves content to notepad with filename "email_draft"
    - To read composed email content, use: notepad_read with filename="email_draft"
    - The parameter name is "filename", NOT "noteId"
-2. notepad_read/notepad_write use parameter "filename" (required)
-3. code_editor uses "path" for file paths, "operation" for action type
-4. sessionId is added automatically to all tool calls - don't invent custom session names`;
+2. compose_email action="export" creates .eml files in the sandbox
+   - ALWAYS specify the "filename" parameter with a predictable name (e.g., "job_offer.eml")
+   - Later tasks reading this file with code_editor MUST use the EXACT same filename
+   - If you create multiple emails, use distinct names: "email1.eml", "email2.eml", etc.
+3. notepad_read/notepad_write use parameter "filename" (required)
+4. code_editor uses "path" for file paths, "operation" for action type
+5. FILE NAMING: When one task creates a file and another reads it, use IDENTICAL filenames
+   - Create with: filename="report.eml" -> Read with: path="report.eml"
+   - Never rely on auto-generated filenames - always specify explicitly
+6. sessionId is added automatically to all tool calls - don't invent custom session names`;
 
   const userPrompt = `<goal index="${goalIndex + 1}" total="${totalGoals}">
 ${goalJson}
