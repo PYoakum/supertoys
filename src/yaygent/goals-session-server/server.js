@@ -50,7 +50,8 @@ function initializeServices() {
       anthropicVersion: config.llm.anthropicVersion,
       parameters: config.llm.parameters.evaluation,
       retry: config.llm.retry,
-      timeout: config.llm.timeout
+      timeout: config.llm.timeout,
+      requestDelayMs: config.llm.requestDelayMs
     });
     logger.info(`LLM client initialized (provider: ${config.llm.provider}, model: ${config.llm.model})`);
   } else {

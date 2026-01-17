@@ -114,31 +114,54 @@ class Logger {
  * HTTP client for session server
  */
 class SessionClient {
-  constructor(baseUrl) {
+  constructor(baseUrl, options = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.timeout = options.timeout || 300000; // 5 minute default for LLM operations
   }
 
-  async request(method, path, body = null) {
+  async request(method, path, body = null, requestTimeout = null) {
     const url = `${this.baseUrl}${path}`;
+    const timeout = requestTimeout || this.timeout;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
     const options = {
       method,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal
     };
 
     if (body) {
       options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(url, options);
-    const data = await response.json();
+    try {
+      const response = await fetch(url, options);
+      clearTimeout(timeoutId);
+      const data = await response.json();
 
-    if (!response.ok) {
-      const error = new Error(data.error || `HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        if (data.error) {
+          errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+        } else if (data.message) {
+          errorMessage = typeof data.message === 'string' ? data.message : JSON.stringify(data.message);
+        }
+        const error = new Error(errorMessage);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+
+      return data;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeout}ms: ${method} ${path}`);
+      }
+      throw err;
     }
-
-    return data;
   }
 
   async healthCheck() {
@@ -146,23 +169,23 @@ class SessionClient {
   }
 
   async createSession(goals, context) {
-    return this.request('POST', '/sessions', { goals, context });
+    return this.request('POST', '/api/sessions', { goals, context });
   }
 
-  async evaluate(sessionId) {
-    return this.request('POST', `/sessions/${sessionId}/evaluate`);
+  async evaluate(sessionId, options = {}) {
+    return this.request('POST', '/api/evaluate', { sessionId, options });
   }
 
-  async generateTaskList(sessionId) {
-    return this.request('POST', `/sessions/${sessionId}/tasks/generate`);
+  async generateTaskList(sessionId, options = {}) {
+    return this.request('POST', '/api/tasklist/generate', { sessionId, options });
   }
 
   async getSandboxInfo(sessionId) {
-    return this.request('GET', `/sessions/${sessionId}/sandbox/info`);
+    return this.request('GET', `/api/sandbox/${sessionId}`);
   }
 
   async cleanupSandbox(sessionId) {
-    return this.request('DELETE', `/sessions/${sessionId}/sandbox`);
+    return this.request('DELETE', `/api/sandbox/${sessionId}`);
   }
 }
 
@@ -615,8 +638,15 @@ async function main() {
 
     // Build environment with all LLM tier configurations
     const env = {
+      SESSION_SERVER_URL: serverUrl,
       MAX_RETRIES: String(maxRetries),
+      LLM_TIMEOUT: process.env.LLM_TIMEOUT || '300000', // 5 minute timeout for LLM operations
+      LLM_MAX_RETRIES: process.env.LLM_MAX_RETRIES || '5',
+      LLM_BACKOFF_MS: process.env.LLM_BACKOFF_MS || '10000',
+      LLM_REQUEST_DELAY_MS: process.env.LLM_REQUEST_DELAY_MS || '3000', // 3s between requests for rate limiting
       ANTHROPIC_VERSION: process.env.ANTHROPIC_VERSION || '2023-06-01',
+      // Continue executing even if task evaluation fails (lenient mode)
+      CONTINUE_ON_EVAL_FAILURE: process.env.CONTINUE_ON_EVAL_FAILURE || 'false',
       // Primary LLM (with legacy fallbacks)
       PRIMARY_LLM_PROVIDER: process.env.PRIMARY_LLM_PROVIDER || process.env.LLM_PROVIDER || 'anthropic',
       PRIMARY_LLM_API_KEY: primaryApiKey,

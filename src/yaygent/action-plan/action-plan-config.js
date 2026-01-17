@@ -140,7 +140,8 @@ export default {
     pollIntervalMs: 1000,
     taskTimeoutMs: parseInt(process.env.TASK_TIMEOUT, 10) || 300000, // 5 minutes
     maxConsecutiveFailures: 1,
-    continueOnEvaluationFailure: false
+    // Continue executing tasks even if evaluation fails (task still executed, just marked as failed)
+    continueOnEvaluationFailure: process.env.CONTINUE_ON_EVAL_FAILURE === 'true'
   },
 
   // Logging

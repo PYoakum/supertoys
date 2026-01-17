@@ -31,10 +31,11 @@ export default {
     model: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
     anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
     timeout: parseInt(process.env.LLM_TIMEOUT, 10) || 120000,
+    requestDelayMs: parseInt(process.env.LLM_REQUEST_DELAY_MS, 10) || 0, // Delay between requests to avoid rate limits
     retry: {
-      maxAttempts: 3,
-      backoffMs: 1000,
-      backoffMultiplier: 2
+      maxAttempts: parseInt(process.env.LLM_MAX_RETRIES, 10) || 5,
+      backoffMs: parseInt(process.env.LLM_BACKOFF_MS, 10) || 5000,
+      backoffMultiplier: parseFloat(process.env.LLM_BACKOFF_MULTIPLIER) || 2
     },
     parameters: {
       evaluation: {

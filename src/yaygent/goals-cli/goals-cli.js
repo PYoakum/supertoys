@@ -5,9 +5,10 @@
  * @module goals-cli
  */
 
-import { writeFile, readFile } from 'fs/promises';
-import { resolve, dirname, basename, extname } from 'path';
+import { writeFile, readFile, mkdir, readdir, copyFile } from 'fs/promises';
+import { resolve, dirname, basename, extname, join } from 'path';
 import { existsSync } from 'fs';
+import { spawn } from 'child_process';
 
 import { parseArguments, validateRequiredArgs, getVersion, getHelpText, formatErrors } from './lib/argument-parser.js';
 import { GoalManager } from './lib/goal-manager.js';
@@ -879,6 +880,369 @@ async function runTuiEditPreview(args, logger, edits, project, goalsList) {
 }
 
 /**
+ * Run the run-all.js pipeline and capture result
+ * @param {Object} options - Pipeline options
+ * @param {string} options.goalsPath - Path to goals file
+ * @param {string} options.contextPath - Path to context directory
+ * @param {string} options.outputPath - Path to output directory
+ * @param {boolean} options.debug - Enable debug output
+ * @param {Object} options.env - Environment variables to pass
+ * @param {Logger} options.logger - Logger instance
+ * @returns {Promise<{success: boolean, output: string, exitCode: number}>}
+ */
+async function runPipeline(options) {
+  const { goalsPath, contextPath, outputPath, debug, env, logger } = options;
+  const runAllPath = resolve(dirname(import.meta.url.replace('file://', '')), './run-all.js');
+  const runtime = typeof Bun !== 'undefined' ? 'bun' : 'node';
+
+  const args = ['--goals', goalsPath];
+  if (contextPath) args.push('--context', contextPath);
+  if (outputPath) args.push('--output', outputPath);
+  args.push('--verbose');
+
+  return new Promise((resolve) => {
+    let output = '';
+
+    const proc = spawn(runtime, [runAllPath, ...args], {
+      env: { ...process.env, ...env },
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    proc.stdout.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      if (debug) {
+        text.split('\n').filter(l => l.trim()).forEach(line => {
+          logger.debug(line);
+        });
+      }
+    });
+
+    proc.stderr.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      if (debug) {
+        text.split('\n').filter(l => l.trim()).forEach(line => {
+          logger.error(line);
+        });
+      }
+    });
+
+    proc.on('close', (code) => {
+      resolve({ success: code === 0, output, exitCode: code });
+    });
+
+    proc.on('error', (err) => {
+      resolve({ success: false, output: output + '\n' + err.message, exitCode: 1 });
+    });
+  });
+}
+
+/**
+ * Clone goals file with attempt suffix
+ * @param {string} originalPath - Original goals file path
+ * @param {number} attempt - Attempt number
+ * @returns {Promise<string>} New file path
+ */
+async function cloneGoalsFile(originalPath, attempt) {
+  const dir = dirname(originalPath);
+  const ext = extname(originalPath);
+  const base = basename(originalPath, ext);
+  const newPath = join(dir, `${base}-attempt-${attempt}${ext}`);
+
+  const content = await readFile(originalPath, 'utf-8');
+  await writeFile(newPath, content, 'utf-8');
+
+  return newPath;
+}
+
+/**
+ * Find and collect LLM logs from output directory
+ * @param {string} outputDir - Output directory to search
+ * @returns {Promise<{path: string, content: string}[]>}
+ */
+async function collectLlmLogs(outputDir) {
+  const logs = [];
+
+  if (!existsSync(outputDir)) {
+    return logs;
+  }
+
+  // Look for execution logs, error logs, and evaluation files
+  const patterns = ['execution-log.json', 'summary.json', 'evaluation'];
+
+  async function scanDir(dir) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await scanDir(fullPath);
+        } else if (entry.isFile()) {
+          const isLogFile = patterns.some(p => entry.name.includes(p)) ||
+                           entry.name.endsWith('.log') ||
+                           entry.name.endsWith('-output.json');
+          if (isLogFile) {
+            try {
+              const content = await readFile(fullPath, 'utf-8');
+              logs.push({ path: fullPath, name: entry.name, content });
+            } catch (e) {
+              // Skip files we can't read
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Directory not accessible
+    }
+  }
+
+  await scanDir(outputDir);
+  return logs;
+}
+
+/**
+ * Create error assessment goal
+ * @param {string} errorSummary - Summary of errors encountered
+ * @param {number} attempt - Current attempt number
+ * @returns {Object} Error assessment goal
+ */
+function createErrorAssessmentGoal(errorSummary, attempt) {
+  return {
+    id: `error-assessment-attempt-${attempt}`,
+    objective: `Review the error logs from attempt ${attempt - 1} and create detailed notes with actionable suggestions to help the workstream succeed. Analyze what went wrong, identify root causes, and provide specific recommendations to avoid similar failures.`,
+    priority: 1,
+    criteria: {
+      success: [
+        'Error logs have been thoroughly analyzed',
+        'Root causes of failures have been identified',
+        'Specific, actionable recommendations have been documented',
+        'Notes include context that will help subsequent tasks succeed'
+      ],
+      acceptance: [
+        'Analysis covers all failed tasks from previous attempt',
+        'Recommendations are practical and implementable',
+        'Notes are clear and well-organized'
+      ],
+      validation: 'llm'
+    },
+    constraints: [
+      'Focus on actionable improvements, not blame',
+      'Be specific about what changes are needed',
+      'Consider dependencies between tasks'
+    ],
+    context: {
+      errorSummary: errorSummary,
+      attemptNumber: attempt,
+      purpose: 'This goal exists to learn from previous failures and guide the retry attempt'
+    }
+  };
+}
+
+/**
+ * Inject error assessment goal and update dependencies
+ * @param {Object} goals - Goals object
+ * @param {Object} errorGoal - Error assessment goal to inject
+ * @returns {Object} Updated goals object
+ */
+function injectErrorAssessmentGoal(goals, errorGoal) {
+  const updatedGoals = JSON.parse(JSON.stringify(goals)); // Deep clone
+
+  // Add error assessment goal at the beginning
+  updatedGoals.goals.unshift(errorGoal);
+
+  // Update all other goals to depend on the error assessment
+  for (let i = 1; i < updatedGoals.goals.length; i++) {
+    const goal = updatedGoals.goals[i];
+    if (!goal.dependencies) {
+      goal.dependencies = [];
+    }
+    // Add dependency if not already present
+    if (!goal.dependencies.includes(errorGoal.id)) {
+      goal.dependencies.push(errorGoal.id);
+    }
+  }
+
+  // Update metadata
+  if (!updatedGoals.metadata) {
+    updatedGoals.metadata = {};
+  }
+  updatedGoals.metadata.vigilantMode = true;
+  updatedGoals.metadata.lastAttempt = new Date().toISOString();
+
+  return updatedGoals;
+}
+
+/**
+ * Handle the vigilant command - auto-retry with error learning
+ * @param {Object} args - Parsed arguments
+ * @param {Logger} logger - Logger
+ * @returns {Promise<number>} Exit code
+ */
+async function cmdVigilant(args, logger) {
+  const maxAttempts = args.vigilantAttempts || 3;
+  const goalsPath = resolve(args.goals);
+  const contextPath = args.context ? resolve(args.context) : resolve(dirname(goalsPath), 'context');
+  const outputPath = args.output || './output';
+
+  logger.info(`Starting vigilant mode with max ${maxAttempts} attempts`);
+  logger.info(`Goals: ${goalsPath}`);
+  logger.info(`Context: ${contextPath}`);
+  logger.info(`Output: ${outputPath}`);
+
+  // Ensure context directory exists
+  if (!existsSync(contextPath)) {
+    await mkdir(contextPath, { recursive: true });
+    logger.info(`Created context directory: ${contextPath}`);
+  }
+
+  // Build environment with LLM config
+  const env = {
+    LLM_API_KEY: process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
+    LLM_PROVIDER: process.env.LLM_PROVIDER || 'anthropic',
+    LLM_MODEL: process.env.LLM_MODEL || '',
+    LLM_ENDPOINT: process.env.LLM_ENDPOINT || '',
+    LLM_TIMEOUT: '300000',
+    LLM_MAX_RETRIES: '5',
+    LLM_BACKOFF_MS: '10000',
+    LLM_REQUEST_DELAY_MS: '3000',
+    CONTINUE_ON_EVAL_FAILURE: 'true'
+  };
+
+  let currentGoalsPath = goalsPath;
+  let lastOutput = '';
+  let success = false;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    logger.info('');
+    logger.info(`${'='.repeat(60)}`);
+    logger.info(`VIGILANT MODE - Attempt ${attempt}/${maxAttempts}`);
+    logger.info(`${'='.repeat(60)}`);
+    logger.info('');
+
+    // Run the pipeline
+    const result = await runPipeline({
+      goalsPath: currentGoalsPath,
+      contextPath,
+      outputPath,
+      debug: true,
+      env,
+      logger
+    });
+
+    lastOutput = result.output;
+
+    if (result.success) {
+      logger.success(`Attempt ${attempt} succeeded!`);
+      success = true;
+      break;
+    }
+
+    logger.error(`Attempt ${attempt} failed with exit code ${result.exitCode}`);
+
+    if (attempt >= maxAttempts) {
+      logger.error(`Max attempts (${maxAttempts}) reached. Giving up.`);
+      break;
+    }
+
+    // Prepare for retry
+    logger.info('Preparing for retry...');
+
+    // 1. Collect LLM logs from output directory
+    logger.info('Collecting error logs...');
+    const logs = await collectLlmLogs(outputPath);
+    logger.info(`Found ${logs.length} log files`);
+
+    // 2. Copy logs to context directory
+    const logsDir = join(contextPath, `attempt-${attempt}-logs`);
+    await mkdir(logsDir, { recursive: true });
+
+    let errorSummary = `=== Error Summary from Attempt ${attempt} ===\n\n`;
+
+    for (const log of logs) {
+      const destPath = join(logsDir, log.name);
+      await writeFile(destPath, log.content, 'utf-8');
+      logger.debug(`Copied log: ${log.name}`);
+
+      // Extract error information for summary
+      try {
+        const parsed = JSON.parse(log.content);
+        if (parsed.entries) {
+          // Execution log format
+          const errors = parsed.entries.filter(e => e.status === 'error' || e.status === 'failed');
+          if (errors.length > 0) {
+            errorSummary += `From ${log.name}:\n`;
+            for (const err of errors) {
+              errorSummary += `  - Task ${err.taskId}: ${err.message}\n`;
+            }
+            errorSummary += '\n';
+          }
+        } else if (parsed.issues) {
+          // Summary format
+          errorSummary += `From ${log.name}:\n`;
+          for (const issue of parsed.issues) {
+            errorSummary += `  - ${issue}\n`;
+          }
+          errorSummary += '\n';
+        }
+      } catch (e) {
+        // Not JSON, include as raw text
+        if (log.content.includes('Error') || log.content.includes('failed')) {
+          errorSummary += `From ${log.name}:\n${log.content.slice(0, 1000)}\n\n`;
+        }
+      }
+    }
+
+    // Also capture pipeline output errors
+    const outputErrors = lastOutput.split('\n')
+      .filter(line => line.includes('Error') || line.includes('failed') || line.includes('FATAL'))
+      .slice(0, 20);
+    if (outputErrors.length > 0) {
+      errorSummary += `Pipeline output errors:\n`;
+      for (const line of outputErrors) {
+        errorSummary += `  ${line}\n`;
+      }
+    }
+
+    // Write error summary to context
+    const summaryPath = join(logsDir, 'error-summary.txt');
+    await writeFile(summaryPath, errorSummary, 'utf-8');
+    logger.info(`Error summary written to: ${summaryPath}`);
+
+    // 3. Clone goals file
+    const nextAttempt = attempt + 1;
+    currentGoalsPath = await cloneGoalsFile(goalsPath, nextAttempt);
+    logger.info(`Created goals file for attempt ${nextAttempt}: ${currentGoalsPath}`);
+
+    // 4. Load goals and inject error assessment
+    const goalsContent = await readFile(currentGoalsPath, 'utf-8');
+    const goals = JSON.parse(goalsContent);
+
+    const errorGoal = createErrorAssessmentGoal(errorSummary, nextAttempt);
+    const updatedGoals = injectErrorAssessmentGoal(goals, errorGoal);
+
+    await writeFile(currentGoalsPath, JSON.stringify(updatedGoals, null, 2), 'utf-8');
+    logger.info(`Injected error-assessment goal with ${updatedGoals.goals.length - 1} dependent goals`);
+
+    logger.info('');
+    logger.info(`Retrying with updated goals...`);
+    logger.info('');
+  }
+
+  // Final status
+  logger.info('');
+  logger.info(`${'='.repeat(60)}`);
+  if (success) {
+    logger.success('VIGILANT MODE COMPLETE - Workflow succeeded');
+    return ExitCodes.SUCCESS;
+  } else {
+    logger.error('VIGILANT MODE COMPLETE - All attempts failed');
+    return ExitCodes.UNKNOWN_ERROR;
+  }
+}
+
+/**
  * Main CLI execution function
  * @param {string[]} argv - Command line arguments
  * @returns {Promise<number>} Exit code
@@ -940,6 +1304,9 @@ async function main(argv) {
 
         case 'tui':
           return await cmdTui(args, logger);
+
+        case 'vigilant':
+          return await cmdVigilant(args, logger);
 
         case 'validate':
           // Treat validate as dry-run

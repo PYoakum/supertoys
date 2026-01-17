@@ -104,11 +104,32 @@ export class LLMClient {
     /** @type {number} */
     this.timeout = config.timeout || DEFAULTS.timeout;
 
+    /** @type {number} */
+    this.requestDelayMs = config.requestDelayMs || 0;
+
+    /** @type {number} */
+    this.lastRequestTime = 0;
+
     /** @type {Object} */
     this.headers = config.headers || {};
 
     /** @type {Object|null} */
     this.logger = null;
+  }
+
+  /**
+   * Wait for rate limit delay if configured
+   * @private
+   */
+  async _waitForRateLimit() {
+    if (this.requestDelayMs > 0) {
+      const elapsed = Date.now() - this.lastRequestTime;
+      const remaining = this.requestDelayMs - elapsed;
+      if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
+      }
+    }
+    this.lastRequestTime = Date.now();
   }
 
   /**
@@ -273,6 +294,9 @@ export class LLMClient {
 
     for (let attempt = 1; attempt <= this.retry.maxAttempts; attempt++) {
       try {
+        // Wait for rate limit delay if configured
+        await this._waitForRateLimit();
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 

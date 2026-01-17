@@ -27,7 +27,7 @@
 /**
  * Valid subcommands
  */
-const SUBCOMMANDS = ['import', 'get', 'set', 'delete', 'list-paths', 'ai-edit', 'browse', 'tui', 'run', 'validate'];
+const SUBCOMMANDS = ['import', 'get', 'set', 'delete', 'list-paths', 'ai-edit', 'browse', 'tui', 'run', 'validate', 'vigilant'];
 
 /**
  * Default argument values
@@ -65,6 +65,9 @@ const DEFAULTS = {
   // TUI options
   theme: null,
   serverUrl: null,
+  // Vigilant mode options
+  vigilantMode: false,
+  vigilantAttempts: 3,
   errors: []
 };
 
@@ -103,7 +106,10 @@ const ARG_DEFINITIONS = {
   // TUI mode
   '--tui': { alias: '-t', type: 'boolean', key: 'tui' },
   '--theme': { alias: '-T', type: 'string', key: 'theme' },
-  '--server-url': { alias: '-s', type: 'string', key: 'serverUrl' }
+  '--server-url': { alias: '-s', type: 'string', key: 'serverUrl' },
+  // Vigilant mode
+  '--vigilant-mode': { alias: null, type: 'boolean', key: 'vigilantMode' },
+  '--vigilant-attempts': { alias: null, type: 'number', key: 'vigilantAttempts' }
 };
 
 /**
@@ -267,6 +273,13 @@ export function validateRequiredArgs(args) {
           errors.push('Missing required argument: --context (-c)');
         }
         break;
+
+      case 'vigilant':
+        // Vigilant mode requires goals file
+        if (!args.goals) {
+          errors.push('vigilant requires --goals (-g)');
+        }
+        break;
     }
     return errors;
   }
@@ -314,6 +327,7 @@ Commands:
   tui       Full tabbed TUI with Goals, Context, Execute, and Output tabs
   run       Execute goals (same as legacy mode)
   validate  Validate goals without executing
+  vigilant  Auto-retry workflow with error assessment and learning
 
 Import Command:
   bun goals-cli.js import --file <path>     Import from local file (.json, .js, .py)
@@ -353,6 +367,22 @@ TUI Command:
   Built-in themes: default, dark, matrix
   Theme path can be a built-in name or path to custom .toml file
   Example: bun goals-cli.js tui --theme matrix
+
+Vigilant Command:
+  bun goals-cli.js vigilant --goals <path> [options]
+
+  Runs the complete workflow with auto-retry on failure. On each failure:
+  - Clones goals file with "-attempt-N" suffix
+  - Adds LLM logs to context directory for error analysis
+  - Injects an "error-assessment" goal that reviews failures
+  - All other goals depend on error assessment for informed retry
+
+  Vigilant Options:
+    --vigilant-attempts <n>   Max retry attempts (default: 3)
+    --context, -c <path>      Context directory (created if needed)
+    --output, -o <path>       Output directory
+
+  Example: bun goals-cli.js vigilant -g ./goals.json -c ./context --vigilant-attempts 5
 
 Legacy Arguments:
   --goals, -g <path>      Path to the goals JSON file
