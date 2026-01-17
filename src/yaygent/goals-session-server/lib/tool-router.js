@@ -140,7 +140,11 @@ export class NotepadTool {
    */
   getFilePath(filename, sessionId) {
     // Sanitize filename to prevent directory traversal
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    let safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Auto-add .txt extension if no extension present
+    if (!safeName.includes('.')) {
+      safeName += '.txt';
+    }
     const dir = sessionId ? join(this.baseDir, sessionId) : this.baseDir;
     return join(dir, safeName);
   }
