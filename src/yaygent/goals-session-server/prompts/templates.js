@@ -132,15 +132,25 @@ CRITICAL REQUIREMENTS:
   // Cross-tool conventions that the LLM must follow
   const crossToolConventions = `
 CROSS-TOOL CONVENTIONS (CRITICAL - follow exactly):
+
+**CREATE BEFORE READ (MOST IMPORTANT RULE)**:
+- You CANNOT read content that doesn't exist yet
+- If a task needs to read from notepad/file, an EARLIER task must CREATE that content first
+- Example: To read "base_job_posting", first create a task that writes to "base_job_posting"
+- Never assume content exists - if the goal requires reading something, add a create task first
+
+TOOL-SPECIFIC RULES:
 1. compose_email automatically saves content to notepad with filename "email_draft"
    - To read composed email content, use: notepad_read with filename="email_draft"
    - The parameter name is "filename", NOT "noteId"
 2. compose_email action="export" creates .eml files in the sandbox
    - ALWAYS specify the "filename" parameter with a predictable name (e.g., "job_offer.eml")
    - Later tasks reading this file with code_editor MUST use the EXACT same filename
-   - If you create multiple emails, use distinct names: "email1.eml", "email2.eml", etc.
 3. notepad_read/notepad_write use parameter "filename" (required)
+   - notepad_write CREATES content, notepad_read RETRIEVES it
+   - Always write before read!
 4. code_editor uses "path" for file paths, "operation" for action type
+   - operation="write" creates files, operation="read" retrieves them
 5. FILE NAMING: When one task creates a file and another reads it, use IDENTICAL filenames
    - Create with: filename="report.eml" -> Read with: path="report.eml"
    - Never rely on auto-generated filenames - always specify explicitly
