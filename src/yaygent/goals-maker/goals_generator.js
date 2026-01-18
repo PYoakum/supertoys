@@ -225,11 +225,12 @@ function printLine(text = "") {
       if (text) process.stdout.write(text);
       currentContentRow++;
 
-      // Clean up row 5 from the bottom to fix border artifacts
+      // Clean up rows near separator to fix border artifacts
       const { rows } = getTerminalSize();
-      const cleanupRow = rows - 5;
-      moveTo(cleanupRow, 1);
-      process.stdout.write("\x1b[2K");
+      for (let i = 5; i <= 7; i++) {
+        moveTo(rows - i, 1);
+        process.stdout.write("\x1b[2K");
+      }
 
       // Restore cursor position
       moveTo(currentContentRow, 1);
@@ -827,15 +828,11 @@ async function prompt(question, defaultValue = "") {
       // Clamp to max content row
       if (currentContentRow > maxRow) currentContentRow = maxRow;
 
-      // Clean up row 5 from the bottom to fix border artifacts
+      // Clean up rows near separator to fix border artifacts
       const { rows } = getTerminalSize();
-      const cleanupRow = rows - 5;
-      moveTo(cleanupRow, 1);
-      process.stdout.write("\x1b[2K"); // Clear the entire line
-
-      // Force redraw borders
-      if (animationInterval) {
-        renderAnimatedBorders();
+      for (let i = 5; i <= 7; i++) {
+        moveTo(rows - i, 1);
+        process.stdout.write("\x1b[2K");
       }
 
       resolve(answer.trim() || defaultValue);
@@ -891,21 +888,17 @@ async function promptPassword(question) {
           stdin.setRawMode(false);
           stdin.removeListener("data", onData);
 
-          // Clean up row 5 from the bottom (above separator) to fix border artifacts
+          // Clean up rows near separator to fix border artifacts
           const { rows } = getTerminalSize();
-          const cleanupRow = rows - 5; // 5th row from bottom
-          moveTo(cleanupRow, 1);
-          process.stdout.write("\x1b[2K"); // Clear the entire line
+          for (let i = 5; i <= 7; i++) {
+            moveTo(rows - i, 1);
+            process.stdout.write("\x1b[2K");
+          }
 
           // Move to end of prompt row before newline
           moveTo(promptRow, promptPrefixLen + 1 + password.length);
           process.stdout.write("\n");
           currentContentRow = promptRow + 1; // Track the row after input
-
-          // Force redraw the borders to ensure clean state
-          if (animationInterval) {
-            renderAnimatedBorders();
-          }
 
           rl.close();
           resolve(password);
@@ -982,15 +975,11 @@ async function promptSelect(question, choices) {
         stdin.setRawMode(false);
         stdin.removeListener("data", onKey);
 
-        // Clean up row 5 from the bottom to fix border artifacts
+        // Clean up rows near separator to fix border artifacts
         const { rows } = getTerminalSize();
-        const cleanupRow = rows - 5;
-        moveTo(cleanupRow, 1);
-        process.stdout.write("\x1b[2K");
-
-        // Force redraw borders
-        if (animationInterval) {
-          renderAnimatedBorders();
+        for (let i = 5; i <= 7; i++) {
+          moveTo(rows - i, 1);
+          process.stdout.write("\x1b[2K");
         }
 
         // Move cursor below menu
@@ -2089,13 +2078,13 @@ async function main() {
 
   const model = await prompt("Model name (optional)", defaultModel);
 
-  // Clean up row 5 from the bottom before API key prompt
-  const { rows } = getTerminalSize();
-  const cleanupRow = rows - 5;
-  moveTo(cleanupRow, 1);
-  process.stdout.write("\x1b[2K");
-  if (animationInterval) {
-    renderAnimatedBorders();
+  // Clean up rows near separator before API key prompt
+  {
+    const { rows } = getTerminalSize();
+    for (let i = 5; i <= 7; i++) {
+      moveTo(rows - i, 1);
+      process.stdout.write("\x1b[2K");
+    }
   }
 
   const apiKey = await promptPassword("API Key");
