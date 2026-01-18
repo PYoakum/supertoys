@@ -262,9 +262,11 @@ export class MidiMp3Tool {
   /**
    * @param {Object} sessionManager - Session manager instance
    * @param {Object} options - Configuration options
+   * @param {Object} options.llmClient - LLM client for pre-processing input
    */
   constructor(sessionManager, options = {}) {
     this.sessionManager = sessionManager;
+    this.llmClient = options.llmClient || null;
     this.config = {
       ...DEFAULT_CONFIG,
       soundfontDir: getSoundfontDir(),
@@ -274,6 +276,96 @@ export class MidiMp3Tool {
     this.hasFluidsynth = commandExists('fluidsynth');
     this.hasFfmpeg = commandExists('ffmpeg');
     this.hasLame = commandExists('lame');
+  }
+
+  /**
+   * Set the LLM client for pre-processing
+   * @param {Object} llmClient - LLM client instance
+   */
+  setLLMClient(llmClient) {
+    this.llmClient = llmClient;
+  }
+
+  /**
+   * Extract MIDI notes from input using LLM
+   * This pre-processes the input to ensure only valid note notation is passed to the parser.
+   * @param {string} input - Raw input that may contain prose, explanations, or mixed content
+   * @param {string} [sessionId] - Session ID for logging
+   * @returns {Promise<string>} - Clean note notation string
+   */
+  async _extractNotesWithLLM(input, sessionId) {
+    if (!this.llmClient) {
+      // No LLM client available, return input as-is
+      return input;
+    }
+
+    // Check if input already looks like clean note notation
+    const trimmed = input.trim();
+
+    // If it's JSON format, don't preprocess
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return input;
+    }
+
+    // Quick check: if input matches expected note pattern without prose, skip LLM
+    // Pattern: only contains note-like tokens (C4:q, tempo:120, R:q, |, etc.) and whitespace
+    const noteTokenPattern = /^(tempo:\d+\s*)?(\[?[A-Ga-gRr][#b]?\d?(\s+[A-Ga-g][#b]?\d)?\]?:[whqest]\.?(\:\d+)?\s*|\|\s*)+$/;
+    if (noteTokenPattern.test(trimmed)) {
+      return input;
+    }
+
+    const systemPrompt = `You are a MIDI note extraction assistant. Your ONLY job is to extract MIDI note notation from the user's input.
+
+OUTPUT FORMAT:
+- Return ONLY the note string, nothing else
+- Notes are "NOTE:DURATION" separated by spaces
+- NOTE: Letter (A-G) + optional accidental (# or b) + octave (0-8). Middle C = C4.
+- DURATION: w=whole, h=half, q=quarter, e=eighth, s=sixteenth. Add "." for dotted.
+- RESTS: R:duration (e.g., R:q)
+- CHORDS: [C4 E4 G4]:q
+- TEMPO: Can prefix with "tempo:120"
+- BARS: Use "|" as separator
+
+EXAMPLES:
+Input: "Play a C major scale going up" → Output: "C4:q D4:q E4:q F4:q G4:q A4:q B4:q C5:q"
+Input: "A sad melody in D minor" → Output: "D4:h F4:q A4:q D4:q E4:q F4:h"
+Input: "tempo:90 C4:q E4:q G4:q" → Output: "tempo:90 C4:q E4:q G4:q"
+
+RULES:
+1. If the input already contains valid note notation, extract and clean it
+2. If the input describes music, convert it to note notation
+3. NEVER output explanations, markdown, or prose
+4. NEVER output anything except the note string
+5. If you cannot determine notes, output a simple C major chord: "[C4 E4 G4]:h"`;
+
+    const userPrompt = `Extract MIDI notes from this input:\n\n${input}`;
+
+    try {
+      const response = await this.llmClient.send({
+        systemPrompt,
+        userPrompt,
+        sessionId,
+        operation: 'midi_note_extraction',
+        parameters: {
+          temperature: 0.3,  // Lower temperature for more consistent output
+          maxTokens: 1024    // Notes shouldn't need more than this
+        }
+      });
+
+      const extracted = response.content.trim();
+
+      // Remove any markdown code blocks if LLM accidentally added them
+      const cleaned = extracted
+        .replace(/^```[\w]*\n?/gm, '')
+        .replace(/\n?```$/gm, '')
+        .trim();
+
+      return cleaned || input;
+    } catch (err) {
+      // If LLM fails, fall back to original input
+      console.error('MIDI note extraction failed, using raw input:', err.message);
+      return input;
+    }
   }
 
   /**
@@ -622,7 +714,8 @@ export class MidiMp3Tool {
       soundfont,
       output_format = 'mp3',
       output_path,
-      keep_midi = false
+      keep_midi = false,
+      llm_preprocess = true  // Enable LLM preprocessing by default
     } = args;
 
     if (!input_text) throw new Error('input_text is required');
@@ -631,8 +724,18 @@ export class MidiMp3Tool {
       throw new Error('FluidSynth is not installed. Install with: brew install fluid-synth (macOS) or apt-get install fluidsynth (Linux)');
     }
 
+    // Pre-process input with LLM to extract clean note notation
+    const sessionId = session?.id || session?.sessionId;
+    let cleanedInput = input_text;
+    let wasPreprocessed = false;
+
+    if (llm_preprocess && this.llmClient) {
+      cleanedInput = await this._extractNotesWithLLM(input_text, sessionId);
+      wasPreprocessed = cleanedInput !== input_text;
+    }
+
     // Parse input
-    const parsed = this._parseInput(input_text);
+    const parsed = this._parseInput(cleanedInput);
     if (tempo) parsed.tempo = tempo;
 
     if (parsed.notes.length === 0) {
@@ -706,7 +809,9 @@ export class MidiMp3Tool {
       notes_count: parsed.notes.length,
       tempo: parsed.tempo,
       instrument: GM_INSTRUMENTS[instrumentNum] || `Program ${instrumentNum}`,
-      format: ext.slice(1)
+      format: ext.slice(1),
+      preprocessed: wasPreprocessed,
+      notes_used: cleanedInput  // The actual note string that was synthesized
     };
   }
 
@@ -977,6 +1082,10 @@ OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or mark
           keep_midi: {
             type: 'boolean',
             description: 'Keep intermediate MIDI file (default: false)'
+          },
+          llm_preprocess: {
+            type: 'boolean',
+            description: 'Use LLM to extract clean note notation from input (default: true). Disable for raw note strings.'
           }
         },
         required: ['action']
@@ -991,7 +1100,8 @@ OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or mark
         tempo: args.tempo,
         instrument: args.instrument,
         output_format: args.format,
-        output_path: args.output_path
+        output_path: args.output_path,
+        llm_preprocess: args.llm_preprocess
       }, session);
     }, {
       name: 'make_music',
@@ -1006,7 +1116,8 @@ OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or mark
           tempo: { type: 'number', description: 'Tempo in BPM (default: 120)' },
           instrument: { type: ['number', 'string'], description: 'Instrument: "piano", "violin", "guitar", "flute", "trumpet", "strings", or number 0-127' },
           format: { type: 'string', enum: ['mp3', 'wav', 'midi'], description: 'Output format (default: mp3)' },
-          output_path: { type: 'string', description: 'Output file path' }
+          output_path: { type: 'string', description: 'Output file path' },
+          llm_preprocess: { type: 'boolean', description: 'Use LLM to extract clean note notation (default: true)' }
         },
         required: ['notes']
       }

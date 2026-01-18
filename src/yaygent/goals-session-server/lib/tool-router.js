@@ -860,7 +860,8 @@ export function createToolRouter(options = {}) {
     // Initialize and register MIDI to MP3 tool
     const midiMp3 = new MidiMp3Tool(options.sessionManager, {
       defaultBpm: options.midiDefaultBpm || 120,
-      mp3Bitrate: options.midiBitrate || '192k'
+      mp3Bitrate: options.midiBitrate || '192k',
+      llmClient: options.llmClient  // Pass LLM client for note extraction preprocessing
     });
     midiMp3.registerTools(router);
 
