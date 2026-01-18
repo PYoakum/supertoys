@@ -2328,7 +2328,7 @@ async function getGoalsDescription() {
   setHeaderSubtitle("Step 2: Describe Your Goals");
 
   // Calculate vertical center (raised by 6 rows for better visibility)
-  const { rows } = getTerminalSize();
+  const { rows, cols } = getTerminalSize();
   const contentAreaHeight = rows - (BORDER_HEIGHT * 2); // Subtract header and footer
   const instructionLines = 8; // Number of instruction lines we'll print
   const centerStartRow = BORDER_HEIGHT + 1 + Math.floor((contentAreaHeight - instructionLines) / 2) - 6;
