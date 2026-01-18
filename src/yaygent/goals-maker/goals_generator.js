@@ -455,16 +455,10 @@ function renderAnimatedBorders() {
   // Bottom separator row (4th from bottom)
   const separatorRow = rows - BORDER_HEIGHT;
 
-  // During multiline input, clean up rows between input area and footer
-  // This prevents any creeping content from appearing
-  if (inMultilineInput) {
-    // Clear from row after current input to row before separator (row-5 to input bottom)
-    const cleanupStart = multilineInputCurrentRow + 1;
-    const cleanupEnd = separatorRow - 1;
-    for (let cleanRow = cleanupStart; cleanRow <= cleanupEnd; cleanRow++) {
-      output += `\x1b[${cleanRow};1H\x1b[2K`; // Move and clear line
-    }
-  }
+  // NOTE: We intentionally don't clear rows during multiline input.
+  // The multilineInputCurrentRow only updates on Enter, so clearing rows
+  // beyond it would wipe out text the user is actively typing or pasting
+  // that has wrapped to subsequent lines.
 
   // Render bottom separator line (4th row from bottom - solid violet line)
   output += `\x1b[${separatorRow};1H`;

@@ -199,10 +199,14 @@ Do not include any text before or after the JSON.`;
       const resultStr = JSON.stringify(t.result || {});
       const maxLen = 4000; // Increased from 500 to allow full content evaluation
       const truncated = resultStr.length > maxLen;
+      // Handle error as object {message, code} or string
+      const errorMsg = t.error
+        ? (typeof t.error === 'object' ? (t.error.message || JSON.stringify(t.error)) : t.error)
+        : null;
       return `
     <invocation tool="${t.toolName}" success="${t.success}">
       <result${truncated ? ' truncated="true"' : ''}>${resultStr.slice(0, maxLen)}${truncated ? '...' : ''}</result>
-      ${t.error ? `<error>${t.error}</error>` : ''}
+      ${errorMsg ? `<error>${errorMsg}</error>` : ''}
     </invocation>`;
     }).join('\n')}
   </tool_invocations>
