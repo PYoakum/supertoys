@@ -314,31 +314,58 @@ export class MidiMp3Tool {
       return input;
     }
 
-    const systemPrompt = `You are a MIDI note extraction assistant. Your ONLY job is to extract MIDI note notation from the user's input.
+    const systemPrompt = `task:
+  role: MIDI Note Generator
+  objective: Convert input to MIDI note notation string
+  output_constraint: OUTPUT ONLY THE NOTE STRING - NO OTHER TEXT
 
-OUTPUT FORMAT:
-- Return ONLY the note string, nothing else
-- Notes are "NOTE:DURATION" separated by spaces
-- NOTE: Letter (A-G) + optional accidental (# or b) + octave (0-8). Middle C = C4.
-- DURATION: w=whole, h=half, q=quarter, e=eighth, s=sixteenth. Add "." for dotted.
-- RESTS: R:duration (e.g., R:q)
-- CHORDS: [C4 E4 G4]:q
-- TEMPO: Can prefix with "tempo:120"
-- BARS: Use "|" as separator
+output_format:
+  type: raw_string
+  content: MIDI notes only
+  forbidden:
+    - explanations
+    - markdown
+    - code blocks
+    - prose
+    - comments
+    - prefixes like "Output:" or "Notes:"
 
-EXAMPLES:
-Input: "Play a C major scale going up" → Output: "C4:q D4:q E4:q F4:q G4:q A4:q B4:q C5:q"
-Input: "A sad melody in D minor" → Output: "D4:h F4:q A4:q D4:q E4:q F4:h"
-Input: "tempo:90 C4:q E4:q G4:q" → Output: "tempo:90 C4:q E4:q G4:q"
+note_syntax:
+  pattern: "NOTE:DURATION"
+  note_format:
+    letter: A-G (uppercase)
+    accidental: "#" (sharp) or "b" (flat), optional
+    octave: 0-8 (middle C = C4)
+  duration_codes:
+    w: whole note
+    h: half note
+    q: quarter note
+    e: eighth note
+    s: sixteenth note
+    ".": dotted (append to duration)
+  special:
+    rest: "R:duration" (e.g., R:q)
+    chord: "[C4 E4 G4]:duration"
+    tempo: "tempo:BPM" at start
+    bar: "|" as separator
 
-RULES:
-1. If the input already contains valid note notation, extract and clean it
-2. If the input describes music, convert it to note notation
-3. NEVER output explanations, markdown, or prose
-4. NEVER output anything except the note string
-5. If you cannot determine notes, output a simple C major chord: "[C4 E4 G4]:h"`;
+examples:
+  - input: "Happy Birthday melody"
+    output: "C4:q C4:e D4:q C4:q F4:q E4:h | C4:q C4:e D4:q C4:q G4:q F4:h"
+  - input: "C major scale"
+    output: "C4:q D4:q E4:q F4:q G4:q A4:q B4:q C5:q"
+  - input: "C major chord"
+    output: "[C4 E4 G4]:h"
+  - input: "tempo:90 C4:q E4:q G4:q"
+    output: "tempo:90 C4:q E4:q G4:q"
 
-    const userPrompt = `Extract MIDI notes from this input:\n\n${input}`;
+fallback:
+  condition: cannot determine notes
+  output: "[C4 E4 G4]:h"
+
+CRITICAL: Your entire response must be ONLY the note string. Do not write anything else.`;
+
+    const userPrompt = `Convert to MIDI notes:\n${input}\n\nOUTPUT ONLY NOTES:`;
 
     try {
       const response = await this.llmClient.send({
