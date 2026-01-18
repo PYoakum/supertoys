@@ -1904,12 +1904,21 @@ async function runAdvancedMode(goalsFilePath) {
   // Reset content area for fresh output
   clearContentArea();
 
+  // Create context directory if not exists (same pattern as vigilant mode)
+  const contextDir = join(dirname(goalsFilePath), "context");
+  await mkdir(contextDir, { recursive: true });
+
   printLine();
   printLine(c("dim", "Launching goals-cli in TUI mode..."));
+  printLine(c("dim", `Context directory: ${contextDir}`));
   printLine();
 
   return new Promise((resolve) => {
-    const proc = spawn("bun", [GOALS_CLI_PATH, goalsFilePath], {
+    const proc = spawn("bun", [
+      GOALS_CLI_PATH,
+      goalsFilePath,
+      "--context", contextDir
+    ], {
       stdio: "inherit",
       cwd: dirname(GOALS_CLI_PATH),
     });
