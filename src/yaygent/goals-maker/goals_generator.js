@@ -84,6 +84,7 @@ let animFrameIndex = 0;
 
 // Track current content row for absolute positioning
 let currentContentRow = 5; // Start after header (3) + separator line (1) + 1
+let currentContentCol = 1; // Current column position (1-indexed)
 
 function getTerminalSize() {
   return {
@@ -462,8 +463,8 @@ function renderAnimatedBorders() {
     output += colors.dim + line.slice(0, cols) + colors.reset;
   }
 
-  // Move cursor back to current content row (don't use save/restore to avoid interference with prompts)
-  output += `\x1b[${currentContentRow};1H`;
+  // Move cursor back to current content position (don't use save/restore to avoid interference with prompts)
+  output += `\x1b[${currentContentRow};${currentContentCol}H`;
 
   // Write all at once for atomic rendering
   process.stdout.write(output);
@@ -860,6 +861,9 @@ async function promptPassword(question) {
   return new Promise((resolve) => {
     process.stdout.write(promptPrefix);
 
+    // Set column position for animation to restore to (after the prompt)
+    currentContentCol = promptPrefixLen + 1;
+
     const stdin = process.stdin;
     stdin.setRawMode(true);
     stdin.resume();
@@ -876,6 +880,8 @@ async function promptPassword(question) {
       if (password.length > 0) {
         process.stdout.write("*".repeat(password.length));
       }
+      // Update column position for animation to restore to
+      currentContentCol = promptPrefixLen + 1 + password.length;
     };
 
     const onData = (data) => {
@@ -896,6 +902,7 @@ async function promptPassword(question) {
           moveTo(promptRow, promptPrefixLen + 1 + password.length);
           process.stdout.write("\n");
           currentContentRow = promptRow + 1; // Track the row after input
+          currentContentCol = 1; // Reset column to start
 
           rl.close();
           resolve(password);
