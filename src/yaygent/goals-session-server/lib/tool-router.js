@@ -31,6 +31,7 @@ import { TablemakerTool } from './tablemaker-tool.js';
 import { PersonaComposeTool } from './persona-compose-tool.js';
 import { ReadFileTool } from './read-file-tool.js';
 import { ReadEmailTool } from './read-email-tool.js';
+import { SttTool } from './stt-tool.js';
 
 /**
  * Tool Router Class
@@ -677,6 +678,14 @@ export function createToolRouter(options = {}) {
       allowAbsolutePaths: options.readEmailAllowAbsolutePaths !== false
     });
     readEmail.registerTools(router);
+
+    // Initialize and register speech-to-text tool (requires sessionManager)
+    const stt = new SttTool(options.sessionManager, {
+      defaultModel: options.sttDefaultModel || 'whisper-base',
+      defaultRecordDuration: options.sttDefaultRecordDuration || 30,
+      maxRecordDuration: options.sttMaxRecordDuration || 300
+    });
+    stt.registerTools(router);
   }
 
   // Store sandbox manager reference for other tools to use
@@ -685,4 +694,4 @@ export function createToolRouter(options = {}) {
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SttTool, SandboxManager, createToolRouter };
