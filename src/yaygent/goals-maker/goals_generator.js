@@ -1174,6 +1174,7 @@ async function promptPassword(question) {
         if (char === "\r" || char === "\n") {
           stdin.setRawMode(false);
           stdin.removeListener("data", onData);
+          stdin.pause();
 
           // Clean up rows near separator to fix border artifacts
           const { rows } = getTerminalSize();
