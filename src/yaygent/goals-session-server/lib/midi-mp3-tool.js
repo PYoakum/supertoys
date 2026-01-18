@@ -919,9 +919,28 @@ export class MidiMp3Tool {
    * @param {ToolRouter} router - Tool router instance
    */
   registerTools(router) {
+    const noteFormatDescription = `MIDI note notation string. IMPORTANT: Provide ONLY notes in this exact format, no prose or explanations.
+
+FORMAT: Each note is "NOTE:DURATION" separated by spaces.
+- NOTE: Letter (A-G) + optional accidental (# or b) + octave number (0-8). Middle C = C4.
+- DURATION: w=whole, h=half, q=quarter, e=eighth, s=sixteenth. Add "." for dotted notes.
+- RESTS: Use "R:duration" (e.g., R:q for quarter rest)
+- CHORDS: Use brackets "[C4 E4 G4]:q" for simultaneous notes
+- TEMPO: Optionally start with "tempo:120" to set BPM
+- BARS: Use "|" as optional visual separator
+
+EXAMPLES:
+- Simple melody: "C4:q D4:q E4:q F4:q G4:h"
+- With tempo: "tempo:90 C4:q E4:q G4:q C5:h"
+- With rests: "C4:q R:q D4:q R:q E4:h"
+- Chords: "[C4 E4 G4]:h [F4 A4 C5]:h [G4 B4 D5]:w"
+- Dotted notes: "C4:q. D4:e E4:h."
+
+OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or markdown.`;
+
     router.registerTool('midi_mp3', this.handle.bind(this), {
       name: 'midi_mp3',
-      description: 'Generate MIDI from text notation and synthesize to MP3 audio using FluidSynth',
+      description: 'Generate MIDI from note notation and synthesize to MP3/WAV audio. Input must be MIDI note notation ONLY - no prose or descriptions.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -932,19 +951,19 @@ export class MidiMp3Tool {
           },
           input_text: {
             type: 'string',
-            description: 'Music notation: "C4:q D4:q E4:h" or JSON format'
+            description: noteFormatDescription
           },
           tempo: {
             type: 'number',
-            description: 'Tempo in BPM (default: 120)'
+            description: 'Tempo in BPM (default: 120). Can also be set in input_text with "tempo:120"'
           },
           instrument: {
             type: ['number', 'string'],
-            description: 'GM instrument number (0-127) or name (e.g., "piano", "violin")'
+            description: 'GM instrument: number 0-127 or name like "piano", "violin", "guitar", "flute", "trumpet", "strings", "organ"'
           },
           soundfont: {
             type: 'string',
-            description: 'SoundFont file name (default: FluidR3_GM.sf2)'
+            description: 'SoundFont file name (default: MuseScore_General.sf2)'
           },
           output_format: {
             type: 'string',
@@ -964,22 +983,7 @@ export class MidiMp3Tool {
       }
     });
 
-    // Convenience alias
-    router.registerTool('text_to_music', this.handle.bind(this), {
-      name: 'text_to_music',
-      description: 'Convert text notation to music audio',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', description: 'Action to perform' },
-          input_text: { type: 'string', description: 'Music notation' },
-          instrument: { type: ['number', 'string'], description: 'Instrument' }
-        },
-        required: ['action']
-      }
-    });
-
-    // Quick synthesize tool
+    // Quick synthesize tool with strict format requirements
     router.registerTool('make_music', async (args, session) => {
       return this.handle({
         action: 'synthesize',
@@ -991,14 +995,17 @@ export class MidiMp3Tool {
       }, session);
     }, {
       name: 'make_music',
-      description: 'Quick music synthesis from note notation',
+      description: 'Synthesize music from MIDI note notation. The "notes" field must contain ONLY note notation - no prose, no explanations, no markdown.',
       inputSchema: {
         type: 'object',
         properties: {
-          notes: { type: 'string', description: 'Note notation (e.g., "C4:q D4:q E4:h")' },
-          tempo: { type: 'number', description: 'Tempo in BPM' },
-          instrument: { type: ['number', 'string'], description: 'Instrument name or number' },
-          format: { type: 'string', description: 'Output format: mp3, wav, midi' },
+          notes: {
+            type: 'string',
+            description: noteFormatDescription
+          },
+          tempo: { type: 'number', description: 'Tempo in BPM (default: 120)' },
+          instrument: { type: ['number', 'string'], description: 'Instrument: "piano", "violin", "guitar", "flute", "trumpet", "strings", or number 0-127' },
+          format: { type: 'string', enum: ['mp3', 'wav', 'midi'], description: 'Output format (default: mp3)' },
           output_path: { type: 'string', description: 'Output file path' }
         },
         required: ['notes']
