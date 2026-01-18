@@ -97,8 +97,8 @@ const INSTRUMENT_ALIASES = {
 const DEFAULT_CONFIG = {
   tempDir: join(tmpdir(), 'midi-mp3-tool'),
   soundfontDir: null, // Set per-platform
-  defaultSoundfont: 'FluidR3_GM.sf2',
-  soundfontUrl: 'https://keymusician01.s3.amazonaws.com/FluidR3_GM.sf2',
+  defaultSoundfont: 'MuseScore_General.sf2',
+  soundfontUrl: 'https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/MuseScore_General.sf2',
   defaultBpm: 120,
   ppqn: 480,
   sampleRate: 44100,
