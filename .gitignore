@@ -78,10 +78,15 @@ src/yaygent/goals-session-server/llm-logs
 src/yaygent/goals-session-server/llm-logs/*
 src/yaygent/goals-cli/llm-logs
 
+# TTS models (large, downloaded separately)
+src/yaygent/goals-session-server/assets/other_models/tts
+
 # evaluation output
 src/yaygent/goals-cli/evaluation-output
 
 src/yaygent/goals-cli/scratch-pad
+
+*/package-lock.json
 
 # Claude
 *.claude
