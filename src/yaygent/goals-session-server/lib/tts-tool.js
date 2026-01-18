@@ -9,7 +9,7 @@
 import { spawn, execSync } from 'child_process';
 import { readFile, writeFile, unlink, mkdir, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, resolve, extname } from 'path';
+import { join, resolve, extname, dirname } from 'path';
 import { tmpdir, homedir, platform } from 'os';
 
 /**
@@ -452,6 +452,12 @@ export class TtsTool {
           : resolve(output_path);
       } else {
         finalPath = join(this.config.tempDir, `tts_output_${Date.now()}${ext}`);
+      }
+
+      // Ensure parent directory exists
+      const parentDir = dirname(finalPath);
+      if (!existsSync(parentDir)) {
+        await mkdir(parentDir, { recursive: true });
       }
 
       // Concatenate chunks if needed
