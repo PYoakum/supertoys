@@ -616,6 +616,12 @@ export class CreateDrumTool {
           : resolve(output_path))
       : join(this.config.tempDir, `pattern_${Date.now()}${ext}`);
 
+    // Ensure parent directory exists
+    const parentDir = dirname(outPath);
+    if (!existsSync(parentDir)) {
+      await mkdir(parentDir, { recursive: true });
+    }
+
     // Render
     const result = await this._renderPattern(timing, outPath, loops);
 
@@ -678,6 +684,12 @@ export class CreateDrumTool {
           ? resolve(join(session.sandboxPath, output_path))
           : resolve(output_path))
       : join(this.config.tempDir, `song_${Date.now()}${ext}`);
+
+    // Ensure parent directory exists
+    const outParentDir = dirname(outPath);
+    if (!existsSync(outParentDir)) {
+      await mkdir(outParentDir, { recursive: true });
+    }
 
     // Concatenate
     if (crossfade_ms > 0 && patternFiles.length > 1) {

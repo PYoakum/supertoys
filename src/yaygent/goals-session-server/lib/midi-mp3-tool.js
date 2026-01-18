@@ -9,7 +9,7 @@
 import { spawn, execSync } from 'child_process';
 import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
-import { join, resolve, basename, extname } from 'path';
+import { join, resolve, basename, extname, dirname } from 'path';
 import { tmpdir, homedir, platform } from 'os';
 import https from 'https';
 import http from 'http';
@@ -670,6 +670,12 @@ export class MidiMp3Tool {
         : resolve(output_path);
     } else {
       finalPath = join(this.config.tempDir, `output_${Date.now()}${ext}`);
+    }
+
+    // Ensure parent directory exists
+    const parentDir = dirname(finalPath);
+    if (!existsSync(parentDir)) {
+      await mkdir(parentDir, { recursive: true });
     }
 
     // Convert/copy to final format
