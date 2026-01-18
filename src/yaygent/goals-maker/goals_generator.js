@@ -972,6 +972,18 @@ async function promptSelect(question, choices) {
       } else if (key === "\r" || key === "\n") {
         stdin.setRawMode(false);
         stdin.removeListener("data", onKey);
+
+        // Clean up row 5 from the bottom to fix border artifacts
+        const { rows } = getTerminalSize();
+        const cleanupRow = rows - 5;
+        moveTo(cleanupRow, 1);
+        process.stdout.write("\x1b[2K");
+
+        // Force redraw borders
+        if (animationInterval) {
+          renderAnimatedBorders();
+        }
+
         // Move cursor below menu
         moveTo(currentContentRow, 1);
         showCursor();
