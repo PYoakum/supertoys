@@ -37,6 +37,8 @@ import { CreateDrumTool } from './create-drum-tool.js';
 import { MidiMp3Tool } from './midi-mp3-tool.js';
 import { TtsTool } from './tts-tool.js';
 import { VoiceCloneTool } from './voice-clone-tool.js';
+import { AnalyzeResearchTool } from './analyze-research-tool.js';
+import { ReviewResearchTool } from './review-research-tool.js';
 
 /**
  * Tool Router Class
@@ -626,6 +628,10 @@ export class NotepadTool {
  * @param {string[]} [options.netToolsAllowedHosts=[]] - Allowed hosts for network tools
  * @param {boolean} [options.netToolsAllowAllHosts=false] - Allow all hosts for network tools
  * @param {boolean} [options.netToolsCaptureEnabled=false] - Enable packet capture
+ * @param {import('./llm-client.js').LLMClient} [options.evaluationClient] - Separate LLM client for review_research evaluation
+ * @param {number} [options.analyzeResearchMaxIterations=3] - Max refinement iterations for analyze_research
+ * @param {number} [options.analyzeResearchConfidenceThreshold=0.7] - Confidence threshold for analyze_research
+ * @param {number} [options.reviewResearchMinScore=0.6] - Minimum relevancy score for review_research
  * @returns {ToolRouter}
  */
 export function createToolRouter(options = {}) {
@@ -878,6 +884,22 @@ export function createToolRouter(options = {}) {
       maxReferenceSeconds: options.voiceCloneMaxRef || 30
     });
     voiceClone.registerTools(router);
+
+    // Initialize and register analyze research tool
+    const analyzeResearch = new AnalyzeResearchTool(options.sessionManager, {
+      llmClient: options.llmClient || null,
+      maxIterations: options.analyzeResearchMaxIterations || 3,
+      confidenceThreshold: options.analyzeResearchConfidenceThreshold || 0.7
+    });
+    analyzeResearch.registerTools(router);
+
+    // Initialize and register review research tool
+    const reviewResearch = new ReviewResearchTool(options.sessionManager, {
+      llmClient: options.llmClient || null,
+      evaluationClient: options.evaluationClient || null,
+      minRelevancyScore: options.reviewResearchMinScore || 0.6
+    });
+    reviewResearch.registerTools(router);
   }
 
   // Store sandbox manager reference for other tools to use
@@ -886,4 +908,4 @@ export function createToolRouter(options = {}) {
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SttTool, EditAudioTool, CreateDrumTool, MidiMp3Tool, TtsTool, VoiceCloneTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SttTool, EditAudioTool, CreateDrumTool, MidiMp3Tool, TtsTool, VoiceCloneTool, AnalyzeResearchTool, ReviewResearchTool, SandboxManager, createToolRouter };
