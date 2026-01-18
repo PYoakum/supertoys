@@ -233,7 +233,12 @@ export class NotepadTool {
 
     const filePath = this.getFilePath(filename, sessionId);
     if (!existsSync(filePath)) {
-      throw new Error(`Note not found: ${filename}${sessionId ? ` (session: ${sessionId.slice(0, 8)}...)` : ''}`);
+      // List available notes to help with debugging
+      const availableNotes = await this._listAvailableNotes(sessionId);
+      const notesList = availableNotes.length > 0
+        ? `\nAvailable notes: ${availableNotes.join(', ')}`
+        : '\nNo notes available in this session.';
+      throw new Error(`Note not found: ${filename}${sessionId ? ` (session: ${sessionId.slice(0, 8)}...)` : ''}${notesList}`);
     }
 
     const content = await readFile(filePath, 'utf-8');
@@ -246,6 +251,33 @@ export class NotepadTool {
         }
       ]
     };
+  }
+
+  /**
+   * List available notes (internal helper for error messages)
+   * @param {string} [sessionId] - Session ID
+   * @returns {Promise<string[]>}
+   */
+  async _listAvailableNotes(sessionId) {
+    try {
+      const dir = await this.ensureBaseDir(sessionId);
+      const files = await readdir(dir);
+      const noteFiles = [];
+      for (const file of files) {
+        const filePath = join(dir, file);
+        try {
+          const stats = await import('fs').then(fs => fs.statSync(filePath));
+          if (stats.isFile()) {
+            noteFiles.push(file);
+          }
+        } catch {
+          // Skip files we can't stat
+        }
+      }
+      return noteFiles;
+    } catch {
+      return [];
+    }
   }
 
   /**
