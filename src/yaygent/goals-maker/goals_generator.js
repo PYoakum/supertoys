@@ -139,8 +139,8 @@ const multilineBuffer = {
   scrollOffset: 0,     // First visible line index
   windowTop: 14,       // Top row of the input window
   windowHeight: 8,     // Number of visible lines
-  windowLeft: 3,       // Left margin
-  windowWidth: 74,     // Width of input area
+  windowLeft: 2,       // Left margin (starts at column 2)
+  windowWidth: 74,     // Width of input area (recalculated based on terminal)
   active: false        // Whether input is active
 };
 
@@ -1325,9 +1325,9 @@ async function promptMultiline(question, instruction, centered = false, startRow
 
   const { cols, rows } = getTerminalSize();
 
-  // Calculate window dimensions - input starts at column 2
-  const windowLeft = centered ? Math.floor(cols / 4) : 2;
-  const windowWidth = cols - windowLeft - 4; // Leave margin on right for scroll indicator
+  // Calculate window dimensions - input stretches across terminal
+  const windowLeft = 2;
+  const windowWidth = cols - 6; // Leave margin on right for scroll indicator
   const windowHeight = Math.min(10, rows - startRow - BORDER_HEIGHT - 3);
 
   // Initialize the multiline buffer
@@ -2335,17 +2335,18 @@ async function getGoalsDescription() {
   currentContentRow = Math.max(BORDER_HEIGHT + 1, centerStartRow);
   moveTo(currentContentRow, 1);
 
-  printCentered(c("cyan", "Instructions"));
-  printCentered(c("dim", "─".repeat(40)));
+  // Left-aligned instructions to match the full-width input box
+  printLine(` ${c("cyan", "Instructions")}`);
+  printLine(` ${c("dim", "─".repeat(cols - 8))}`);
   printLine();
-  printCentered("Enter a description of what you want to accomplish.");
-  printCentered("Be as detailed as possible - include objectives,");
-  printCentered("priorities, success criteria, and any constraints.");
+  printLine(" Enter a description of what you want to accomplish.");
+  printLine(" Be as detailed as possible - include objectives,");
+  printLine(" priorities, success criteria, and any constraints.");
   printLine();
-  printCentered(c("dim", "Type .done on a new line when finished."));
+  printLine(` ${c("dim", "Type .done on a new line when finished.")}`);
   printLine();
 
-  const description = await promptMultiline(null, null, true);
+  const description = await promptMultiline(null, null, false);
 
   if (!description.trim()) {
     return null;
