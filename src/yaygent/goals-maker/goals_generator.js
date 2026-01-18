@@ -1083,6 +1083,8 @@ function createRL() {
 }
 
 async function prompt(question, defaultValue = "") {
+  // Ensure stdin is resumed (may have been paused by raw mode handlers)
+  process.stdin.resume();
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
 
