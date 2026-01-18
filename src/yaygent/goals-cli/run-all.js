@@ -77,16 +77,16 @@ class Logger {
 
   success(msg) {
     if (!this.quiet) {
-      console.log(`${colors.dim}[${this._timestamp()}]${colors.reset} ${colors.green}✓${colors.reset} ${msg}`);
+      console.log(`${colors.dim}[${this._timestamp()}]${colors.reset} ${colors.green}[+]${colors.reset} ${msg}`);
     }
   }
 
   warn(msg) {
-    console.log(`${colors.dim}[${this._timestamp()}]${colors.reset} ${colors.yellow}⚠${colors.reset} ${msg}`);
+    console.log(`${colors.dim}[${this._timestamp()}]${colors.reset} ${colors.yellow}[!]${colors.reset} ${msg}`);
   }
 
   error(msg) {
-    console.error(`${colors.dim}[${this._timestamp()}]${colors.reset} ${colors.red}✗${colors.reset} ${msg}`);
+    console.error(`${colors.dim}[${this._timestamp()}]${colors.reset} ${colors.red}[x]${colors.reset} ${msg}`);
   }
 
   debug(msg) {
@@ -97,7 +97,7 @@ class Logger {
 
   phase(num, total, name) {
     if (!this.quiet) {
-      console.log(`\n${colors.cyan}▶ Phase ${num}/${total}: ${name}${colors.reset}`);
+      console.log(`\n${colors.cyan}[>] Phase ${num}/${total}: ${name}${colors.reset}`);
     }
   }
 
@@ -119,49 +119,71 @@ class SessionClient {
     this.timeout = options.timeout || 300000; // 5 minute default for LLM operations
   }
 
-  async request(method, path, body = null, requestTimeout = null) {
+  async request(method, path, body = null, requestTimeout = null, retries = 2) {
     const url = `${this.baseUrl}${path}`;
     const timeout = requestTimeout || this.timeout;
+    let lastError;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const options = {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal
-    };
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal
+      };
 
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
 
-    try {
-      const response = await fetch(url, options);
-      clearTimeout(timeoutId);
-      const data = await response.json();
+      try {
+        const response = await fetch(url, options);
+        clearTimeout(timeoutId);
+        const data = await response.json();
 
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}`;
-        if (data.error) {
-          errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-        } else if (data.message) {
-          errorMessage = typeof data.message === 'string' ? data.message : JSON.stringify(data.message);
+        if (!response.ok) {
+          let errorMessage = `HTTP ${response.status}`;
+          if (data.error) {
+            errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+          } else if (data.message) {
+            errorMessage = typeof data.message === 'string' ? data.message : JSON.stringify(data.message);
+          }
+          const error = new Error(errorMessage);
+          error.status = response.status;
+          error.data = data;
+          throw error;
         }
-        const error = new Error(errorMessage);
-        error.status = response.status;
-        error.data = data;
-        throw error;
-      }
 
-      return data;
-    } catch (err) {
-      clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        throw new Error(`Request timeout after ${timeout}ms: ${method} ${path}`);
+        return data;
+      } catch (err) {
+        clearTimeout(timeoutId);
+
+        // Check if this is a retryable error (timeout, network issues)
+        const isTimeout = err.name === 'AbortError' ||
+          err.message?.toLowerCase().includes('timeout') ||
+          err.message?.toLowerCase().includes('timed out');
+        const isNetworkError = err.code === 'ECONNREFUSED' ||
+          err.code === 'ECONNRESET' ||
+          err.code === 'ENOTFOUND';
+
+        if ((isTimeout || isNetworkError) && attempt <= retries) {
+          const delay = 5000 * attempt; // 5s, 10s backoff
+          console.log(`[client] Request failed (attempt ${attempt}/${retries + 1}), retrying in ${delay/1000}s...`);
+          await new Promise(r => setTimeout(r, delay));
+          lastError = err;
+          continue;
+        }
+
+        if (err.name === 'AbortError') {
+          throw new Error(`Request timeout after ${timeout}ms: ${method} ${path}`);
+        }
+        throw err;
       }
-      throw err;
     }
+
+    throw lastError || new Error('Request failed after retries');
   }
 
   async healthCheck() {
@@ -177,7 +199,9 @@ class SessionClient {
   }
 
   async generateTaskList(sessionId, options = {}) {
-    return this.request('POST', '/api/tasklist/generate', { sessionId, options });
+    // Task generation can take a long time with many goals, use extended timeout
+    const extendedTimeout = 600000; // 10 minutes
+    return this.request('POST', '/api/tasklist/generate', { sessionId, options }, extendedTimeout);
   }
 
   async getSandboxInfo(sessionId) {
@@ -384,6 +408,107 @@ async function copyLogsToMemory(sessionId, outputDir, memoryDir, logger) {
 }
 
 /**
+ * Print final output summary with all file locations
+ */
+async function printOutputSummary(sessionId, outputDir, logger) {
+  const sessionOutputDir = resolve(process.cwd(), outputDir, sessionId);
+  const sandboxDir = resolve(__dirname, 'sandbox', sessionId);
+
+  console.log();
+  console.log(`${colors.cyan}${'─'.repeat(60)}${colors.reset}`);
+  console.log(`${colors.bold}${colors.cyan}  OUTPUT SUMMARY${colors.reset}`);
+  console.log(`${colors.cyan}${'─'.repeat(60)}${colors.reset}`);
+  console.log();
+
+  // Session ID
+  console.log(`${colors.dim}Session ID:${colors.reset}  ${sessionId}`);
+  console.log();
+
+  // Completed Work (execution outputs)
+  console.log(`${colors.green}[+]${colors.reset} ${colors.bold}Completed Work:${colors.reset}`);
+  console.log(`    ${colors.cyan}${sessionOutputDir}${colors.reset}`);
+
+  // List key files in session output
+  if (existsSync(sessionOutputDir)) {
+    const hasExecutionLog = existsSync(resolve(sessionOutputDir, 'execution-log.json'));
+    const hasSummary = existsSync(resolve(sessionOutputDir, 'summary.md'));
+    const tasksDir = resolve(sessionOutputDir, 'tasks');
+    const taskCount = existsSync(tasksDir) ? (await readdir(tasksDir)).length : 0;
+    const evalsDir = resolve(sessionOutputDir, 'evaluations');
+    const evalCount = existsSync(evalsDir) ? (await readdir(evalsDir)).length : 0;
+
+    console.log(`    ${colors.dim}├── execution-log.json${hasExecutionLog ? '' : ' (not found)'}${colors.reset}`);
+    console.log(`    ${colors.dim}├── summary.md${hasSummary ? '' : ' (not found)'}${colors.reset}`);
+    console.log(`    ${colors.dim}├── tasks/ (${taskCount} files)${colors.reset}`);
+    console.log(`    ${colors.dim}└── evaluations/ (${evalCount} files)${colors.reset}`);
+  }
+  console.log();
+
+  // Look for bundle directory
+  const bundleDir = resolve(process.cwd(), outputDir);
+  if (existsSync(bundleDir)) {
+    try {
+      const entries = await readdir(bundleDir);
+      const bundlePrefix = `bundle-${sessionId.slice(0, 8)}`;
+      const bundles = entries.filter(e => e.startsWith(bundlePrefix));
+
+      if (bundles.length > 0) {
+        // Get the most recent bundle
+        const latestBundle = bundles.sort().reverse()[0];
+        const bundlePath = resolve(bundleDir, latestBundle);
+
+        console.log(`${colors.green}[+]${colors.reset} ${colors.bold}Bundle:${colors.reset}`);
+        console.log(`    ${colors.cyan}${bundlePath}${colors.reset}`);
+
+        // Show bundle contents summary
+        const hasSandbox = existsSync(resolve(bundlePath, 'sandbox'));
+        const hasSession = existsSync(resolve(bundlePath, 'session'));
+        const hasManifest = existsSync(resolve(bundlePath, 'manifest.json'));
+
+        console.log(`    ${colors.dim}├── manifest.json${hasManifest ? '' : ' (not found)'}${colors.reset}`);
+        console.log(`    ${colors.dim}├── session/ ${hasSession ? '(goals, tasks, context)' : '(not found)'}${colors.reset}`);
+        console.log(`    ${colors.dim}├── execution/ (task outputs, evaluations)${colors.reset}`);
+        console.log(`    ${colors.dim}└── sandbox/ ${hasSandbox ? '(generated project files)' : '(empty)'}${colors.reset}`);
+        console.log();
+      }
+    } catch (err) {
+      // Ignore errors reading bundle dir
+    }
+  }
+
+  // Sandbox (working directory for tool execution)
+  if (existsSync(sandboxDir)) {
+    console.log(`${colors.green}[+]${colors.reset} ${colors.bold}Sandbox (dev server):${colors.reset}`);
+    console.log(`    ${colors.cyan}${sandboxDir}${colors.reset}`);
+
+    // List top-level project files
+    try {
+      const sandboxEntries = await readdir(sandboxDir);
+      const keyFiles = sandboxEntries.filter(f =>
+        f === 'package.json' ||
+        f === 'vite.config.js' ||
+        f === 'svelte.config.js' ||
+        f === 'index.html' ||
+        f === 'src'
+      );
+      if (keyFiles.length > 0) {
+        const lastIdx = keyFiles.length - 1;
+        keyFiles.forEach((file, idx) => {
+          const prefix = idx === lastIdx ? '└──' : '├──';
+          console.log(`    ${colors.dim}${prefix} ${file}${colors.reset}`);
+        });
+      }
+    } catch (err) {
+      // Ignore
+    }
+    console.log();
+  }
+
+  console.log(`${colors.cyan}${'─'.repeat(60)}${colors.reset}`);
+  console.log();
+}
+
+/**
  * Start the session server
  */
 async function startServer(port, logger, env) {
@@ -452,7 +577,7 @@ async function runActionPlan(sessionId, options, logger) {
   if (options.verbose) args.push('--verbose');
   if (options.output) args.push('--output', options.output);
   if (options.noBundle) args.push('--no-bundle');
-  if (options.noEval) args.push('--no-eval');
+  if (options.runEval) args.push('--eval');
 
   const env = {
     ...process.env,
@@ -474,7 +599,7 @@ async function runActionPlan(sessionId, options, logger) {
       text.split('\n').filter(l => l.trim()).forEach(line => {
         if (line.includes('Error') || line.includes('FATAL')) {
           logger.error(line);
-        } else if (line.includes('✓') || line.includes('SUCCESS')) {
+        } else if (line.includes('[+]') || line.includes('SUCCESS')) {
           logger.success(line);
         } else if (options.verbose || line.includes('[') || line.includes('Task')) {
           logger.info(line);
@@ -577,7 +702,7 @@ ${colors.bold}OPTIONS:${colors.reset}
   --memory, -m            Enable memory mode - use previous attempt logs as context
   --memory-dir <dir>      Memory directory (default: ./memory)
   --dry-run, -d           Dry run mode - no actual execution
-  --no-eval               Skip output evaluation
+  --eval, -e              Run output evaluation (requires LLM_API_KEY)
   --no-server             Don't start server (requires --server-url)
   --clean-sandbox         Clean sandbox before execution
   --verbose, -v           Verbose output
@@ -643,7 +768,7 @@ function parseCliArgs() {
     memory: { type: 'boolean', short: 'm', default: false },
     'memory-dir': { type: 'string', default: './memory' },
     'dry-run': { type: 'boolean', short: 'd', default: false },
-    'no-eval': { type: 'boolean', default: false },
+    eval: { type: 'boolean', short: 'e', default: false },
     'no-server': { type: 'boolean', default: false },
     'clean-sandbox': { type: 'boolean', default: false },
     verbose: { type: 'boolean', short: 'v', default: false },
@@ -946,8 +1071,8 @@ async function main() {
         dryRun: args['dry-run'],
         verbose: args.verbose,
         output: args.output,
-        noBundle: args['no-eval'],
-        noEval: true, // We run eval separately
+        noBundle: false,
+        runEval: false, // We run eval separately if requested
         env
       }, logger),
       'execute action plan',
@@ -964,8 +1089,8 @@ async function main() {
       logger.warn(`Execution completed with exit code: ${execResult.exitCode}`);
     }
 
-    // Phase 5: Evaluation
-    if (!args['no-eval']) {
+    // Phase 5: Evaluation (only if --eval flag is passed)
+    if (args.eval) {
       logger.phase(5, 5, 'Output Evaluation');
       result.phases.eval = { success: false };
 
@@ -1012,6 +1137,9 @@ async function main() {
     if (result.scores) {
       logger.info(`Score: ${result.scores.overall}/100 (${result.scores.grade})`);
     }
+
+    // Print final output summary with file locations
+    await printOutputSummary(sessionId, args.output, logger);
 
   } catch (err) {
     result.success = false;
