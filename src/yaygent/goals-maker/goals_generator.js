@@ -403,9 +403,6 @@ function renderAnimatedBorders() {
   // Build all output as a single string for atomic write
   let output = "";
 
-  // Save cursor position
-  output += "\x1b[s";
-
   // Render header (top 3 rows) - all rows have the same buffer zone
   for (let row = 0; row < BORDER_HEIGHT; row++) {
     output += `\x1b[${row + 1};1H`; // moveTo
@@ -465,8 +462,8 @@ function renderAnimatedBorders() {
     output += colors.dim + line.slice(0, cols) + colors.reset;
   }
 
-  // Restore cursor position
-  output += "\x1b[u";
+  // Move cursor back to current content row (don't use save/restore to avoid interference with prompts)
+  output += `\x1b[${currentContentRow};1H`;
 
   // Write all at once for atomic rendering
   process.stdout.write(output);
@@ -811,9 +808,6 @@ async function prompt(question, defaultValue = "") {
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
 
-  // Pause animation during input to prevent cursor interference
-  const wasAnimating = pauseBorderAnimation();
-
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -838,9 +832,6 @@ async function prompt(question, defaultValue = "") {
         process.stdout.write("\x1b[2K");
       }
 
-      // Resume animation
-      if (wasAnimating) resumeBorderAnimation();
-
       resolve(answer.trim() || defaultValue);
     });
   });
@@ -848,9 +839,6 @@ async function prompt(question, defaultValue = "") {
 
 async function promptPassword(question) {
   const rl = createRL();
-
-  // Pause animation during input to prevent cursor interference
-  const wasAnimating = pauseBorderAnimation();
 
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
@@ -909,9 +897,6 @@ async function promptPassword(question) {
           process.stdout.write("\n");
           currentContentRow = promptRow + 1; // Track the row after input
 
-          // Resume animation
-          if (wasAnimating) resumeBorderAnimation();
-
           rl.close();
           resolve(password);
           return;
@@ -940,9 +925,6 @@ async function promptPassword(question) {
 
 async function promptSelect(question, choices) {
   let selectedIndex = 0;
-
-  // Pause animation during input to prevent cursor interference
-  const wasAnimating = pauseBorderAnimation();
 
   // Capture the starting row from our tracker
   const menuStartRow = getCurrentRow();
@@ -996,9 +978,6 @@ async function promptSelect(question, choices) {
           moveTo(rows - i, 1);
           process.stdout.write("\x1b[2K");
         }
-
-        // Resume animation
-        if (wasAnimating) resumeBorderAnimation();
 
         // Move cursor below menu
         moveTo(currentContentRow, 1);
