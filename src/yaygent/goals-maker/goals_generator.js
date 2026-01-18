@@ -131,6 +131,19 @@ const consoleBuffer = {
   scrollEnabled: false // Whether scroll mode is active
 };
 
+// Multiline input buffer for scrollable text input
+const multilineBuffer = {
+  lines: [''],         // Content lines (always at least one empty line)
+  cursorLine: 0,       // Which line the cursor is on
+  cursorCol: 0,        // Column position within the line
+  scrollOffset: 0,     // First visible line index
+  windowTop: 14,       // Top row of the input window
+  windowHeight: 8,     // Number of visible lines
+  windowLeft: 3,       // Left margin
+  windowWidth: 74,     // Width of input area
+  active: false        // Whether input is active
+};
+
 // Get visible line count in content area
 function getVisibleLineCount() {
   const { rows } = getTerminalSize();
@@ -283,6 +296,246 @@ function clearContentArea() {
 
   // Clear buffer too
   clearConsoleBuffer();
+}
+
+// ============== Multiline Input Buffer Functions ==============
+
+// Initialize/reset the multiline buffer for new input
+function initMultilineBuffer(windowTop, windowHeight, windowLeft, windowWidth) {
+  const { cols, rows } = getTerminalSize();
+  multilineBuffer.lines = [''];
+  multilineBuffer.cursorLine = 0;
+  multilineBuffer.cursorCol = 0;
+  multilineBuffer.scrollOffset = 0;
+  multilineBuffer.windowTop = windowTop || 14;
+  multilineBuffer.windowHeight = windowHeight || Math.min(8, rows - BORDER_HEIGHT * 2 - 6);
+  multilineBuffer.windowLeft = windowLeft || 3;
+  multilineBuffer.windowWidth = windowWidth || (cols - 6);
+  multilineBuffer.active = true;
+  inMultilineInput = true;
+}
+
+// Render the multiline input buffer to its window
+function renderMultilineBuffer() {
+  if (!multilineBuffer.active) return;
+
+  const { windowTop, windowHeight, windowLeft, windowWidth, scrollOffset, lines, cursorLine, cursorCol } = multilineBuffer;
+
+  // Ensure cursor line is visible (auto-scroll)
+  if (cursorLine < scrollOffset) {
+    multilineBuffer.scrollOffset = cursorLine;
+  } else if (cursorLine >= scrollOffset + windowHeight) {
+    multilineBuffer.scrollOffset = cursorLine - windowHeight + 1;
+  }
+
+  const visibleStart = multilineBuffer.scrollOffset;
+  const visibleEnd = Math.min(visibleStart + windowHeight, lines.length);
+
+  // Draw each visible line
+  for (let i = 0; i < windowHeight; i++) {
+    const lineIndex = visibleStart + i;
+    const screenRow = windowTop + i;
+
+    moveTo(screenRow, windowLeft);
+    process.stdout.write("\x1b[2K"); // Clear line
+
+    if (lineIndex < lines.length) {
+      // Get line content, truncate to window width
+      const lineContent = lines[lineIndex] || '';
+      const displayContent = lineContent.slice(0, windowWidth);
+      process.stdout.write(displayContent);
+    }
+  }
+
+  // Draw scroll indicator on the right edge
+  const totalLines = lines.length;
+  const { cols } = getTerminalSize();
+  const indicatorCol = cols - 2;
+
+  if (totalLines > windowHeight) {
+    const scrollPercent = Math.round((scrollOffset / Math.max(1, totalLines - windowHeight)) * 100);
+    const scrollBarHeight = Math.max(1, Math.floor((windowHeight / totalLines) * windowHeight));
+    const scrollBarPos = Math.floor((scrollOffset / Math.max(1, totalLines - windowHeight)) * (windowHeight - scrollBarHeight));
+
+    for (let i = 0; i < windowHeight; i++) {
+      moveTo(windowTop + i, indicatorCol);
+      if (i >= scrollBarPos && i < scrollBarPos + scrollBarHeight) {
+        process.stdout.write(colors.cyan + "█" + colors.reset);
+      } else {
+        process.stdout.write(colors.dim + "│" + colors.reset);
+      }
+    }
+  }
+
+  // Draw status line below the input area
+  const statusRow = windowTop + windowHeight;
+  moveTo(statusRow, windowLeft);
+  process.stdout.write("\x1b[2K");
+  const lineInfo = `${c("dim", `Line ${cursorLine + 1}/${totalLines}`)}`;
+  const scrollInfo = totalLines > windowHeight
+    ? `  ${c("dim", "[")}${c("cyan", "↑↓")}${c("dim", "] scroll")}`
+    : "";
+  const helpInfo = `  ${c("dim", "Type")} ${c("cyan", ".done")} ${c("dim", "to finish")}`;
+  process.stdout.write(lineInfo + scrollInfo + helpInfo);
+
+  // Position cursor at the correct location
+  const cursorScreenRow = windowTop + (cursorLine - multilineBuffer.scrollOffset);
+  const cursorScreenCol = windowLeft + Math.min(cursorCol, windowWidth - 1);
+  moveTo(cursorScreenRow, cursorScreenCol);
+}
+
+// Insert text at cursor position (handles paste with multiple chars/lines)
+function multilineInsertText(text) {
+  // Split pasted text into lines
+  const inputLines = text.split(/\r?\n/);
+
+  for (let i = 0; i < inputLines.length; i++) {
+    const chars = inputLines[i];
+
+    // Insert characters into current line
+    const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+    const before = currentLine.slice(0, multilineBuffer.cursorCol);
+    const after = currentLine.slice(multilineBuffer.cursorCol);
+    multilineBuffer.lines[multilineBuffer.cursorLine] = before + chars + after;
+    multilineBuffer.cursorCol += chars.length;
+
+    // If there are more lines to paste, insert a newline
+    if (i < inputLines.length - 1) {
+      multilineInsertNewline();
+    }
+  }
+
+  renderMultilineBuffer();
+}
+
+// Insert a newline at cursor position
+function multilineInsertNewline() {
+  const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+  const before = currentLine.slice(0, multilineBuffer.cursorCol);
+  const after = currentLine.slice(multilineBuffer.cursorCol);
+
+  multilineBuffer.lines[multilineBuffer.cursorLine] = before;
+  multilineBuffer.lines.splice(multilineBuffer.cursorLine + 1, 0, after);
+  multilineBuffer.cursorLine++;
+  multilineBuffer.cursorCol = 0;
+}
+
+// Delete character before cursor (backspace)
+function multilineBackspace() {
+  if (multilineBuffer.cursorCol > 0) {
+    // Delete character in current line
+    const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+    const before = currentLine.slice(0, multilineBuffer.cursorCol - 1);
+    const after = currentLine.slice(multilineBuffer.cursorCol);
+    multilineBuffer.lines[multilineBuffer.cursorLine] = before + after;
+    multilineBuffer.cursorCol--;
+  } else if (multilineBuffer.cursorLine > 0) {
+    // Merge with previous line
+    const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+    const prevLine = multilineBuffer.lines[multilineBuffer.cursorLine - 1] || '';
+    multilineBuffer.cursorCol = prevLine.length;
+    multilineBuffer.lines[multilineBuffer.cursorLine - 1] = prevLine + currentLine;
+    multilineBuffer.lines.splice(multilineBuffer.cursorLine, 1);
+    multilineBuffer.cursorLine--;
+  }
+  renderMultilineBuffer();
+}
+
+// Delete character at cursor (delete key)
+function multilineDelete() {
+  const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+  if (multilineBuffer.cursorCol < currentLine.length) {
+    // Delete character at cursor
+    const before = currentLine.slice(0, multilineBuffer.cursorCol);
+    const after = currentLine.slice(multilineBuffer.cursorCol + 1);
+    multilineBuffer.lines[multilineBuffer.cursorLine] = before + after;
+  } else if (multilineBuffer.cursorLine < multilineBuffer.lines.length - 1) {
+    // Merge with next line
+    const nextLine = multilineBuffer.lines[multilineBuffer.cursorLine + 1] || '';
+    multilineBuffer.lines[multilineBuffer.cursorLine] = currentLine + nextLine;
+    multilineBuffer.lines.splice(multilineBuffer.cursorLine + 1, 1);
+  }
+  renderMultilineBuffer();
+}
+
+// Move cursor
+function multilineMoveCursor(direction) {
+  const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+
+  switch (direction) {
+    case 'left':
+      if (multilineBuffer.cursorCol > 0) {
+        multilineBuffer.cursorCol--;
+      } else if (multilineBuffer.cursorLine > 0) {
+        multilineBuffer.cursorLine--;
+        multilineBuffer.cursorCol = (multilineBuffer.lines[multilineBuffer.cursorLine] || '').length;
+      }
+      break;
+    case 'right':
+      if (multilineBuffer.cursorCol < currentLine.length) {
+        multilineBuffer.cursorCol++;
+      } else if (multilineBuffer.cursorLine < multilineBuffer.lines.length - 1) {
+        multilineBuffer.cursorLine++;
+        multilineBuffer.cursorCol = 0;
+      }
+      break;
+    case 'up':
+      if (multilineBuffer.cursorLine > 0) {
+        multilineBuffer.cursorLine--;
+        const newLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+        multilineBuffer.cursorCol = Math.min(multilineBuffer.cursorCol, newLine.length);
+      }
+      break;
+    case 'down':
+      if (multilineBuffer.cursorLine < multilineBuffer.lines.length - 1) {
+        multilineBuffer.cursorLine++;
+        const newLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
+        multilineBuffer.cursorCol = Math.min(multilineBuffer.cursorCol, newLine.length);
+      }
+      break;
+    case 'home':
+      multilineBuffer.cursorCol = 0;
+      break;
+    case 'end':
+      multilineBuffer.cursorCol = currentLine.length;
+      break;
+    case 'pageup':
+      multilineBuffer.scrollOffset = Math.max(0, multilineBuffer.scrollOffset - multilineBuffer.windowHeight);
+      multilineBuffer.cursorLine = Math.max(0, multilineBuffer.cursorLine - multilineBuffer.windowHeight);
+      break;
+    case 'pagedown':
+      const maxScroll = Math.max(0, multilineBuffer.lines.length - multilineBuffer.windowHeight);
+      multilineBuffer.scrollOffset = Math.min(maxScroll, multilineBuffer.scrollOffset + multilineBuffer.windowHeight);
+      multilineBuffer.cursorLine = Math.min(multilineBuffer.lines.length - 1, multilineBuffer.cursorLine + multilineBuffer.windowHeight);
+      break;
+  }
+  renderMultilineBuffer();
+}
+
+// Check if the input ends with ".done"
+function multilineCheckDone() {
+  const lastLine = multilineBuffer.lines[multilineBuffer.lines.length - 1] || '';
+  return lastLine.trim() === '.done';
+}
+
+// Get the final content (excluding the ".done" line)
+function multilineGetContent() {
+  let lines = [...multilineBuffer.lines];
+  // Remove the ".done" line if present
+  if (lines.length > 0 && lines[lines.length - 1].trim() === '.done') {
+    lines.pop();
+  }
+  // Remove trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop();
+  }
+  return lines.join('\n');
+}
+
+// Deactivate multiline buffer
+function deactivateMultilineBuffer() {
+  multilineBuffer.active = false;
+  inMultilineInput = false;
 }
 
 function resetScrollRegion() {
@@ -487,6 +740,11 @@ function renderAnimatedBorders() {
 
   // Write all at once for atomic rendering
   process.stdout.write(output);
+
+  // If multiline buffer is active, re-render it to ensure input area is clean
+  if (multilineBuffer.active) {
+    renderMultilineBuffer();
+  }
 
   animFrameIndex = (animFrameIndex + 1) % animFrames.length;
 }
@@ -1067,64 +1325,128 @@ async function promptMultiline(question, instruction, centered = false, startRow
 
   const { cols, rows } = getTerminalSize();
 
-  // Input starts at fixed row (default 14)
-  let inputIndent = 1;
-  if (centered) {
-    inputIndent = Math.floor(cols / 4); // Indent input from left
-  }
+  // Calculate window dimensions - input starts at column 2
+  const windowLeft = centered ? Math.floor(cols / 4) : 2;
+  const windowWidth = cols - windowLeft - 4; // Leave margin on right for scroll indicator
+  const windowHeight = Math.min(10, rows - startRow - BORDER_HEIGHT - 3);
 
-  // Set fixed starting position for input
-  multilineInputStartRow = startRow;
-  multilineInputCurrentRow = startRow;
-  currentContentRow = startRow;
-  currentContentCol = inputIndent;
-  moveTo(currentContentRow, inputIndent);
+  // Initialize the multiline buffer
+  initMultilineBuffer(startRow, windowHeight, windowLeft, windowWidth);
 
-  // Enable multiline input mode
-  inMultilineInput = true;
+  // Draw initial border/frame for the input area
+  const drawInputFrame = () => {
+    // Top border
+    moveTo(startRow - 1, windowLeft - 1);
+    process.stdout.write(colors.dim + "┌" + "─".repeat(windowWidth + 2) + "┐" + colors.reset);
 
-  const lines = [];
-  const rl = createRL();
+    // Side borders
+    for (let i = 0; i < windowHeight; i++) {
+      moveTo(startRow + i, windowLeft - 1);
+      process.stdout.write(colors.dim + "│" + colors.reset);
+      moveTo(startRow + i, windowLeft + windowWidth + 1);
+      process.stdout.write(colors.dim + "│" + colors.reset);
+    }
 
-  // Calculate visual rows a line takes (accounting for word wrap)
-  const calcVisualRows = (lineText) => {
-    const availableWidth = cols - inputIndent;
-    if (lineText.length === 0) return 1;
-    return Math.ceil(lineText.length / availableWidth);
+    // Bottom border
+    moveTo(startRow + windowHeight, windowLeft - 1);
+    process.stdout.write(colors.dim + "└" + "─".repeat(windowWidth + 2) + "┘" + colors.reset);
   };
 
-  // Maximum row before footer (leave 5 rows: separator + 3 footer + 1 buffer)
-  const maxContentRow = rows - BORDER_HEIGHT - 2;
+  drawInputFrame();
+  renderMultilineBuffer();
+  showCursor();
 
   return new Promise((resolve) => {
-    rl.on("line", (line) => {
-      if (line === ".done") {
-        rl.close();
-        inMultilineInput = false;
-        multilineInputCurrentRow = multilineInputStartRow;
-        currentContentCol = 1;
-        resolve(lines.join("\n"));
-      } else {
-        lines.push(line);
-        // Track visual rows used (including word wrap)
-        const visualRows = calcVisualRows(line);
-        multilineInputCurrentRow += visualRows;
-        currentContentRow = multilineInputCurrentRow;
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
 
-        // Clamp to max content area
-        if (multilineInputCurrentRow > maxContentRow) {
-          multilineInputCurrentRow = maxContentRow;
-          currentContentRow = maxContentRow;
+    const cleanup = () => {
+      stdin.setRawMode(false);
+      stdin.removeListener("data", onKey);
+      deactivateMultilineBuffer();
+
+      // Clear the input area frame
+      for (let i = -1; i <= windowHeight + 1; i++) {
+        moveTo(startRow + i, windowLeft - 1);
+        process.stdout.write("\x1b[2K");
+      }
+
+      // Reset content row position
+      currentContentRow = startRow + windowHeight + 2;
+      currentContentCol = 1;
+      moveTo(currentContentRow, 1);
+    };
+
+    const onKey = (data) => {
+      // Handle escape sequences for special keys
+      if (data === "\x1b[A") {
+        // Up arrow
+        multilineMoveCursor('up');
+      } else if (data === "\x1b[B") {
+        // Down arrow
+        multilineMoveCursor('down');
+      } else if (data === "\x1b[C") {
+        // Right arrow
+        multilineMoveCursor('right');
+      } else if (data === "\x1b[D") {
+        // Left arrow
+        multilineMoveCursor('left');
+      } else if (data === "\x1b[H" || data === "\x1b[1~") {
+        // Home
+        multilineMoveCursor('home');
+      } else if (data === "\x1b[F" || data === "\x1b[4~") {
+        // End
+        multilineMoveCursor('end');
+      } else if (data === "\x1b[5~") {
+        // Page Up
+        multilineMoveCursor('pageup');
+      } else if (data === "\x1b[6~") {
+        // Page Down
+        multilineMoveCursor('pagedown');
+      } else if (data === "\x1b[3~") {
+        // Delete key
+        multilineDelete();
+      } else if (data === "\x7f" || data === "\b") {
+        // Backspace
+        multilineBackspace();
+      } else if (data === "\r" || data === "\n") {
+        // Enter - check if we should finish or add newline
+        // First add the newline
+        multilineInsertNewline();
+        renderMultilineBuffer();
+
+        // Check if previous line was ".done"
+        if (multilineBuffer.cursorLine > 0) {
+          const prevLine = multilineBuffer.lines[multilineBuffer.cursorLine - 1] || '';
+          if (prevLine.trim() === '.done') {
+            cleanup();
+            resolve(multilineGetContent());
+            return;
+          }
+        }
+      } else if (data === "\u0003") {
+        // Ctrl+C - cancel
+        cleanup();
+        resolve('');
+      } else if (data === "\u0004") {
+        // Ctrl+D - done (alternative to .done)
+        cleanup();
+        resolve(multilineGetContent());
+      } else if (data.startsWith("\x1b")) {
+        // Other escape sequences - ignore
+      } else {
+        // Regular text input (handles paste too)
+        // Filter out control characters except tab
+        const filtered = data.split('').filter(ch => ch >= ' ' || ch === '\t').join('');
+        if (filtered.length > 0) {
+          multilineInsertText(filtered);
         }
       }
-    });
+    };
 
-    rl.on("close", () => {
-      inMultilineInput = false;
-      multilineInputCurrentRow = multilineInputStartRow;
-      currentContentCol = 1;
-      resolve(lines.join("\n"));
-    });
+    stdin.on("data", onKey);
   });
 }
 
