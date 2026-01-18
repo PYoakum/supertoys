@@ -1073,10 +1073,19 @@ async function promptMultiline(question, instruction, centered = false) {
   const lines = [];
   const rl = createRL();
 
-  // Track row as user enters lines
-  rl.on("line", () => {
-    currentContentRow++;
-  });
+  // Calculate visual rows a line takes (accounting for word wrap)
+  const calcVisualRows = (lineText) => {
+    const { cols } = getTerminalSize();
+    const availableWidth = cols - inputIndent; // Width available for text
+    if (lineText.length === 0) return 1; // Empty line still takes 1 row
+    return Math.ceil(lineText.length / availableWidth);
+  };
+
+  // Maximum row before footer (leave room for separator + footer)
+  const getMaxContentRow = () => {
+    const { rows } = getTerminalSize();
+    return rows - BORDER_HEIGHT - 1; // One row above bottom separator
+  };
 
   return new Promise((resolve) => {
     rl.on("line", (line) => {
@@ -1087,6 +1096,14 @@ async function promptMultiline(question, instruction, centered = false) {
         resolve(lines.join("\n"));
       } else {
         lines.push(line);
+        // Track actual visual rows used (including word wrap)
+        const visualRows = calcVisualRows(line);
+        currentContentRow += visualRows;
+        // Clamp to max content area (don't overflow into footer)
+        const maxRow = getMaxContentRow();
+        if (currentContentRow > maxRow) {
+          currentContentRow = maxRow;
+        }
       }
     });
 
