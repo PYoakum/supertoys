@@ -2240,7 +2240,8 @@ async function runAdvancedMode(goalsFilePath) {
   return new Promise((resolve) => {
     const proc = spawn("bun", [
       GOALS_CLI_PATH,
-      goalsFilePath,
+      "tui",
+      "--goals", goalsFilePath,
       "--context", contextDir
     ], {
       stdio: "inherit",
