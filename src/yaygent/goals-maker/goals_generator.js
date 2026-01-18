@@ -872,7 +872,7 @@ async function promptPassword(question) {
 
           // Clean up row 5 from the bottom (above separator) to fix border artifacts
           const { rows } = getTerminalSize();
-          const cleanupRow = rows - 4; // 5th row from bottom (1-indexed from bottom)
+          const cleanupRow = rows - 5; // 5th row from bottom
           moveTo(cleanupRow, 1);
           process.stdout.write("\x1b[2K"); // Clear the entire line
 
