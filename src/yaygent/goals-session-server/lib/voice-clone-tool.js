@@ -12,7 +12,18 @@ import { readFile, writeFile, unlink, mkdir, readdir, stat, copyFile } from 'fs/
 import { existsSync } from 'fs';
 import { join, resolve, basename, extname, dirname } from 'path';
 import { tmpdir, homedir, platform } from 'os';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * Get the custom TTS model directory in assets
+ */
+function getCustomModelDir() {
+  return join(__dirname, '..', 'assets', 'other_models', 'tts');
+}
 
 /**
  * Supported languages for XTTS v2
@@ -224,6 +235,17 @@ export class VoiceCloneTool {
     this.hasTts = checkTtsCli();
     this.hasFfmpeg = checkFfmpeg();
     this.warmedUpModels = new Set(); // Track which models have been warmed up
+
+    // Set up custom model directory if it exists
+    const customModelDir = getCustomModelDir();
+    this.ttsEnv = existsSync(customModelDir) ? { TTS_HOME: customModelDir } : {};
+  }
+
+  /**
+   * Get environment variables for TTS commands
+   */
+  _getTtsEnv() {
+    return this.ttsEnv;
   }
 
   /**
@@ -251,7 +273,7 @@ export class VoiceCloneTool {
         args.push('--language_idx', 'en');
       }
 
-      await runCommand('tts', args, { timeout: this.config.timeout });
+      await runCommand('tts', args, { timeout: this.config.timeout, env: this._getTtsEnv() });
 
       // Give the model a moment to stabilize
       await sleep(1000);
@@ -414,7 +436,7 @@ export class VoiceCloneTool {
         '--speaker_wav', processedRef,
         '--language_idx', language,
         '--out_path', tempOutput
-      ], { timeout: this.config.timeout });
+      ], { timeout: this.config.timeout, env: this._getTtsEnv() });
 
       // Convert to final format if needed
       if (ext !== '.wav' && this.hasFfmpeg) {
@@ -513,7 +535,7 @@ export class VoiceCloneTool {
       '--source_wav', sourcePath,
       '--target_wav', targetPath,
       '--out_path', finalPath
-    ], { timeout: this.config.timeout });
+    ], { timeout: this.config.timeout, env: this._getTtsEnv() });
 
     // Get output info and audio level
     const outputInfo = await getAudioInfo(finalPath);
@@ -599,7 +621,7 @@ export class VoiceCloneTool {
     // Warm up the model
     await this._warmupModel(this.config.xttsModel);
 
-    await runCommand('tts', ttsArgs, { timeout: this.config.timeout });
+    await runCommand('tts', ttsArgs, { timeout: this.config.timeout, env: this._getTtsEnv() });
 
     // Convert format if needed
     if (ext !== '.wav' && this.hasFfmpeg) {

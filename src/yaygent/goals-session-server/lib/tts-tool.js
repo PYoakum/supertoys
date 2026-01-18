@@ -11,6 +11,17 @@ import { readFile, writeFile, unlink, mkdir, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve, extname, dirname } from 'path';
 import { tmpdir, homedir, platform } from 'os';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * Get the custom TTS model directory in assets
+ */
+function getCustomModelDir() {
+  return join(__dirname, '..', 'assets', 'other_models', 'tts');
+}
 
 /**
  * Common TTS models
@@ -247,6 +258,17 @@ export class TtsTool {
     this.hasFfmpeg = checkFfmpeg();
     this.modelCache = null; // Cached model list
     this.warmedUpModels = new Set(); // Track which models have been warmed up
+
+    // Set up custom model directory if it exists
+    const customModelDir = getCustomModelDir();
+    this.ttsEnv = existsSync(customModelDir) ? { TTS_HOME: customModelDir } : {};
+  }
+
+  /**
+   * Get environment variables for TTS commands
+   */
+  _getTtsEnv() {
+    return this.ttsEnv;
   }
 
   /**
@@ -267,7 +289,7 @@ export class TtsTool {
         '--text', 'test',
         '--model_name', model,
         '--out_path', warmupPath
-      ], { timeout: this.config.timeout });
+      ], { timeout: this.config.timeout, env: this._getTtsEnv() });
 
       // Give the model a moment to stabilize
       await sleep(1000);
@@ -326,7 +348,7 @@ export class TtsTool {
     if (this.modelCache) return this.modelCache;
 
     try {
-      const result = await runCommand('tts', ['--list_models'], { timeout: 30000 });
+      const result = await runCommand('tts', ['--list_models'], { timeout: 30000, env: this._getTtsEnv() });
       const lines = result.stdout.split('\n');
       const models = [];
 
@@ -408,7 +430,7 @@ export class TtsTool {
       args.push('--language_idx', language);
     }
 
-    await runCommand('tts', args, { timeout: this.config.timeout });
+    await runCommand('tts', args, { timeout: this.config.timeout, env: this._getTtsEnv() });
 
     return outputPath;
   }
@@ -632,7 +654,7 @@ export class TtsTool {
       const result = await runCommand('tts', [
         '--model_name', resolvedModel,
         '--list_speaker_idxs'
-      ], { timeout: 60000 });
+      ], { timeout: 60000, env: this._getTtsEnv() });
 
       // Parse speaker output
       const speakers = [];
