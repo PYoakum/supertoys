@@ -405,11 +405,6 @@ function renderAnimatedBorders() {
   // Build all output as a single string for atomic write
   let output = "";
 
-  // Save cursor position if in multiline input mode (so readline cursor isn't disrupted)
-  if (inMultilineInput) {
-    output += "\x1b[s"; // Save cursor position
-  }
-
   // Render header (top 3 rows) - all rows have the same buffer zone
   for (let row = 0; row < BORDER_HEIGHT; row++) {
     output += `\x1b[${row + 1};1H`; // moveTo
@@ -452,12 +447,12 @@ function renderAnimatedBorders() {
 
   // Render bottom separator line (4th row from bottom - solid violet line)
   const separatorRow = rows - BORDER_HEIGHT;
-  output += `\x1b[${separatorRow};1H`; // moveTo separator row
+  output += `\x1b[${separatorRow};1H`;
   output += colors.violet + "—".repeat(cols) + colors.reset;
 
   // Render footer (bottom 3 rows)
   for (let row = 0; row < BORDER_HEIGHT; row++) {
-    output += `\x1b[${rows - BORDER_HEIGHT + row + 1};1H`; // moveTo
+    output += `\x1b[${rows - BORDER_HEIGHT + row + 1};1H`;
 
     let line = "";
     for (let col = 0; col < cols; col += 3) {
@@ -470,13 +465,7 @@ function renderAnimatedBorders() {
   }
 
   // Move cursor back to content position
-  if (inMultilineInput) {
-    // Restore cursor to where readline had it
-    output += "\x1b[u"; // Restore cursor position
-  } else {
-    // Use explicit positioning for other input types
-    output += `\x1b[${currentContentRow};${currentContentCol}H`;
-  }
+  output += `\x1b[${currentContentRow};${currentContentCol}H`;
 
   // Write all at once for atomic rendering
   process.stdout.write(output);
@@ -1045,7 +1034,7 @@ async function promptConfirm(question, defaultValue = true) {
   return answer.toLowerCase().startsWith("y");
 }
 
-async function promptMultiline(question, instruction, centered = false) {
+async function promptMultiline(question, instruction, centered = false, startRow = 14) {
   // Only print question/instruction if provided
   if (question) {
     if (centered) {
@@ -1058,16 +1047,20 @@ async function promptMultiline(question, instruction, centered = false) {
     printLine();
   }
 
-  // For centered input, move cursor to center for typing
+  const { cols, rows } = getTerminalSize();
+
+  // Input starts at fixed row (default 14)
   let inputIndent = 1;
   if (centered) {
-    const { cols } = getTerminalSize();
     inputIndent = Math.floor(cols / 4); // Indent input from left
-    moveTo(currentContentRow, inputIndent);
-    currentContentCol = inputIndent;
   }
 
-  // Enable multiline input mode - animation keeps running but won't reposition cursor
+  // Set fixed starting position for input
+  currentContentRow = startRow;
+  currentContentCol = inputIndent;
+  moveTo(currentContentRow, inputIndent);
+
+  // Enable multiline input mode
   inMultilineInput = true;
 
   const lines = [];
@@ -1075,40 +1068,51 @@ async function promptMultiline(question, instruction, centered = false) {
 
   // Calculate visual rows a line takes (accounting for word wrap)
   const calcVisualRows = (lineText) => {
-    const { cols } = getTerminalSize();
-    const availableWidth = cols - inputIndent; // Width available for text
-    if (lineText.length === 0) return 1; // Empty line still takes 1 row
+    const availableWidth = cols - inputIndent;
+    if (lineText.length === 0) return 1;
     return Math.ceil(lineText.length / availableWidth);
   };
 
-  // Maximum row before footer (leave room for separator + footer)
-  const getMaxContentRow = () => {
-    const { rows } = getTerminalSize();
-    return rows - BORDER_HEIGHT - 1; // One row above bottom separator
+  // Maximum row before footer
+  const maxContentRow = rows - BORDER_HEIGHT - 1;
+
+  // Clean up animation artifacts on current and nearby rows
+  const cleanupRows = () => {
+    const { rows: termRows } = getTerminalSize();
+    // Re-render the footer area to fix any creep
+    const separatorRow = termRows - BORDER_HEIGHT;
+    moveTo(separatorRow, 1);
+    process.stdout.write("\x1b[2K" + "\x1b[38;5;135m" + "—".repeat(cols) + "\x1b[0m");
+
+    // Move cursor back to current input position
+    moveTo(currentContentRow, inputIndent);
   };
 
   return new Promise((resolve) => {
     rl.on("line", (line) => {
       if (line === ".done") {
         rl.close();
-        inMultilineInput = false; // Exit multiline mode
+        inMultilineInput = false;
         currentContentCol = 1;
         resolve(lines.join("\n"));
       } else {
         lines.push(line);
-        // Track actual visual rows used (including word wrap)
+        // Track visual rows used (including word wrap)
         const visualRows = calcVisualRows(line);
         currentContentRow += visualRows;
-        // Clamp to max content area (don't overflow into footer)
-        const maxRow = getMaxContentRow();
-        if (currentContentRow > maxRow) {
-          currentContentRow = maxRow;
+
+        // Clamp to max content area
+        if (currentContentRow > maxContentRow) {
+          currentContentRow = maxContentRow;
         }
+
+        // Clean up after each line to prevent animation creep
+        cleanupRows();
       }
     });
 
     rl.on("close", () => {
-      inMultilineInput = false; // Exit multiline mode
+      inMultilineInput = false;
       currentContentCol = 1;
       resolve(lines.join("\n"));
     });
