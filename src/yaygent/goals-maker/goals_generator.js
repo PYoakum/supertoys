@@ -2089,6 +2089,15 @@ async function main() {
 
   const model = await prompt("Model name (optional)", defaultModel);
 
+  // Clean up row 5 from the bottom before API key prompt
+  const { rows } = getTerminalSize();
+  const cleanupRow = rows - 5;
+  moveTo(cleanupRow, 1);
+  process.stdout.write("\x1b[2K");
+  if (animationInterval) {
+    renderAnimatedBorders();
+  }
+
   const apiKey = await promptPassword("API Key");
   if (!apiKey) {
     printLine(c("red", "API key is required. Exiting."));
