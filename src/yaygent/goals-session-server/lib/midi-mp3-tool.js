@@ -940,7 +940,7 @@ OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or mark
 
     router.registerTool('midi_mp3', this.handle.bind(this), {
       name: 'midi_mp3',
-      description: 'Generate MIDI from note notation and synthesize to MP3/WAV audio. Input must be MIDI note notation ONLY - no prose or descriptions.',
+      description: 'CREATE AUDIO FILES from note notation. This tool synthesizes notes into actual MP3/WAV audio files using FluidSynth. Use action="synthesize" to generate audio. Returns the path to the created audio file.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -995,7 +995,7 @@ OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or mark
       }, session);
     }, {
       name: 'make_music',
-      description: 'Synthesize music from MIDI note notation. The "notes" field must contain ONLY note notation - no prose, no explanations, no markdown.',
+      description: 'CREATE AN AUDIO FILE (MP3/WAV) from note notation. This is the primary tool for generating music - it synthesizes notes into a real audio file you can play. Use this tool when you need to create music, melodies, or songs. Returns output_path to the created audio file.',
       inputSchema: {
         type: 'object',
         properties: {
