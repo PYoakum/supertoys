@@ -2233,32 +2233,50 @@ async function runAdvancedMode(goalsFilePath) {
   await mkdir(contextDir, { recursive: true });
 
   printLine();
-  printLine(c("dim", "Launching goals-cli in TUI mode..."));
-  printLine(c("dim", `Context directory: ${contextDir}`));
+  printLine(c("dim", "Launching goals-cli TUI..."));
+  printLine(c("dim", `Goals: ${goalsFilePath}`));
+  printLine(c("dim", `Context: ${contextDir}`));
   printLine();
 
-  return new Promise((resolve) => {
-    const proc = spawn("bun", [
-      GOALS_CLI_PATH,
-      "tui",
-      "--goals", goalsFilePath,
-      "--context", contextDir
-    ], {
-      stdio: "inherit",
-      cwd: dirname(GOALS_CLI_PATH),
-    });
+  // Clean up stdin before handing off to TUI
+  // The TUI needs full control of the terminal
+  const stdin = process.stdin;
+  stdin.removeAllListeners("data");
+  stdin.removeAllListeners("keypress");
+  if (stdin.setRawMode) {
+    stdin.setRawMode(false);
+  }
+  stdin.pause();
 
-    proc.on("close", (code) => {
-      printLine();
-      printLine(c("dim", `TUI exited with code ${code}`));
-      resolve(code === 0);
-    });
+  // Clear screen and reset cursor for clean TUI handoff
+  process.stdout.write("\x1b[?25h");  // Show cursor
 
-    proc.on("error", (err) => {
-      printLine(c("red", `[x] Failed to launch goals-cli: ${err.message}`));
-      resolve(false);
-    });
+  // Small delay to let terminal settle
+  await new Promise(r => setTimeout(r, 100));
+
+  // Spawn TUI - it will take over the terminal
+  const proc = spawn("bun", [
+    GOALS_CLI_PATH,
+    "tui",
+    "--goals", goalsFilePath,
+    "--context", contextDir
+  ], {
+    stdio: "inherit",
+    cwd: dirname(GOALS_CLI_PATH),
   });
+
+  // Wait for TUI to exit, then exit with same code
+  proc.on("close", (code) => {
+    process.exit(code || 0);
+  });
+
+  proc.on("error", (err) => {
+    console.error(`Failed to launch goals-cli: ${err.message}`);
+    process.exit(1);
+  });
+
+  // Return a promise that never resolves - we'll exit via the handlers above
+  return new Promise(() => {});
 }
 
 // Post-generation menu
