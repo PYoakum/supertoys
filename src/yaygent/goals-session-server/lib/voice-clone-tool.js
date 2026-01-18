@@ -147,6 +147,13 @@ function runCommand(cmd, args, options = {}) {
 }
 
 /**
+ * Sleep for a specified number of milliseconds
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Get audio info using ffprobe
  */
 async function getAudioInfo(filePath) {
@@ -174,6 +181,31 @@ async function getAudioInfo(filePath) {
 }
 
 /**
+ * Get audio volume level using ffmpeg volumedetect
+ * Returns max_volume in dB (e.g., -30.5 for normal audio, -91.0 for silence)
+ */
+async function getAudioLevel(filePath) {
+  try {
+    const result = await runCommand('ffmpeg', [
+      '-i', filePath,
+      '-af', 'volumedetect',
+      '-f', 'null',
+      '-'
+    ], { timeout: 30000 });
+
+    // volumedetect outputs to stderr
+    const output = result.stderr;
+    const maxMatch = output.match(/max_volume:\s*([-\d.]+)\s*dB/);
+    if (maxMatch) {
+      return parseFloat(maxMatch[1]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Voice Clone Tool Class
  */
 export class VoiceCloneTool {
@@ -191,6 +223,47 @@ export class VoiceCloneTool {
 
     this.hasTts = checkTtsCli();
     this.hasFfmpeg = checkFfmpeg();
+    this.warmedUpModels = new Set(); // Track which models have been warmed up
+  }
+
+  /**
+   * Warm up a model by running a short test synthesis
+   * This ensures the model is fully loaded before actual synthesis
+   */
+  async _warmupModel(model) {
+    if (this.warmedUpModels.has(model)) {
+      return; // Already warmed up
+    }
+
+    await this._ensureDirs();
+    const warmupPath = join(this.config.tempDir, `warmup_${Date.now()}.wav`);
+
+    try {
+      // Run a short test synthesis to load the model
+      const args = [
+        '--text', 'test',
+        '--model_name', model,
+        '--out_path', warmupPath
+      ];
+
+      // XTTS needs language
+      if (model.includes('xtts')) {
+        args.push('--language_idx', 'en');
+      }
+
+      await runCommand('tts', args, { timeout: this.config.timeout });
+
+      // Give the model a moment to stabilize
+      await sleep(1000);
+
+      this.warmedUpModels.add(model);
+    } catch (err) {
+      // Warmup failed, but we'll still try the actual synthesis
+      console.error(`Model warmup failed for ${model}:`, err.message);
+    } finally {
+      // Clean up warmup file
+      await unlink(warmupPath).catch(() => {});
+    }
   }
 
   /**
@@ -331,6 +404,9 @@ export class VoiceCloneTool {
       // Create temp WAV output
       const tempOutput = join(this.config.tempDir, `clone_temp_${Date.now()}.wav`);
 
+      // Warm up the model to ensure it's fully loaded
+      await this._warmupModel(this.config.xttsModel);
+
       // Run TTS with XTTS and speaker_wav
       await runCommand('tts', [
         '--text', text,
@@ -356,17 +432,21 @@ export class VoiceCloneTool {
         await unlink(tempOutput).catch(() => {});
       }
 
-      // Get output info
+      // Get output info and audio level
       const outputInfo = await getAudioInfo(finalPath);
+      const audioLevelDb = await getAudioLevel(finalPath);
+      const isSilent = audioLevelDb !== null && audioLevelDb < -80;
 
       return {
         success: true,
         output_path: finalPath,
         duration_ms: Math.round(outputInfo.duration * 1000),
+        max_volume_db: audioLevelDb,
+        is_silent: isSilent,
         text_length: text.length,
         language,
         reference_duration_s: validation.duration,
-        warning: validation.warning || undefined,
+        warning: isSilent ? 'Audio output appears to be silent' : (validation.warning || undefined),
         model_used: this.config.xttsModel
       };
     } finally {
@@ -424,6 +504,9 @@ export class VoiceCloneTool {
       await mkdir(parentDir, { recursive: true });
     }
 
+    // Warm up the model
+    await this._warmupModel(this.config.freevcModel);
+
     // Run voice conversion
     await runCommand('tts', [
       '--model_name', this.config.freevcModel,
@@ -432,15 +515,21 @@ export class VoiceCloneTool {
       '--out_path', finalPath
     ], { timeout: this.config.timeout });
 
+    // Get output info and audio level
     const outputInfo = await getAudioInfo(finalPath);
+    const audioLevelDb = await getAudioLevel(finalPath);
+    const isSilent = audioLevelDb !== null && audioLevelDb < -80;
 
     return {
       success: true,
       output_path: finalPath,
       duration_ms: Math.round(outputInfo.duration * 1000),
+      max_volume_db: audioLevelDb,
+      is_silent: isSilent,
       source_duration_s: sourceInfo.duration,
       target_duration_s: targetInfo.duration,
-      model_used: this.config.freevcModel
+      model_used: this.config.freevcModel,
+      warning: isSilent ? 'Audio output appears to be silent' : undefined
     };
   }
 
@@ -507,6 +596,9 @@ export class VoiceCloneTool {
       ttsArgs.push('--speaker_idx', preset_speaker);
     }
 
+    // Warm up the model
+    await this._warmupModel(this.config.xttsModel);
+
     await runCommand('tts', ttsArgs, { timeout: this.config.timeout });
 
     // Convert format if needed
@@ -519,15 +611,21 @@ export class VoiceCloneTool {
       await unlink(tempOutput).catch(() => {});
     }
 
+    // Get output info and audio level
     const outputInfo = await getAudioInfo(finalPath);
+    const audioLevelDb = await getAudioLevel(finalPath);
+    const isSilent = audioLevelDb !== null && audioLevelDb < -80;
 
     return {
       success: true,
       output_path: finalPath,
       duration_ms: Math.round(outputInfo.duration * 1000),
+      max_volume_db: audioLevelDb,
+      is_silent: isSilent,
       text_length: text.length,
       language,
-      speaker: speaker_id || preset_speaker || 'default'
+      speaker: speaker_id || preset_speaker || 'default',
+      warning: isSilent ? 'Audio output appears to be silent' : undefined
     };
   }
 
