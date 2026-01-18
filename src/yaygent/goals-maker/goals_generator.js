@@ -831,12 +831,19 @@ async function promptPassword(question) {
   if (currentContentRow < minRow) currentContentRow = minRow;
   if (currentContentRow > maxRow) currentContentRow = maxRow;
 
+  // Capture the row we're using for this prompt
+  const promptRow = currentContentRow;
+
   // Position at current tracked row
-  moveTo(currentContentRow, 1);
+  moveTo(promptRow, 1);
   process.stdout.write("\x1b[2K"); // Clear line
 
+  // Build the prompt prefix
+  const promptPrefix = `${c("cyan", "?")} ${c("bold", question)}: `;
+  const promptPrefixLen = question.length + 4; // "? " + question + ": "
+
   return new Promise((resolve) => {
-    process.stdout.write(`${c("cyan", "?")} ${c("bold", question)}: `);
+    process.stdout.write(promptPrefix);
 
     const stdin = process.stdin;
     stdin.setRawMode(true);
@@ -845,27 +852,46 @@ async function promptPassword(question) {
 
     let password = "";
 
-    const onData = (char) => {
-      if (char === "\r" || char === "\n") {
-        stdin.setRawMode(false);
-        stdin.removeListener("data", onData);
-        process.stdout.write("\n");
-        currentContentRow++; // Track the row after input
-        rl.close();
-        resolve(password);
-      } else if (char === "\u0003") {
-        // Ctrl+C
-        stdin.setRawMode(false);
-        process.exit(0);
-      } else if (char === "\u007F" || char === "\b") {
-        // Backspace
-        if (password.length > 0) {
-          password = password.slice(0, -1);
-          process.stdout.write("\b \b");
+    // Function to redraw the masked input field
+    const redrawInput = () => {
+      // Move to exact row and column (animation may have moved cursor)
+      moveTo(promptRow, promptPrefixLen + 1);
+      process.stdout.write("\x1b[K"); // Clear from cursor to end of line
+      // Show asterisks for the password length
+      if (password.length > 0) {
+        process.stdout.write("*".repeat(password.length));
+      }
+    };
+
+    const onData = (data) => {
+      // Handle each character in the data (paste sends multiple chars)
+      for (const char of data) {
+        if (char === "\r" || char === "\n") {
+          stdin.setRawMode(false);
+          stdin.removeListener("data", onData);
+          // Move to end of prompt row before newline
+          moveTo(promptRow, promptPrefixLen + 1 + password.length);
+          process.stdout.write("\n");
+          currentContentRow = promptRow + 1; // Track the row after input
+          rl.close();
+          resolve(password);
+          return;
+        } else if (char === "\u0003") {
+          // Ctrl+C
+          stdin.setRawMode(false);
+          process.exit(0);
+        } else if (char === "\u007F" || char === "\b") {
+          // Backspace
+          if (password.length > 0) {
+            password = password.slice(0, -1);
+            redrawInput();
+          }
+        } else if (char >= " " || char === "\t") {
+          // Printable character or tab
+          password += char;
+          redrawInput();
         }
-      } else {
-        password += char;
-        process.stdout.write("*");
+        // Ignore other control characters
       }
     };
 
