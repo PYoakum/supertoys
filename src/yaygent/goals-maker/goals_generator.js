@@ -86,6 +86,8 @@ let animFrameIndex = 0;
 let currentContentRow = 5; // Start after header (3) + separator line (1) + 1
 let currentContentCol = 1; // Current column position (1-indexed)
 let inMultilineInput = false; // Flag to prevent cursor repositioning during multiline input
+let multilineInputStartRow = 14; // Where multiline input begins
+let multilineInputCurrentRow = 14; // Current row during multiline input
 
 function getTerminalSize() {
   return {
@@ -450,8 +452,21 @@ function renderAnimatedBorders() {
   output += `\x1b[${topSeparatorRow};1H`;
   output += colors.violet + "—".repeat(cols) + colors.reset;
 
-  // Render bottom separator line (4th row from bottom - solid violet line)
+  // Bottom separator row (4th from bottom)
   const separatorRow = rows - BORDER_HEIGHT;
+
+  // During multiline input, clean up rows between input area and footer
+  // This prevents any creeping content from appearing
+  if (inMultilineInput) {
+    // Clear from row after current input to row before separator (row-5 to input bottom)
+    const cleanupStart = multilineInputCurrentRow + 1;
+    const cleanupEnd = separatorRow - 1;
+    for (let cleanRow = cleanupStart; cleanRow <= cleanupEnd; cleanRow++) {
+      output += `\x1b[${cleanRow};1H\x1b[2K`; // Move and clear line
+    }
+  }
+
+  // Render bottom separator line (4th row from bottom - solid violet line)
   output += `\x1b[${separatorRow};1H`;
   output += colors.violet + "—".repeat(cols) + colors.reset;
 
@@ -1065,6 +1080,8 @@ async function promptMultiline(question, instruction, centered = false, startRow
   }
 
   // Set fixed starting position for input
+  multilineInputStartRow = startRow;
+  multilineInputCurrentRow = startRow;
   currentContentRow = startRow;
   currentContentCol = inputIndent;
   moveTo(currentContentRow, inputIndent);
@@ -1082,46 +1099,35 @@ async function promptMultiline(question, instruction, centered = false, startRow
     return Math.ceil(lineText.length / availableWidth);
   };
 
-  // Maximum row before footer
-  const maxContentRow = rows - BORDER_HEIGHT - 1;
-
-  // Clean up animation artifacts on current and nearby rows
-  const cleanupRows = () => {
-    const { rows: termRows } = getTerminalSize();
-    // Re-render the footer area to fix any creep
-    const separatorRow = termRows - BORDER_HEIGHT;
-    moveTo(separatorRow, 1);
-    process.stdout.write("\x1b[2K" + "\x1b[38;5;135m" + "—".repeat(cols) + "\x1b[0m");
-
-    // Move cursor back to current input position
-    moveTo(currentContentRow, inputIndent);
-  };
+  // Maximum row before footer (leave 5 rows: separator + 3 footer + 1 buffer)
+  const maxContentRow = rows - BORDER_HEIGHT - 2;
 
   return new Promise((resolve) => {
     rl.on("line", (line) => {
       if (line === ".done") {
         rl.close();
         inMultilineInput = false;
+        multilineInputCurrentRow = multilineInputStartRow;
         currentContentCol = 1;
         resolve(lines.join("\n"));
       } else {
         lines.push(line);
         // Track visual rows used (including word wrap)
         const visualRows = calcVisualRows(line);
-        currentContentRow += visualRows;
+        multilineInputCurrentRow += visualRows;
+        currentContentRow = multilineInputCurrentRow;
 
         // Clamp to max content area
-        if (currentContentRow > maxContentRow) {
+        if (multilineInputCurrentRow > maxContentRow) {
+          multilineInputCurrentRow = maxContentRow;
           currentContentRow = maxContentRow;
         }
-
-        // Clean up after each line to prevent animation creep
-        cleanupRows();
       }
     });
 
     rl.on("close", () => {
       inMultilineInput = false;
+      multilineInputCurrentRow = multilineInputStartRow;
       currentContentCol = 1;
       resolve(lines.join("\n"));
     });
