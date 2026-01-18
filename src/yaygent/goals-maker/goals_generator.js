@@ -85,6 +85,7 @@ let animFrameIndex = 0;
 // Track current content row for absolute positioning
 let currentContentRow = 5; // Start after header (3) + separator line (1) + 1
 let currentContentCol = 1; // Current column position (1-indexed)
+let inMultilineInput = false; // Flag to prevent cursor repositioning during multiline input
 
 function getTerminalSize() {
   return {
@@ -404,6 +405,11 @@ function renderAnimatedBorders() {
   // Build all output as a single string for atomic write
   let output = "";
 
+  // Save cursor position if in multiline input mode (so readline cursor isn't disrupted)
+  if (inMultilineInput) {
+    output += "\x1b[s"; // Save cursor position
+  }
+
   // Render header (top 3 rows) - all rows have the same buffer zone
   for (let row = 0; row < BORDER_HEIGHT; row++) {
     output += `\x1b[${row + 1};1H`; // moveTo
@@ -463,8 +469,14 @@ function renderAnimatedBorders() {
     output += colors.dim + line.slice(0, cols) + colors.reset;
   }
 
-  // Move cursor back to current content position (don't use save/restore to avoid interference with prompts)
-  output += `\x1b[${currentContentRow};${currentContentCol}H`;
+  // Move cursor back to content position
+  if (inMultilineInput) {
+    // Restore cursor to where readline had it
+    output += "\x1b[u"; // Restore cursor position
+  } else {
+    // Use explicit positioning for other input types
+    output += `\x1b[${currentContentRow};${currentContentCol}H`;
+  }
 
   // Write all at once for atomic rendering
   process.stdout.write(output);
@@ -819,10 +831,19 @@ async function prompt(question, defaultValue = "") {
   moveTo(currentContentRow, 1);
   process.stdout.write("\x1b[2K"); // Clear line
 
+  // Calculate prompt length for cursor tracking
+  // "? " + question + " (default)" + ": "
+  const defaultHintLen = defaultValue ? defaultValue.length + 3 : 0; // " (default)"
+  const promptLen = 2 + question.length + defaultHintLen + 2; // "? " + question + hint + ": "
+
   return new Promise((resolve) => {
+    // Set column position for animation (will be at end of prompt when waiting for input)
+    currentContentCol = promptLen + 1;
+
     rl.question(`${c("cyan", "?")} ${c("bold", question)}${defaultHint}: `, (answer) => {
       rl.close();
       currentContentRow++; // Track the row after input
+      currentContentCol = 1; // Reset column
       // Clamp to max content row
       if (currentContentRow > maxRow) currentContentRow = maxRow;
 
@@ -943,6 +964,11 @@ async function promptSelect(question, choices) {
     const text = index === selectedIndex ? c("cyan", choices[index].label) : choices[index].label;
     moveTo(row, 1);
     process.stdout.write("\x1b[2K" + prefix + text);
+    // Update cursor tracking for the selected item
+    if (index === selectedIndex) {
+      currentContentRow = row;
+      currentContentCol = 3 + choices[index].label.length;
+    }
   };
 
   // Render entire menu
@@ -960,8 +986,7 @@ async function promptSelect(question, choices) {
   // Initial render
   renderMenu();
 
-  // Update row tracker to after menu
-  currentContentRow = menuStartRow + 1 + choices.length;
+  // Row tracker is set by renderChoice for the selected item
 
   return new Promise((resolve) => {
     const stdin = process.stdin;
@@ -986,7 +1011,9 @@ async function promptSelect(question, choices) {
           process.stdout.write("\x1b[2K");
         }
 
-        // Move cursor below menu
+        // Move cursor below menu and reset column tracking
+        currentContentRow = menuStartRow + 1 + choices.length;
+        currentContentCol = 1;
         moveTo(currentContentRow, 1);
         showCursor();
         resolve(choices[selectedIndex].value);
@@ -1032,25 +1059,31 @@ async function promptMultiline(question, instruction, centered = false) {
   }
 
   // For centered input, move cursor to center for typing
+  let inputIndent = 1;
   if (centered) {
     const { cols } = getTerminalSize();
-    const inputIndent = Math.floor(cols / 4); // Indent input from left
+    inputIndent = Math.floor(cols / 4); // Indent input from left
     moveTo(currentContentRow, inputIndent);
+    currentContentCol = inputIndent;
   }
 
-  // Pause animation during multiline input to prevent interference
-  const wasAnimating = pauseBorderAnimation();
+  // Enable multiline input mode - animation keeps running but won't reposition cursor
+  inMultilineInput = true;
 
   const lines = [];
   const rl = createRL();
 
+  // Track row as user enters lines
+  rl.on("line", () => {
+    currentContentRow++;
+  });
+
   return new Promise((resolve) => {
     rl.on("line", (line) => {
-      currentContentRow++; // Track each line entered
       if (line === ".done") {
         rl.close();
-        // Resume animation after input
-        if (wasAnimating) resumeBorderAnimation();
+        inMultilineInput = false; // Exit multiline mode
+        currentContentCol = 1;
         resolve(lines.join("\n"));
       } else {
         lines.push(line);
@@ -1058,8 +1091,8 @@ async function promptMultiline(question, instruction, centered = false) {
     });
 
     rl.on("close", () => {
-      // Resume animation after input
-      if (wasAnimating) resumeBorderAnimation();
+      inMultilineInput = false; // Exit multiline mode
+      currentContentCol = 1;
       resolve(lines.join("\n"));
     });
   });
@@ -1931,11 +1964,11 @@ async function getGoalsDescription() {
   clearScreen();
   setHeaderSubtitle("Step 2: Describe Your Goals");
 
-  // Calculate vertical center (raised by 3 rows for better visibility)
+  // Calculate vertical center (raised by 6 rows for better visibility)
   const { rows } = getTerminalSize();
   const contentAreaHeight = rows - (BORDER_HEIGHT * 2); // Subtract header and footer
   const instructionLines = 8; // Number of instruction lines we'll print
-  const centerStartRow = BORDER_HEIGHT + 1 + Math.floor((contentAreaHeight - instructionLines) / 2) - 3;
+  const centerStartRow = BORDER_HEIGHT + 1 + Math.floor((contentAreaHeight - instructionLines) / 2) - 6;
 
   // Position at vertical center
   currentContentRow = Math.max(BORDER_HEIGHT + 1, centerStartRow);
