@@ -1083,10 +1083,9 @@ function createRL() {
 }
 
 async function prompt(question, defaultValue = "") {
-  // Pause animation while waiting for readline input
-  const wasAnimating = pauseBorderAnimation();
+  // Drain any buffered input and ensure clean stdin state
+  await new Promise(resolve => setImmediate(resolve));
 
-  // Ensure stdin is resumed (may have been paused by raw mode handlers)
   process.stdin.resume();
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
@@ -1124,20 +1123,12 @@ async function prompt(question, defaultValue = "") {
         process.stdout.write("\x1b[2K");
       }
 
-      // Resume animation if it was running
-      if (wasAnimating) {
-        resumeBorderAnimation();
-      }
-
       resolve(answer.trim() || defaultValue);
     });
   });
 }
 
 async function promptPassword(question) {
-  // Pause animation while waiting for input
-  const wasAnimating = pauseBorderAnimation();
-
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -1201,11 +1192,6 @@ async function promptPassword(question) {
           process.stdout.write("\n");
           currentContentRow = promptRow + 1; // Track the row after input
           currentContentCol = 1; // Reset column to start
-
-          // Resume animation if it was running
-          if (wasAnimating) {
-            resumeBorderAnimation();
-          }
 
           resolve(password);
           return;
