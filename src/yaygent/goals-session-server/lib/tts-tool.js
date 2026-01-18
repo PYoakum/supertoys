@@ -177,6 +177,13 @@ function runCommand(cmd, args, options = {}) {
 }
 
 /**
+ * Sleep for a specified number of milliseconds
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Get audio duration using ffprobe
  */
 async function getAudioDuration(filePath) {
@@ -192,6 +199,31 @@ async function getAudioDuration(filePath) {
     return parseFloat(info.format?.duration || 0) * 1000;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * Get audio volume level using ffmpeg volumedetect
+ * Returns max_volume in dB (e.g., -30.5 for normal audio, -91.0 for silence)
+ */
+async function getAudioLevel(filePath) {
+  try {
+    const result = await runCommand('ffmpeg', [
+      '-i', filePath,
+      '-af', 'volumedetect',
+      '-f', 'null',
+      '-'
+    ], { timeout: 30000 });
+
+    // volumedetect outputs to stderr
+    const output = result.stderr;
+    const maxMatch = output.match(/max_volume:\s*([-\d.]+)\s*dB/);
+    if (maxMatch) {
+      return parseFloat(maxMatch[1]);
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -214,6 +246,40 @@ export class TtsTool {
     this.hasTts = checkTtsCli();
     this.hasFfmpeg = checkFfmpeg();
     this.modelCache = null; // Cached model list
+    this.warmedUpModels = new Set(); // Track which models have been warmed up
+  }
+
+  /**
+   * Warm up a model by running a short test synthesis
+   * This ensures the model is fully loaded before actual synthesis
+   */
+  async _warmupModel(model) {
+    if (this.warmedUpModels.has(model)) {
+      return; // Already warmed up
+    }
+
+    await this._ensureTempDir();
+    const warmupPath = join(this.config.tempDir, `warmup_${Date.now()}.wav`);
+
+    try {
+      // Run a short test synthesis to load the model
+      await runCommand('tts', [
+        '--text', 'test',
+        '--model_name', model,
+        '--out_path', warmupPath
+      ], { timeout: this.config.timeout });
+
+      // Give the model a moment to stabilize
+      await sleep(1000);
+
+      this.warmedUpModels.add(model);
+    } catch (err) {
+      // Warmup failed, but we'll still try the actual synthesis
+      console.error(`Model warmup failed for ${model}:`, err.message);
+    } finally {
+      // Clean up warmup file
+      await unlink(warmupPath).catch(() => {});
+    }
   }
 
   /**
@@ -426,6 +492,9 @@ export class TtsTool {
 
     const resolvedModel = this._resolveModel(model);
 
+    // Warm up the model to ensure it's fully loaded
+    await this._warmupModel(resolvedModel);
+
     // Split text into chunks for long texts
     const textChunks = this._splitText(text);
     const chunkPaths = [];
@@ -477,19 +546,26 @@ export class TtsTool {
         await unlink(concatenatedPath).catch(() => {});
       }
 
-      // Get duration
+      // Get duration and audio level
       const durationMs = await getAudioDuration(finalPath);
+      const audioLevelDb = await getAudioLevel(finalPath);
+
+      // Warn if audio appears to be silent (below -80dB is effectively silent)
+      const isSilent = audioLevelDb !== null && audioLevelDb < -80;
 
       return {
         success: true,
         output_path: finalPath,
         duration_ms: Math.round(durationMs),
+        max_volume_db: audioLevelDb,
+        is_silent: isSilent,
         characters_processed: text.length,
         chunks_processed: textChunks.length,
         model_used: resolvedModel,
         speaker_used: speaker || null,
         language_used: language || null,
-        format: output_format
+        format: output_format,
+        warning: isSilent ? 'Audio output appears to be silent - model may not have initialized correctly' : null
       };
     } finally {
       // Cleanup chunk files
