@@ -405,6 +405,11 @@ function renderAnimatedBorders() {
   // Build all output as a single string for atomic write
   let output = "";
 
+  // Save cursor position during multiline input (readline manages cursor, we must restore it)
+  if (inMultilineInput) {
+    output += "\x1b[s"; // Save cursor
+  }
+
   // Render header (top 3 rows) - all rows have the same buffer zone
   for (let row = 0; row < BORDER_HEIGHT; row++) {
     output += `\x1b[${row + 1};1H`; // moveTo
@@ -465,7 +470,11 @@ function renderAnimatedBorders() {
   }
 
   // Move cursor back to content position
-  output += `\x1b[${currentContentRow};${currentContentCol}H`;
+  if (inMultilineInput) {
+    output += "\x1b[u"; // Restore cursor to where readline had it
+  } else {
+    output += `\x1b[${currentContentRow};${currentContentCol}H`;
+  }
 
   // Write all at once for atomic rendering
   process.stdout.write(output);
