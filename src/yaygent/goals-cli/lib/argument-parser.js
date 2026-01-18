@@ -280,6 +280,11 @@ export function validateRequiredArgs(args) {
           errors.push('vigilant requires --goals (-g)');
         }
         break;
+
+      case 'tui':
+      case 'browse':
+        // TUI modes can load goals interactively, no required args
+        break;
     }
     return errors;
   }
