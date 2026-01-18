@@ -444,7 +444,9 @@ RULES:
     let currentTick = 0;
 
     for (const line of lines) {
-      const tokens = line.trim().split(/\s+/);
+      // Tokenize carefully: don't split inside brackets [...]
+      // Match either bracketed chords like [C4 E4 G4]:h or regular tokens
+      const tokens = line.trim().match(/\[[^\]]+\]:\w+\.?|\S+/g) || [];
 
       for (const token of tokens) {
         if (!token || token === '|') continue;
@@ -550,9 +552,27 @@ RULES:
   _parseInput(input) {
     const trimmed = input.trim();
 
-    // JSON format
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    // JSON format - but be careful to distinguish from chord notation like [C4 E4 G4]:h
+    // JSON arrays start with [ and contain quotes or numbers, not note names with colons
+    if (trimmed.startsWith('{')) {
       return this._parseJsonFormat(trimmed);
+    }
+
+    // Check if it looks like a JSON array vs chord notation
+    // Chord notation: [C4 E4 G4]:h - has ]: pattern after the bracket content
+    // JSON array: [{"pitch": "C4"...}] or ["C4", "D4"] - proper JSON structure
+    if (trimmed.startsWith('[')) {
+      // If it contains ']:' right after notes, it's chord notation, not JSON
+      if (/^\[[A-Ga-g][#b]?\d/.test(trimmed)) {
+        // Starts with [<note> - this is chord DSL notation
+        return this._parseNoteDsl(trimmed);
+      }
+      // Try JSON parse, fall back to DSL if it fails
+      try {
+        return this._parseJsonFormat(trimmed);
+      } catch {
+        return this._parseNoteDsl(trimmed);
+      }
     }
 
     // ABC notation (basic detection)
