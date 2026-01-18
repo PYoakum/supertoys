@@ -44,8 +44,10 @@ echo "----------------------------------------------"
 echo "1. Downloading XTTS v2 (multilingual voice cloning)"
 echo "   Model: tts_models/multilingual/multi-dataset/xtts_v2"
 echo "   Size: ~1.8GB"
+echo "   Note: Auto-accepting CPML license for non-commercial use"
 echo "----------------------------------------------"
-$TTS_CMD --model_name "tts_models/multilingual/multi-dataset/xtts_v2" --list_speaker_idxs 2>/dev/null || true
+# Auto-accept license by piping 'y' to the command
+echo "y" | $TTS_CMD --model_name "tts_models/multilingual/multi-dataset/xtts_v2" --list_speaker_idxs 2>/dev/null || true
 echo "XTTS v2 download complete."
 echo ""
 
@@ -55,8 +57,14 @@ echo "2. Downloading FreeVC24 (voice conversion)"
 echo "   Model: voice_conversion_models/multilingual/vctk/freevc24"
 echo "   Size: ~100MB"
 echo "----------------------------------------------"
-# FreeVC doesn't have a list_speaker_idxs, so we do a minimal test
-$TTS_CMD --model_name "voice_conversion_models/multilingual/vctk/freevc24" --help 2>/dev/null || true
+# FreeVC needs a dummy conversion to trigger download - create temp files
+TEMP_WAV="${MODEL_DIR}/temp_dummy.wav"
+# Generate a short silent wav for testing
+$TTS_CMD --model_name "tts_models/en/ljspeech/vits" --text "test" --out_path "$TEMP_WAV" 2>/dev/null || true
+if [ -f "$TEMP_WAV" ]; then
+    $TTS_CMD --model_name "voice_conversion_models/multilingual/vctk/freevc24" --source_wav "$TEMP_WAV" --target_wav "$TEMP_WAV" --out_path "${MODEL_DIR}/temp_vc.wav" 2>/dev/null || true
+    rm -f "$TEMP_WAV" "${MODEL_DIR}/temp_vc.wav"
+fi
 echo "FreeVC24 download complete."
 echo ""
 
