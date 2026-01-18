@@ -1188,7 +1188,8 @@ async function cmdVigilant(args, logger) {
   const maxAttempts = args.vigilantAttempts || 3;
   const goalsPath = resolve(args.goals);
   const contextPath = args.context ? resolve(args.context) : resolve(dirname(goalsPath), 'context');
-  const outputPath = args.output || './output';
+  // args.output defaults to 'stdout' from parser, but vigilant needs a directory
+  const outputPath = (args.output && args.output !== 'stdout') ? args.output : './output';
 
   logger.info(`Starting vigilant mode with max ${maxAttempts} attempts`);
   logger.info(`Goals: ${goalsPath}`);

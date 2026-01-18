@@ -27,6 +27,7 @@ const colors = {
   red: "\x1b[31m",
   white: "\x1b[37m",
   bgCyan: "\x1b[46m",
+  violet: "\x1b[38;5;135m",
 };
 
 const c = (color, text) => `${colors[color]}${text}${colors.reset}`;
@@ -74,8 +75,204 @@ const DEFAULT_MODELS = {
 };
 
 // Terminal utilities
+const BORDER_HEIGHT = 3; // Height of animated header and footer
+
+// Animation state (declared early for use in clearScreen)
+const animFrames = [" ■ ", " ≣ ", " ≡ ", " = ", " - ", " ▪ "];
+let animationInterval = null;
+let animFrameIndex = 0;
+
+// Track current content row for absolute positioning
+let currentContentRow = 5; // Start after header (3) + separator line (1) + 1
+
+function getTerminalSize() {
+  return {
+    cols: process.stdout.columns || 80,
+    rows: process.stdout.rows || 24
+  };
+}
+
 function clearScreen() {
+  // Clear entire screen
   process.stdout.write("\x1b[2J\x1b[H");
+
+  // Reset content row tracker (after header + top separator)
+  currentContentRow = BORDER_HEIGHT + 2;
+
+  // Redraw borders immediately if animation is running
+  if (animationInterval) {
+    renderAnimatedBorders();
+  }
+
+  // Move cursor to content area (after header rows)
+  moveTo(currentContentRow, 1);
+}
+
+// Get the maximum row for content (5th from bottom, above separator line)
+function getMaxContentRow() {
+  const { rows } = getTerminalSize();
+  return rows - BORDER_HEIGHT - 2; // Leave room for bottom separator line above footer
+}
+
+// Get the minimum row for content (after header + top separator)
+function getMinContentRow() {
+  return BORDER_HEIGHT + 2; // Row 5 (after 3-row header + 1 separator)
+}
+
+// Console buffer for scrollable output
+const consoleBuffer = {
+  lines: [],           // All output lines
+  scrollOffset: 0,     // Lines scrolled up from bottom (0 = at bottom)
+  followMode: true,    // Auto-scroll to bottom on new output
+  scrollEnabled: false // Whether scroll mode is active
+};
+
+// Get visible line count in content area
+function getVisibleLineCount() {
+  const { rows } = getTerminalSize();
+  return rows - (BORDER_HEIGHT * 2) - 3; // Content area minus both separator lines
+}
+
+// Render the console buffer to screen
+function renderConsoleBuffer() {
+  const { rows } = getTerminalSize();
+  const startRow = BORDER_HEIGHT + 2; // After header + top separator
+  const visibleLines = getVisibleLineCount();
+  const totalLines = consoleBuffer.lines.length;
+
+  // Calculate which lines to show
+  const endIndex = totalLines - consoleBuffer.scrollOffset;
+  const startIndex = Math.max(0, endIndex - visibleLines);
+
+  // Clear and render content area
+  for (let i = 0; i < visibleLines; i++) {
+    const lineIndex = startIndex + i;
+    const row = startRow + i;
+    moveTo(row, 1);
+    process.stdout.write("\x1b[2K"); // Clear line
+    if (lineIndex >= 0 && lineIndex < endIndex && lineIndex < totalLines) {
+      process.stdout.write(consoleBuffer.lines[lineIndex]);
+    }
+  }
+
+  // Show scroll indicator on status line (just above bottom separator)
+  const statusRow = rows - BORDER_HEIGHT - 2;
+  moveTo(statusRow, 1);
+  process.stdout.write("\x1b[2K");
+  if (consoleBuffer.scrollEnabled) {
+    const position = totalLines > 0 ? Math.round(((totalLines - consoleBuffer.scrollOffset) / totalLines) * 100) : 100;
+    const scrollStatus = consoleBuffer.scrollOffset > 0
+      ? `${c("dim", "[")}${c("cyan", "^v")}${c("dim", "] Scroll")}  ${c("dim", "[")}${c("cyan", "f")}${c("dim", "] Follow")}  ${c("dim", `${position}%`)}`
+      : `${c("dim", "[")}${c("cyan", "^v")}${c("dim", "] Scroll")}  ${c("green", "[*] Following")}`;
+    process.stdout.write(scrollStatus);
+  }
+}
+
+// Scroll the console buffer
+function scrollConsole(direction) {
+  const visibleLines = getVisibleLineCount();
+  const maxScroll = Math.max(0, consoleBuffer.lines.length - visibleLines);
+
+  if (direction === 'up') {
+    consoleBuffer.scrollOffset = Math.min(consoleBuffer.scrollOffset + 1, maxScroll);
+    consoleBuffer.followMode = false;
+  } else if (direction === 'down') {
+    consoleBuffer.scrollOffset = Math.max(consoleBuffer.scrollOffset - 1, 0);
+    if (consoleBuffer.scrollOffset === 0) {
+      consoleBuffer.followMode = true;
+    }
+  } else if (direction === 'pageup') {
+    consoleBuffer.scrollOffset = Math.min(consoleBuffer.scrollOffset + visibleLines, maxScroll);
+    consoleBuffer.followMode = false;
+  } else if (direction === 'pagedown') {
+    consoleBuffer.scrollOffset = Math.max(consoleBuffer.scrollOffset - visibleLines, 0);
+    if (consoleBuffer.scrollOffset === 0) {
+      consoleBuffer.followMode = true;
+    }
+  } else if (direction === 'top') {
+    consoleBuffer.scrollOffset = maxScroll;
+    consoleBuffer.followMode = false;
+  } else if (direction === 'bottom') {
+    consoleBuffer.scrollOffset = 0;
+    consoleBuffer.followMode = true;
+  }
+
+  renderConsoleBuffer();
+}
+
+// Print a line to the console buffer
+function printLine(text = "") {
+  // Add to buffer
+  consoleBuffer.lines.push(text);
+
+  // If in follow mode, keep scroll at bottom
+  if (consoleBuffer.followMode) {
+    consoleBuffer.scrollOffset = 0;
+  }
+
+  // Render if scroll mode is enabled, otherwise use direct output
+  if (consoleBuffer.scrollEnabled) {
+    renderConsoleBuffer();
+  } else {
+    // Direct output mode (for menus, prompts, etc.)
+    const minRow = getMinContentRow();
+    const maxRow = getMaxContentRow();
+    // Clamp currentContentRow to valid bounds
+    if (currentContentRow < minRow) currentContentRow = minRow;
+    if (currentContentRow <= maxRow) {
+      moveTo(currentContentRow, 1);
+      process.stdout.write("\x1b[2K");
+      if (text) process.stdout.write(text);
+      currentContentRow++;
+    }
+  }
+}
+
+// Enable scroll mode for console output
+function enableScrollMode() {
+  consoleBuffer.scrollEnabled = true;
+  consoleBuffer.followMode = true;
+  consoleBuffer.scrollOffset = 0;
+}
+
+// Disable scroll mode
+function disableScrollMode() {
+  consoleBuffer.scrollEnabled = false;
+}
+
+// Clear the console buffer
+function clearConsoleBuffer() {
+  consoleBuffer.lines = [];
+  consoleBuffer.scrollOffset = 0;
+  consoleBuffer.followMode = true;
+}
+
+// Get current row for menu positioning
+function getCurrentRow() {
+  return currentContentRow;
+}
+
+// Clear the content area between separator lines (row 5 to row N-4)
+function clearContentArea() {
+  const { rows } = getTerminalSize();
+  const startRow = BORDER_HEIGHT + 2; // After header + top separator
+  const endRow = rows - BORDER_HEIGHT - 1; // Before bottom separator
+
+  for (let row = startRow; row <= endRow; row++) {
+    moveTo(row, 1);
+    process.stdout.write("\x1b[2K"); // Clear line
+  }
+
+  // Reset content row to start
+  currentContentRow = BORDER_HEIGHT + 2;
+  moveTo(currentContentRow, 1);
+
+  // Clear buffer too
+  clearConsoleBuffer();
+}
+
+function resetScrollRegion() {
+  process.stdout.write("\x1b[r"); // Reset scroll region to full screen
 }
 
 function hideCursor() {
@@ -86,11 +283,224 @@ function showCursor() {
   process.stdout.write("\x1b[?25h");
 }
 
+function moveTo(row, col) {
+  process.stdout.write(`\x1b[${row};${col}H`);
+}
+
+// Query current cursor row position
+async function getCursorRow() {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+
+    // Check if we can use raw mode
+    if (!stdin.setRawMode) {
+      resolve(BORDER_HEIGHT + 1); // Default to content start
+      return;
+    }
+
+    const wasRaw = stdin.isRaw;
+
+    try {
+      if (!wasRaw) {
+        stdin.setRawMode(true);
+      }
+      stdin.resume();
+      stdin.setEncoding("utf8");
+
+      let response = "";
+      let resolved = false;
+
+      const onData = (data) => {
+        if (resolved) return;
+        response += data;
+        // Response format: \x1b[row;colR
+        const match = response.match(/\x1b\[(\d+);(\d+)R/);
+        if (match) {
+          resolved = true;
+          stdin.removeListener("data", onData);
+          if (!wasRaw && stdin.setRawMode) {
+            stdin.setRawMode(false);
+          }
+          resolve(parseInt(match[1], 10));
+        }
+      };
+
+      stdin.on("data", onData);
+
+      // Request cursor position (DSR - Device Status Report)
+      process.stdout.write("\x1b[6n");
+
+      // Timeout fallback
+      setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        stdin.removeListener("data", onData);
+        if (!wasRaw && stdin.setRawMode) {
+          stdin.setRawMode(false);
+        }
+        resolve(BORDER_HEIGHT + 1); // Default to content start
+      }, 100);
+    } catch (e) {
+      resolve(BORDER_HEIGHT + 1); // Default to content start
+    }
+  });
+}
+
+function centerText(text, width) {
+  const stripped = text.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes for length calc
+  const padding = Math.max(0, Math.floor((width - stripped.length) / 2));
+  return ' '.repeat(padding) + text;
+}
+
+function printCentered(text) {
+  const { cols } = getTerminalSize();
+  printLine(centerText(text, cols));
+}
+
+// Header title configuration
+const HEADER_TITLE = "Goals Generator TUI";
+const TITLE_BUFFER = 1; // 1-column buffer on each side of title
+
+// Subtitle (row 3) - can be changed dynamically
+let headerSubtitle = "";
+
+// Set the header subtitle (appears on row 3)
+function setHeaderSubtitle(text) {
+  headerSubtitle = text || "";
+  // Trigger immediate re-render if animation is running
+  if (animationInterval) {
+    renderAnimatedBorders();
+  }
+}
+
+// Animated header/footer rendering
+function renderAnimatedBorders() {
+  const { cols, rows } = getTerminalSize();
+
+  // Calculate positions for title (row 1) and subtitle (row 3)
+  const titleRow = 1;
+  const subtitleRow = 3;
+  const titleStartCol = Math.floor((cols - HEADER_TITLE.length) / 2);
+  const subtitleStartCol = headerSubtitle ? Math.floor((cols - headerSubtitle.length) / 2) : cols;
+
+  // Calculate a single rectangular buffer zone spanning all header rows
+  // Based on the wider of title or subtitle, plus 1 column buffer on each side
+  const maxTextWidth = Math.max(HEADER_TITLE.length, headerSubtitle ? headerSubtitle.length : 0);
+  const bufferCenterCol = Math.floor(cols / 2);
+  const bufferStart = bufferCenterCol - Math.floor(maxTextWidth / 2) - TITLE_BUFFER;
+  const bufferEnd = bufferCenterCol + Math.ceil(maxTextWidth / 2) + TITLE_BUFFER;
+
+  // Build all output as a single string for atomic write
+  let output = "";
+
+  // Save cursor position
+  output += "\x1b[s";
+
+  // Render header (top 3 rows) - all rows have the same buffer zone
+  for (let row = 0; row < BORDER_HEIGHT; row++) {
+    output += `\x1b[${row + 1};1H`; // moveTo
+    const currentRow = row + 1;
+
+    // Render animation with rectangular gap for all header rows
+    let line = "";
+    for (let col = 0; col < cols; col += 3) {
+      const frameOffset = (animFrameIndex + row + Math.floor(col / 3)) % animFrames.length;
+      const segment = animFrames[frameOffset];
+
+      // Add each character, but skip if in buffer zone
+      for (let i = 0; i < segment.length && col + i < cols; i++) {
+        const actualCol = col + i;
+        if (actualCol >= bufferStart && actualCol < bufferEnd) {
+          line += " "; // Space in buffer zone
+        } else {
+          line += segment[i];
+        }
+      }
+    }
+    output += colors.dim + line.slice(0, cols) + colors.reset;
+
+    // Draw title on row 1
+    if (currentRow === titleRow) {
+      output += `\x1b[${currentRow};${titleStartCol + 1}H`;
+      output += colors.bold + HEADER_TITLE + colors.reset;
+    }
+    // Draw subtitle on row 3
+    else if (currentRow === subtitleRow && headerSubtitle) {
+      output += `\x1b[${currentRow};${subtitleStartCol + 1}H`;
+      output += colors.bold + headerSubtitle + colors.reset;
+    }
+  }
+
+  // Render top separator line (row 4 - right after header)
+  const topSeparatorRow = BORDER_HEIGHT + 1;
+  output += `\x1b[${topSeparatorRow};1H`;
+  output += colors.violet + "—".repeat(cols) + colors.reset;
+
+  // Render bottom separator line (4th row from bottom - solid violet line)
+  const separatorRow = rows - BORDER_HEIGHT;
+  output += `\x1b[${separatorRow};1H`; // moveTo separator row
+  output += colors.violet + "—".repeat(cols) + colors.reset;
+
+  // Render footer (bottom 3 rows)
+  for (let row = 0; row < BORDER_HEIGHT; row++) {
+    output += `\x1b[${rows - BORDER_HEIGHT + row + 1};1H`; // moveTo
+
+    let line = "";
+    for (let col = 0; col < cols; col += 3) {
+      // Reverse direction for footer to create mirror effect
+      const frameOffset = (animFrameIndex + (BORDER_HEIGHT - 1 - row) + Math.floor(col / 3)) % animFrames.length;
+      line += animFrames[frameOffset];
+    }
+
+    output += colors.dim + line.slice(0, cols) + colors.reset;
+  }
+
+  // Restore cursor position
+  output += "\x1b[u";
+
+  // Write all at once for atomic rendering
+  process.stdout.write(output);
+
+  animFrameIndex = (animFrameIndex + 1) % animFrames.length;
+}
+
+function startBorderAnimation() {
+  if (animationInterval) return;
+
+  // Reset and position cursor at start of content area (after header + top separator)
+  currentContentRow = BORDER_HEIGHT + 2;
+  moveTo(currentContentRow, 1);
+
+  animationInterval = setInterval(renderAnimatedBorders, 300);
+  renderAnimatedBorders(); // Initial render
+}
+
+function stopBorderAnimation() {
+  if (animationInterval) {
+    clearInterval(animationInterval);
+    animationInterval = null;
+  }
+}
+
+function pauseBorderAnimation() {
+  if (animationInterval) {
+    clearInterval(animationInterval);
+    animationInterval = null;
+    return true; // Was running
+  }
+  return false;
+}
+
+function resumeBorderAnimation() {
+  if (!animationInterval) {
+    renderAnimatedBorders(); // Immediately render
+    animationInterval = setInterval(renderAnimatedBorders, 300);
+  }
+}
+
 function printHeader() {
-  console.log();
-  console.log(c("bold", "Goals Generator TUI"));
-  console.log(c("dim", "Generate goals.json using LLM providers"));
-  console.log();
+  // Title is now in the animated header, just add spacing
+  printLine();
 }
 
 function printBox(title, content, color = "green") {
@@ -98,11 +508,11 @@ function printBox(title, content, color = "green") {
   const maxLen = Math.max(title.length, ...lines.map((l) => l.length)) + 2;
   const border = "─".repeat(maxLen + 2);
 
-  console.log(c(color, `┌─ ${title} ${border.slice(title.length + 3)}┐`));
+  printLine(c(color, `┌─ ${title} ${border.slice(title.length + 3)}┐`));
   for (const line of lines) {
-    console.log(c(color, "│ ") + line.padEnd(maxLen) + c(color, " │"));
+    printLine(c(color, "│ ") + line.padEnd(maxLen) + c(color, " │"));
   }
-  console.log(c(color, `└${border}┘`));
+  printLine(c(color, `└${border}┘`));
 }
 
 /**
@@ -112,13 +522,13 @@ function printBox(title, content, color = "green") {
  * @param {string} [labelColor='cyan'] - Color for label
  */
 function printFormField(label, content, labelColor = "cyan") {
-  console.log(c(labelColor, `${label}:`));
-  console.log();
+  printLine(c(labelColor, `${label}:`));
+  printLine();
   const lines = content.split("\n");
   for (const line of lines) {
-    console.log(`  ${line}`);
+    printLine(`  ${line}`);
   }
-  console.log();
+  printLine();
 }
 
 /**
@@ -172,6 +582,213 @@ function formatGoalsSummary(goals) {
   return lines.join("\n");
 }
 
+/**
+ * Format a single goal in detail for paged review
+ * @param {Object} goal - Goal object
+ * @param {number} index - Goal index (0-based)
+ * @param {number} total - Total number of goals
+ * @returns {string[]} Array of lines to display
+ */
+function formatGoalDetail(goal, index, total) {
+  const lines = [];
+
+  // Goal ID and objective
+  lines.push(`${c("bold", "ID:")} ${c("cyan", goal.id)}`);
+  lines.push("");
+  lines.push(`${c("bold", "Objective:")}`);
+  // Word wrap objective at ~60 chars
+  const words = goal.objective.split(" ");
+  let line = "  ";
+  for (const word of words) {
+    if (line.length + word.length > 62) {
+      lines.push(line);
+      line = "  " + word + " ";
+    } else {
+      line += word + " ";
+    }
+  }
+  if (line.trim()) lines.push(line);
+  lines.push("");
+
+  // Priority
+  if (goal.priority) {
+    const priorityColor = goal.priority <= 3 ? "red" : goal.priority <= 6 ? "yellow" : "green";
+    lines.push(`${c("bold", "Priority:")} ${c(priorityColor, goal.priority + "/10")}`);
+  }
+
+  // Dependencies
+  if (goal.dependencies && goal.dependencies.length > 0) {
+    lines.push(`${c("bold", "Dependencies:")}`);
+    for (const dep of goal.dependencies) {
+      lines.push(`  ${c("dim", "->")} ${dep}`);
+    }
+  } else {
+    lines.push(`${c("bold", "Dependencies:")} ${c("dim", "None")}`);
+  }
+  lines.push("");
+
+  // Success criteria
+  if (goal.criteria && goal.criteria.success && goal.criteria.success.length > 0) {
+    lines.push(`${c("bold", "Success Criteria:")}`);
+    for (const criterion of goal.criteria.success) {
+      lines.push(`  ${c("green", "[+]")} ${criterion}`);
+    }
+    lines.push("");
+  }
+
+  // Acceptance criteria
+  if (goal.criteria && goal.criteria.acceptance && goal.criteria.acceptance.length > 0) {
+    lines.push(`${c("bold", "Acceptance Criteria:")}`);
+    for (const criterion of goal.criteria.acceptance) {
+      lines.push(`  ${c("cyan", "*")} ${criterion}`);
+    }
+    lines.push("");
+  }
+
+  // Constraints
+  if (goal.constraints && goal.constraints.length > 0) {
+    lines.push(`${c("bold", "Constraints:")}`);
+    for (const constraint of goal.constraints) {
+      lines.push(`  ${c("yellow", "!")} ${constraint}`);
+    }
+    lines.push("");
+  }
+
+  // Context
+  if (goal.context && Object.keys(goal.context).length > 0) {
+    lines.push(`${c("bold", "Context:")}`);
+    for (const [key, value] of Object.entries(goal.context)) {
+      lines.push(`  ${c("dim", key + ":")} ${value}`);
+    }
+    lines.push("");
+  }
+
+  return lines;
+}
+
+/**
+ * Paged goal review with tab-like navigation
+ * @param {Object} goals - Goals object with goals array
+ * @returns {Promise<boolean>} True if user confirms to proceed
+ */
+async function reviewGoals(goals) {
+  if (!goals.goals || goals.goals.length === 0) {
+    return true;
+  }
+
+  let currentIndex = 0;
+  const total = goals.goals.length;
+  const contentStartRow = currentContentRow;
+
+  // Render function for the current goal page
+  const renderPage = () => {
+    // Reset to content start
+    currentContentRow = contentStartRow;
+
+    const { rows } = getTerminalSize();
+    const availableRows = rows - BORDER_HEIGHT - contentStartRow - 3; // Leave room for nav help
+
+    // Clear the content area
+    for (let i = 0; i < availableRows + 3; i++) {
+      moveTo(contentStartRow + i, 1);
+      process.stdout.write("\x1b[2K");
+    }
+
+    // Render tab bar
+    moveTo(contentStartRow, 1);
+    let tabBar = "";
+    for (let i = 0; i < total; i++) {
+      const goalId = goals.goals[i].id;
+      const shortId = goalId.length > 12 ? goalId.slice(0, 11) + "…" : goalId;
+      if (i === currentIndex) {
+        tabBar += c("bgCyan", c("bold", ` ${shortId} `)) + " ";
+      } else {
+        tabBar += c("dim", ` ${shortId} `) + " ";
+      }
+    }
+    process.stdout.write(tabBar);
+    currentContentRow++;
+
+    // Separator line
+    printLine(c("dim", "─".repeat(60)));
+    printLine();
+
+    // Render goal detail
+    const goal = goals.goals[currentIndex];
+    const detailLines = formatGoalDetail(goal, currentIndex, total);
+
+    for (const line of detailLines) {
+      if (currentContentRow < rows - BORDER_HEIGHT - 2) {
+        printLine(line);
+      }
+    }
+
+    // Navigation help at bottom of content area
+    const navRow = rows - BORDER_HEIGHT - 1;
+    moveTo(navRow, 1);
+    process.stdout.write("\x1b[2K");
+    const navHelp = `${c("dim", "[")}${c("cyan", "<-")}${c("dim", "/")}${c("cyan", "->")}${c("dim", "] Navigate")}  ` +
+                    `${c("dim", "[")}${c("cyan", "Enter")}${c("dim", "] Continue")}  ` +
+                    `${c("dim", "[")}${c("cyan", "q")}${c("dim", "] Cancel")}  ` +
+                    `${c("dim", "Goal")} ${c("bold", (currentIndex + 1) + "/" + total)}`;
+    process.stdout.write(navHelp);
+  };
+
+  // Initial render
+  renderPage();
+
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    const onKey = (key) => {
+      if (key === "\u0003" || key === "q" || key === "Q") {
+        // Ctrl+C or q - cancel
+        stdin.setRawMode(false);
+        stdin.removeListener("data", onKey);
+        showCursor();
+        printLine();
+        resolve(false);
+      } else if (key === "\r" || key === "\n") {
+        // Enter - proceed
+        stdin.setRawMode(false);
+        stdin.removeListener("data", onKey);
+        showCursor();
+        // Move past the navigation area
+        const { rows } = getTerminalSize();
+        currentContentRow = rows - BORDER_HEIGHT;
+        moveTo(currentContentRow, 1);
+        resolve(true);
+      } else if (key === "\x1b[C" || key === "l" || key === "\t") {
+        // Right arrow, l, or Tab - next
+        if (currentIndex < total - 1) {
+          currentIndex++;
+          renderPage();
+        }
+      } else if (key === "\x1b[D" || key === "h" || key === "\x1b[Z") {
+        // Left arrow, h, or Shift+Tab - previous
+        if (currentIndex > 0) {
+          currentIndex--;
+          renderPage();
+        }
+      } else if (key === "\x1b[H" || key === "g") {
+        // Home or g - first goal
+        currentIndex = 0;
+        renderPage();
+      } else if (key === "\x1b[F" || key === "G") {
+        // End or G - last goal
+        currentIndex = total - 1;
+        renderPage();
+      }
+    };
+
+    hideCursor();
+    stdin.on("data", onKey);
+  });
+}
+
 // Interactive prompt utilities
 function createRL() {
   return readline.createInterface({
@@ -184,9 +801,22 @@ async function prompt(question, defaultValue = "") {
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
 
+  // Ensure currentContentRow is within valid bounds
+  const minRow = getMinContentRow();
+  const maxRow = getMaxContentRow();
+  if (currentContentRow < minRow) currentContentRow = minRow;
+  if (currentContentRow > maxRow) currentContentRow = maxRow;
+
+  // Position at current tracked row
+  moveTo(currentContentRow, 1);
+  process.stdout.write("\x1b[2K"); // Clear line
+
   return new Promise((resolve) => {
     rl.question(`${c("cyan", "?")} ${c("bold", question)}${defaultHint}: `, (answer) => {
       rl.close();
+      currentContentRow++; // Track the row after input
+      // Clamp to max content row
+      if (currentContentRow > maxRow) currentContentRow = maxRow;
       resolve(answer.trim() || defaultValue);
     });
   });
@@ -194,6 +824,16 @@ async function prompt(question, defaultValue = "") {
 
 async function promptPassword(question) {
   const rl = createRL();
+
+  // Ensure currentContentRow is within valid bounds
+  const minRow = getMinContentRow();
+  const maxRow = getMaxContentRow();
+  if (currentContentRow < minRow) currentContentRow = minRow;
+  if (currentContentRow > maxRow) currentContentRow = maxRow;
+
+  // Position at current tracked row
+  moveTo(currentContentRow, 1);
+  process.stdout.write("\x1b[2K"); // Clear line
 
   return new Promise((resolve) => {
     process.stdout.write(`${c("cyan", "?")} ${c("bold", question)}: `);
@@ -210,6 +850,7 @@ async function promptPassword(question) {
         stdin.setRawMode(false);
         stdin.removeListener("data", onData);
         process.stdout.write("\n");
+        currentContentRow++; // Track the row after input
         rl.close();
         resolve(password);
       } else if (char === "\u0003") {
@@ -235,33 +876,41 @@ async function promptPassword(question) {
 async function promptSelect(question, choices) {
   let selectedIndex = 0;
 
+  // Capture the starting row from our tracker
+  const menuStartRow = getCurrentRow();
+
+  // Render choice at specific index
+  const renderChoice = (index) => {
+    const row = menuStartRow + 1 + index;
+    const prefix = index === selectedIndex ? c("cyan", "> ") : "  ";
+    const text = index === selectedIndex ? c("cyan", choices[index].label) : choices[index].label;
+    moveTo(row, 1);
+    process.stdout.write("\x1b[2K" + prefix + text);
+  };
+
+  // Render entire menu
+  const renderMenu = () => {
+    // Question line
+    moveTo(menuStartRow, 1);
+    process.stdout.write("\x1b[2K" + `${c("cyan", "?")} ${c("bold", question)}`);
+
+    // Choice lines
+    for (let i = 0; i < choices.length; i++) {
+      renderChoice(i);
+    }
+  };
+
+  // Initial render
+  renderMenu();
+
+  // Update row tracker to after menu
+  currentContentRow = menuStartRow + 1 + choices.length;
+
   return new Promise((resolve) => {
     const stdin = process.stdin;
     stdin.setRawMode(true);
     stdin.resume();
     stdin.setEncoding("utf8");
-
-    const render = () => {
-      // Move cursor up and clear previous render
-      if (selectedIndex >= 0) {
-        process.stdout.write(`\x1b[${choices.length + 1}A`);
-      }
-
-      console.log(`${c("cyan", "?")} ${c("bold", question)}`);
-      choices.forEach((choice, i) => {
-        const prefix = i === selectedIndex ? c("cyan", "> ") : "  ";
-        const text = i === selectedIndex ? c("cyan", choice.label) : choice.label;
-        console.log(`${prefix}${text}`);
-      });
-    };
-
-    // Initial render
-    console.log(`${c("cyan", "?")} ${c("bold", question)}`);
-    choices.forEach((choice, i) => {
-      const prefix = i === selectedIndex ? c("cyan", "> ") : "  ";
-      const text = i === selectedIndex ? c("cyan", choice.label) : choice.label;
-      console.log(`${prefix}${text}`);
-    });
 
     const onKey = (key) => {
       if (key === "\u0003") {
@@ -272,16 +921,22 @@ async function promptSelect(question, choices) {
       } else if (key === "\r" || key === "\n") {
         stdin.setRawMode(false);
         stdin.removeListener("data", onKey);
+        // Move cursor below menu
+        moveTo(currentContentRow, 1);
         showCursor();
         resolve(choices[selectedIndex].value);
       } else if (key === "\x1b[A" || key === "k") {
         // Up arrow or k
+        const prevIndex = selectedIndex;
         selectedIndex = (selectedIndex - 1 + choices.length) % choices.length;
-        render();
+        renderChoice(prevIndex);
+        renderChoice(selectedIndex);
       } else if (key === "\x1b[B" || key === "j") {
         // Down arrow or j
+        const prevIndex = selectedIndex;
         selectedIndex = (selectedIndex + 1) % choices.length;
-        render();
+        renderChoice(prevIndex);
+        renderChoice(selectedIndex);
       }
     };
 
@@ -298,18 +953,36 @@ async function promptConfirm(question, defaultValue = true) {
   return answer.toLowerCase().startsWith("y");
 }
 
-async function promptMultiline(question, instruction) {
-  console.log(`${c("cyan", "?")} ${c("bold", question)}`);
-  console.log(c("dim", `   ${instruction}`));
-  console.log();
+async function promptMultiline(question, instruction, centered = false) {
+  if (centered) {
+    printCentered(`${c("cyan", "?")} ${c("bold", question)}`);
+    printCentered(c("dim", instruction));
+  } else {
+    printLine(`${c("cyan", "?")} ${c("bold", question)}`);
+    printLine(c("dim", `   ${instruction}`));
+  }
+  printLine();
+
+  // For centered input, move cursor to center for typing
+  if (centered) {
+    const { cols } = getTerminalSize();
+    const inputIndent = Math.floor(cols / 4); // Indent input from left
+    moveTo(currentContentRow, inputIndent);
+  }
+
+  // Pause animation during multiline input to prevent interference
+  const wasAnimating = pauseBorderAnimation();
 
   const lines = [];
   const rl = createRL();
 
   return new Promise((resolve) => {
     rl.on("line", (line) => {
+      currentContentRow++; // Track each line entered
       if (line === ".done") {
         rl.close();
+        // Resume animation after input
+        if (wasAnimating) resumeBorderAnimation();
         resolve(lines.join("\n"));
       } else {
         lines.push(line);
@@ -317,6 +990,8 @@ async function promptMultiline(question, instruction) {
     });
 
     rl.on("close", () => {
+      // Resume animation after input
+      if (wasAnimating) resumeBorderAnimation();
       resolve(lines.join("\n"));
     });
   });
@@ -327,23 +1002,33 @@ function createSpinner(text) {
   const frames = ["-", "\\", "|", "/"];
   let i = 0;
   let interval;
+  const spinnerRow = currentContentRow; // Capture the row when spinner is created
 
   return {
     start() {
       hideCursor();
+      moveTo(spinnerRow, 1);
       interval = setInterval(() => {
-        process.stdout.write(`\r${c("cyan", "[" + frames[i] + "]")} ${text}`);
+        moveTo(spinnerRow, 1);
+        process.stdout.write("\x1b[2K"); // Clear line
+        process.stdout.write(`${c("cyan", "[" + frames[i] + "]")} ${text}`);
         i = (i + 1) % frames.length;
       }, 100);
     },
     stop(finalText) {
       clearInterval(interval);
-      process.stdout.write(`\r${c("green", "[+]")} ${finalText}\n`);
+      moveTo(spinnerRow, 1);
+      process.stdout.write("\x1b[2K"); // Clear line
+      process.stdout.write(`${c("green", "[+]")} ${finalText}`);
+      currentContentRow = spinnerRow + 1; // Move to next row
       showCursor();
     },
     fail(finalText) {
       clearInterval(interval);
-      process.stdout.write(`\r${c("red", "[x]")} ${finalText}\n`);
+      moveTo(spinnerRow, 1);
+      process.stdout.write("\x1b[2K"); // Clear line
+      process.stdout.write(`${c("red", "[x]")} ${finalText}`);
+      currentContentRow = spinnerRow + 1; // Move to next row
       showCursor();
     },
   };
@@ -545,14 +1230,18 @@ async function saveGoals(goals, filename) {
 // Progress bar utility
 function createProgressBar(total, width = 30) {
   let current = 0;
+  const progressRow = currentContentRow; // Capture the row when created
+  currentContentRow++; // Reserve this row for the progress bar
 
   const render = (status = "") => {
     const percent = Math.floor((current / total) * 100);
     const filled = Math.floor((current / total) * width);
     const empty = width - filled;
     const bar = "[" + "=".repeat(filled) + (filled < width ? ">" : "") + " ".repeat(Math.max(0, empty - 1)) + "]";
-    const line = `\r${c("cyan", bar)} ${percent.toString().padStart(3)}% ${status}`;
-    process.stdout.write(line + " ".repeat(20)); // pad to clear previous text
+    const line = `${c("cyan", bar)} ${percent.toString().padStart(3)}% ${status}`;
+    moveTo(progressRow, 1);
+    process.stdout.write("\x1b[2K" + line); // Clear line and write
+    moveTo(currentContentRow, 1); // Return cursor to current content row
   };
 
   return {
@@ -567,7 +1256,8 @@ function createProgressBar(total, width = 30) {
     complete(status = "") {
       current = total;
       render(status);
-      console.log();
+      // Progress bar row is already reserved, just ensure cursor is at current row
+      moveTo(currentContentRow, 1);
     }
   };
 }
@@ -577,32 +1267,35 @@ async function runAgent(goalsFilePath, config, options = {}) {
   const debug = options.debug || false;
   const throttled = options.throttled || false;
 
-  console.log();
+  // Reset content area for fresh output
+  clearContentArea();
+
+  printLine();
   const modeLabel = throttled ? "--- Agent Pipeline Execution (Throttled) ---" :
                     debug ? "--- Agent Pipeline Execution (Debug Mode) ---" :
                     "--- Agent Pipeline Execution ---";
-  console.log(c("bold", modeLabel));
-  console.log();
+  printLine(c("bold", modeLabel));
+  printLine();
 
   const confirm = await promptConfirm("Start the agent pipeline?", true);
   if (!confirm) {
-    console.log(c("yellow", "Pipeline cancelled."));
+    printLine(c("yellow", "Pipeline cancelled."));
     return false;
   }
 
   // Create completed-work directory
   await mkdir(COMPLETED_WORK_DIR, { recursive: true });
 
-  console.log();
-  console.log(c("dim", "Starting pipeline execution..."));
-  console.log(c("dim", `Output directory: ${COMPLETED_WORK_DIR}`));
+  printLine();
+  printLine(c("dim", "Starting pipeline execution..."));
+  printLine(c("dim", `Output directory: ${COMPLETED_WORK_DIR}`));
   if (debug) {
-    console.log(c("yellow", "Debug mode enabled - showing all output"));
+    printLine(c("yellow", "Debug mode enabled - showing all output"));
   }
   if (throttled) {
-    console.log(c("yellow", "Throttled mode enabled - 5 second delay between LLM requests"));
+    printLine(c("yellow", "Throttled mode enabled - 5 second delay between LLM requests"));
   }
-  console.log();
+  printLine();
 
   // Track phases for progress display (patterns must be specific to avoid false matches)
   const phases = [
@@ -658,9 +1351,40 @@ async function runAgent(goalsFilePath, config, options = {}) {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    let lastOutput = "";
+    // Enable scrollable console output
+    enableScrollMode();
 
-    const processOutput = (data) => {
+    // Setup scroll key listener
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    const onScrollKey = (key) => {
+      if (key === "\x1b[A" || key === "k") { // Up arrow or k
+        scrollConsole('up');
+      } else if (key === "\x1b[B" || key === "j") { // Down arrow or j
+        scrollConsole('down');
+      } else if (key === "\x1b[5~") { // Page Up
+        scrollConsole('pageup');
+      } else if (key === "\x1b[6~") { // Page Down
+        scrollConsole('pagedown');
+      } else if (key === "g") { // Go to top
+        scrollConsole('top');
+      } else if (key === "G" || key === "f") { // Go to bottom / Follow
+        scrollConsole('bottom');
+      } else if (key === "\u0003") { // Ctrl+C
+        proc.kill();
+      }
+    };
+
+    stdin.on("data", onScrollKey);
+
+    let lastOutput = "";
+    let recentLines = [];  // Keep last N lines for error context
+    const MAX_CONTEXT_LINES = 10;
+
+    const processOutput = (data, isStderr = false) => {
       const text = data.toString();
       lastOutput = text;
 
@@ -676,8 +1400,9 @@ async function runAgent(goalsFilePath, config, options = {}) {
       // Print status lines
       const lines = text.split("\n").filter(l => l.trim());
       for (const line of lines) {
-        // Normalize emoji to pictograms
+        // Normalize: strip ANSI codes first, then replace emoji with pictograms
         const normalized = line
+          .replace(/\x1b\[[0-9;]*m/g, '')  // Strip ANSI escape codes
           .replace(/✓/g, "[+]")
           .replace(/✗/g, "[x]")
           .replace(/✅/g, "[+]")
@@ -689,44 +1414,133 @@ async function runAgent(goalsFilePath, config, options = {}) {
           .replace(/📊/g, "")
           .replace(/⏱️?/g, "");
 
-        // Show output based on debug mode
-        if (line.includes("✓") || line.includes("✅") || line.includes("[+]") || line.includes("SUCCESS") || line.includes("Completed")) {
-          console.log(`  ${c("green", "[+]")} ${normalized.replace(/\[.*?\]\s*/, "")}`);
-        } else if (line.includes("✗") || line.includes("❌") || line.includes("[x]") || line.includes("Error") || line.includes("FATAL") || line.includes("Failed")) {
-          console.log(`  ${c("red", "[x]")} ${normalized.replace(/\[.*?\]\s*/, "")}`);
-        } else if (line.includes("Executing:") || line.includes("In Progress")) {
-          console.log(`  ${c("cyan", "[.]")} ${normalized.replace(/\[.*?\]\s*/, "")}`);
-        } else if (line.includes("Phase") || line.includes("══")) {
-          console.log(`  ${c("cyan", "[>]")} ${normalized.replace(/\[.*?\]\s*/, "")}`);
-        } else if (debug && normalized.trim()) {
-          // In debug mode, show all other lines
-          console.log(`  ${c("dim", "...")} ${normalized}`);
+        // Track recent lines for error context
+        recentLines.push(normalized);
+        if (recentLines.length > MAX_CONTEXT_LINES) recentLines.shift();
+
+        const stripped = normalized.replace(/\[.*?\]\s*/, "");
+
+        // === ERRORS (always show) ===
+        if (line.includes("✗") || line.includes("❌") || line.includes("[x]") ||
+            line.includes("FATAL") || line.includes("Failed") ||
+            /\bError\b/i.test(line) || /\bException\b/i.test(line)) {
+          printLine(`  ${c("red", "[x]")} ${stripped}`);
+        }
+        // === RATE LIMITS & RETRIES (always show) ===
+        else if (/rate.?limit/i.test(line) || /\b429\b/.test(line) ||
+                 /retry/i.test(line) || /backoff/i.test(line) ||
+                 /too many requests/i.test(line)) {
+          printLine(`  ${c("yellow", "[!]")} ${stripped}`);
+        }
+        // === TIMEOUTS (always show) ===
+        else if (/timeout/i.test(line) || /timed.?out/i.test(line) ||
+                 /ETIMEDOUT/i.test(line) || /ECONNRESET/i.test(line)) {
+          printLine(`  ${c("yellow", "[!]")} ${stripped}`);
+        }
+        // === WARNINGS (always show) ===
+        else if (line.includes("[WARN]") || line.includes("[!]") ||
+                 /\bwarning\b/i.test(line) || line.includes("⚠")) {
+          printLine(`  ${c("yellow", "[!]")} ${stripped}`);
+        }
+        // === SUCCESS (always show) ===
+        else if (line.includes("✓") || line.includes("✅") || line.includes("[+]") ||
+                 line.includes("SUCCESS") || line.includes("Completed") ||
+                 line.includes("passed") || line.includes("complete")) {
+          printLine(`  ${c("green", "[+]")} ${stripped}`);
+        }
+        // === PHASES (always show) ===
+        else if (line.includes("Phase") || line.includes("══") || line.includes("☆")) {
+          printLine(`  ${c("cyan", "[>]")} ${stripped}`);
+        }
+        // === TASK EXECUTION (always show) ===
+        else if (/\[\d+\/\d+\]/.test(line) || line.includes("Executing:") ||
+                 line.includes("In Progress") || line.includes("Tool:")) {
+          printLine(`  ${c("cyan", "[.]")} ${stripped}`);
+        }
+        // === PROGRESS & METRICS (always show) ===
+        else if (line.includes("Progress:") || line.includes("█") ||
+                 line.includes("[#]") || /Tokens?:/i.test(line) ||
+                 /\d+\.\d+s/.test(line) && (line.includes("LLM") || line.includes("responded"))) {
+          printLine(`  ${c("dim", "[#]")} ${stripped}`);
+        }
+        // === ARTIFACTS (always show) ===
+        else if (line.includes("Artifacts:") || line.includes("file(s) created") ||
+                 line.includes("Bundle") || /^\s+-\s+\S/.test(normalized)) {
+          printLine(`  ${c("dim", "[~]")} ${stripped}`);
+        }
+        // === API/NETWORK ERRORS (always show) ===
+        else if (/API\s*(Error|error)/i.test(line) || /status.?\d{3}/i.test(line) ||
+                 /ENOTFOUND/i.test(line) || /ECONNREFUSED/i.test(line) ||
+                 line.includes("fetch failed") || line.includes("network")) {
+          printLine(`  ${c("red", "[x]")} ${stripped}`);
+        }
+        // === STDERR lines (show with warning) ===
+        else if (isStderr && normalized.trim()) {
+          printLine(`  ${c("yellow", "[stderr]")} ${stripped}`);
+        }
+        // === DEBUG MODE: show everything else ===
+        else if (debug && normalized.trim()) {
+          printLine(`  ${c("dim", "...")} ${normalized}`);
         }
       }
     };
 
-    proc.stdout.on("data", processOutput);
-    proc.stderr.on("data", processOutput);
+    // Helper to show recent context on fatal error
+    const showErrorContext = () => {
+      if (recentLines.length > 0) {
+        printLine();
+        printLine(`  ${c("dim", "--- Recent output (last " + recentLines.length + " lines) ---")}`);
+        recentLines.forEach(line => {
+          printLine(`  ${c("dim", "  |")} ${line}`);
+        });
+      }
+    };
+
+    proc.stdout.on("data", (data) => processOutput(data, false));
+    proc.stderr.on("data", (data) => processOutput(data, true));
 
     proc.on("close", (code) => {
+      // Clean up scroll key listener
+      stdin.removeListener("data", onScrollKey);
+      stdin.setRawMode(false);
+      disableScrollMode();
+
       progress.complete(code === 0 ? "Pipeline complete" : "Pipeline finished with errors");
-      console.log();
+      printLine();
 
       if (code === 0) {
-        console.log(`${c("green", "[+]")} Agent pipeline finished successfully.`);
-        console.log(`${c("green", "[+]")} Output saved to: ${c("cyan", COMPLETED_WORK_DIR)}`);
+        printLine(`${c("green", "[+]")} Agent pipeline finished successfully.`);
+        printLine(`${c("green", "[+]")} Output saved to: ${c("cyan", COMPLETED_WORK_DIR)}`);
       } else {
-        console.log(`${c("yellow", "[!]")} Pipeline exited with code ${code}`);
-        console.log(`${c("dim", "Check the output above for details.")}`);
+        printLine(`${c("red", "[x]")} Pipeline exited with code ${code}`);
+        showErrorContext();
+        printLine();
+        printLine(`${c("dim", "Common issues:")}`);
+        printLine(`${c("dim", "  - Rate limiting: Wait a few minutes and try Putter mode")}`);
+        printLine(`${c("dim", "  - API errors: Check your API key and endpoint")}`);
+        printLine(`${c("dim", "  - Timeouts: Try reducing the number of goals")}`);
       }
 
-      resolvePromise(code === 0);
+      printLine();
+      printLine(c("dim", "Press any key to continue..."));
+
+      // Wait for keypress before returning
+      stdin.setRawMode(true);
+      stdin.once("data", () => {
+        stdin.setRawMode(false);
+        resolvePromise(code === 0);
+      });
     });
 
     proc.on("error", (err) => {
+      // Clean up scroll key listener
+      stdin.removeListener("data", onScrollKey);
+      stdin.setRawMode(false);
+      disableScrollMode();
+
       progress.complete("Pipeline failed to start");
-      console.log();
-      console.log(`${c("red", "[x]")} Failed to start pipeline: ${err.message}`);
+      printLine();
+      printLine(`${c("red", "[x]")} Failed to start pipeline: ${err.message}`);
       resolvePromise(false);
     });
   });
@@ -734,19 +1548,22 @@ async function runAgent(goalsFilePath, config, options = {}) {
 
 // Run vigilant mode via goals-cli vigilant command
 async function runVigilantMode(goalsFilePath, config) {
-  console.log();
-  console.log(c("bold", "--- Vigilant Mode (Auto-Retry with Error Learning) ---"));
-  console.log();
-  console.log(c("dim", "This mode will:"));
-  console.log(c("dim", "  1. Run the pipeline in debug mode"));
-  console.log(c("dim", "  2. On failure, collect error logs"));
-  console.log(c("dim", "  3. Inject an error-assessment goal"));
-  console.log(c("dim", "  4. Retry with learned context (up to 3 attempts)"));
-  console.log();
+  // Reset content area for fresh output
+  clearContentArea();
+
+  printLine();
+  printLine(c("bold", "--- Vigilant Mode (Auto-Retry with Error Learning) ---"));
+  printLine();
+  printLine(c("dim", "This mode will:"));
+  printLine(c("dim", "  1. Run the pipeline in debug mode"));
+  printLine(c("dim", "  2. On failure, collect error logs"));
+  printLine(c("dim", "  3. Inject an error-assessment goal"));
+  printLine(c("dim", "  4. Retry with learned context (up to 3 attempts)"));
+  printLine();
 
   const confirm = await promptConfirm("Start vigilant mode?", true);
   if (!confirm) {
-    console.log(c("yellow", "Vigilant mode cancelled."));
+    printLine(c("yellow", "Vigilant mode cancelled."));
     return false;
   }
 
@@ -757,11 +1574,11 @@ async function runVigilantMode(goalsFilePath, config) {
   // Create completed-work directory
   await mkdir(COMPLETED_WORK_DIR, { recursive: true });
 
-  console.log();
-  console.log(c("dim", "Starting vigilant mode execution..."));
-  console.log(c("dim", `Output directory: ${COMPLETED_WORK_DIR}`));
-  console.log(c("dim", `Context directory: ${contextDir}`));
-  console.log();
+  printLine();
+  printLine(c("dim", "Starting vigilant mode execution..."));
+  printLine(c("dim", `Output directory: ${COMPLETED_WORK_DIR}`));
+  printLine(c("dim", `Context directory: ${contextDir}`));
+  printLine();
 
   return new Promise((resolvePromise) => {
     const runtime = typeof Bun !== "undefined" ? "bun" : "node";
@@ -798,51 +1615,154 @@ async function runVigilantMode(goalsFilePath, config) {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    const processOutput = (data) => {
+    // Enable scrollable console output
+    enableScrollMode();
+
+    // Setup scroll key listener
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    const onScrollKey = (key) => {
+      if (key === "\x1b[A" || key === "k") { // Up arrow or k
+        scrollConsole('up');
+      } else if (key === "\x1b[B" || key === "j") { // Down arrow or j
+        scrollConsole('down');
+      } else if (key === "\x1b[5~") { // Page Up
+        scrollConsole('pageup');
+      } else if (key === "\x1b[6~") { // Page Down
+        scrollConsole('pagedown');
+      } else if (key === "g") { // Go to top
+        scrollConsole('top');
+      } else if (key === "G" || key === "f") { // Go to bottom / Follow
+        scrollConsole('bottom');
+      } else if (key === "\u0003") { // Ctrl+C
+        proc.kill();
+      }
+    };
+
+    stdin.on("data", onScrollKey);
+
+    let recentLines = [];
+    const MAX_CONTEXT_LINES = 10;
+
+    const processOutput = (data, isStderr = false) => {
       const text = data.toString();
       const lines = text.split("\n").filter(l => l.trim());
 
       for (const line of lines) {
-        // Show attempt headers
-        if (line.includes("VIGILANT MODE") || line.includes("Attempt")) {
-          console.log(`  ${c("cyan", "[>]")} ${line.trim()}`);
+        // Strip ANSI codes before processing brackets
+        const normalized = line.replace(/\x1b\[[0-9;]*m/g, '');
+        const stripped = normalized.replace(/\[.*?\]\s*/, "").trim();
+
+        // Track recent lines for error context
+        recentLines.push(normalized);
+        if (recentLines.length > MAX_CONTEXT_LINES) recentLines.shift();
+
+        // === ERRORS (always show) ===
+        if (line.includes("[x]") || line.includes("FATAL") ||
+            /\bError\b/i.test(line) || /\bException\b/i.test(line) ||
+            line.includes("failed") && !line.includes("Collecting")) {
+          printLine(`  ${c("red", "[x]")} ${stripped}`);
         }
-        // Show success messages
-        else if (line.includes("SUCCESS") || line.includes("succeeded") || line.includes("[+]")) {
-          console.log(`  ${c("green", "[+]")} ${line.replace(/\[.*?\]\s*/, "").trim()}`);
+        // === RATE LIMITS & RETRIES (always show) ===
+        else if (/rate.?limit/i.test(line) || /\b429\b/.test(line) ||
+                 /retry/i.test(line) || /backoff/i.test(line)) {
+          printLine(`  ${c("yellow", "[!]")} ${stripped}`);
         }
-        // Show error/failure messages
-        else if (line.includes("Error") || line.includes("failed") || line.includes("[x]") || line.includes("FATAL")) {
-          console.log(`  ${c("red", "[x]")} ${line.replace(/\[.*?\]\s*/, "").trim()}`);
+        // === TIMEOUTS (always show) ===
+        else if (/timeout/i.test(line) || /timed.?out/i.test(line)) {
+          printLine(`  ${c("yellow", "[!]")} ${stripped}`);
         }
-        // Show info messages
-        else if (line.includes("[INFO]") || line.includes("Preparing") || line.includes("Collecting") || line.includes("Created") || line.includes("Injected")) {
-          console.log(`  ${c("dim", "...")} ${line.replace(/\[.*?\]\s*/, "").trim()}`);
+        // === WARNINGS (always show) ===
+        else if (line.includes("[WARN]") || line.includes("[!]") ||
+                 /\bwarning\b/i.test(line)) {
+          printLine(`  ${c("yellow", "[!]")} ${stripped}`);
         }
-        // Show phase separators
-        else if (line.includes("===") || line.includes("---")) {
-          console.log(`  ${c("cyan", "[>]")} ${line.trim()}`);
+        // === SUCCESS (always show) ===
+        else if (line.includes("SUCCESS") || line.includes("succeeded") ||
+                 line.includes("[+]") || line.includes("passed")) {
+          printLine(`  ${c("green", "[+]")} ${stripped}`);
+        }
+        // === ATTEMPT HEADERS (always show) ===
+        else if (line.includes("VIGILANT MODE") || line.includes("Attempt") ||
+                 line.includes("===" ) || line.includes("---") ||
+                 line.includes("Phase") || line.includes("☆")) {
+          printLine(`  ${c("cyan", "[>]")} ${normalized.trim()}`);
+        }
+        // === TASK EXECUTION (always show) ===
+        else if (/\[\d+\/\d+\]/.test(line) || line.includes("Executing:") ||
+                 line.includes("Tool:")) {
+          printLine(`  ${c("cyan", "[.]")} ${stripped}`);
+        }
+        // === INFO MESSAGES (always show) ===
+        else if (line.includes("[INFO]") || line.includes("Preparing") ||
+                 line.includes("Collecting") || line.includes("Created") ||
+                 line.includes("Injected") || line.includes("Learning")) {
+          printLine(`  ${c("dim", "...")} ${stripped}`);
+        }
+        // === PROGRESS & METRICS (always show) ===
+        else if (line.includes("[#]") || /Tokens?:/i.test(line) ||
+                 /\d+\.\d+s/.test(line)) {
+          printLine(`  ${c("dim", "[#]")} ${stripped}`);
+        }
+        // === STDERR (show with marker) ===
+        else if (isStderr && normalized.trim()) {
+          printLine(`  ${c("yellow", "[stderr]")} ${stripped}`);
         }
       }
     };
 
-    proc.stdout.on("data", processOutput);
-    proc.stderr.on("data", processOutput);
+    // Helper to show recent context on fatal error
+    const showErrorContext = () => {
+      if (recentLines.length > 0) {
+        printLine();
+        printLine(`  ${c("dim", "--- Recent output (last " + recentLines.length + " lines) ---")}`);
+        recentLines.forEach(line => {
+          printLine(`  ${c("dim", "  |")} ${line}`);
+        });
+      }
+    };
+
+    proc.stdout.on("data", (data) => processOutput(data, false));
+    proc.stderr.on("data", (data) => processOutput(data, true));
 
     proc.on("close", (code) => {
-      console.log();
+      // Clean up scroll key listener
+      stdin.removeListener("data", onScrollKey);
+      stdin.setRawMode(false);
+      disableScrollMode();
+
+      printLine();
       if (code === 0) {
-        console.log(`${c("green", "[+]")} Vigilant mode completed successfully.`);
-        console.log(`${c("green", "[+]")} Output saved to: ${c("cyan", COMPLETED_WORK_DIR)}`);
+        printLine(`${c("green", "[+]")} Vigilant mode completed successfully.`);
+        printLine(`${c("green", "[+]")} Output saved to: ${c("cyan", COMPLETED_WORK_DIR)}`);
       } else {
-        console.log(`${c("yellow", "[!]")} Vigilant mode exited with code ${code}`);
-        console.log(`${c("dim", "All retry attempts exhausted or an error occurred.")}`);
+        printLine(`${c("red", "[x]")} Vigilant mode exited with code ${code}`);
+        showErrorContext();
+        printLine();
+        printLine(`${c("dim", "All retry attempts exhausted. Check the error context above.")}`);
       }
-      resolvePromise(code === 0);
+
+      printLine();
+      printLine(c("dim", "Press any key to continue..."));
+
+      // Wait for keypress before returning
+      stdin.setRawMode(true);
+      stdin.once("data", () => {
+        stdin.setRawMode(false);
+        resolvePromise(code === 0);
+      });
     });
 
     proc.on("error", (err) => {
-      console.log(`${c("red", "[x]")} Failed to start vigilant mode: ${err.message}`);
+      // Clean up scroll key listener
+      stdin.removeListener("data", onScrollKey);
+      stdin.setRawMode(false);
+      disableScrollMode();
+
+      printLine(`${c("red", "[x]")} Failed to start vigilant mode: ${err.message}`);
       resolvePromise(false);
     });
   });
@@ -850,9 +1770,12 @@ async function runVigilantMode(goalsFilePath, config) {
 
 // Run goals-cli in advanced TUI mode
 async function runAdvancedMode(goalsFilePath) {
-  console.log();
-  console.log(c("dim", "Launching goals-cli in TUI mode..."));
-  console.log();
+  // Reset content area for fresh output
+  clearContentArea();
+
+  printLine();
+  printLine(c("dim", "Launching goals-cli in TUI mode..."));
+  printLine();
 
   return new Promise((resolve) => {
     const proc = spawn("bun", [GOALS_CLI_PATH, goalsFilePath], {
@@ -861,13 +1784,13 @@ async function runAdvancedMode(goalsFilePath) {
     });
 
     proc.on("close", (code) => {
-      console.log();
-      console.log(c("dim", `TUI exited with code ${code}`));
+      printLine();
+      printLine(c("dim", `TUI exited with code ${code}`));
       resolve(code === 0);
     });
 
     proc.on("error", (err) => {
-      console.log(c("red", `[x] Failed to launch goals-cli: ${err.message}`));
+      printLine(c("red", `[x] Failed to launch goals-cli: ${err.message}`));
       resolve(false);
     });
   });
@@ -878,9 +1801,9 @@ async function postGenerationMenu(config, goals, filepath) {
   let continueLoop = true;
 
   while (continueLoop) {
-    console.log();
-    console.log(c("bold", "--- What would you like to do? ---"));
-    console.log();
+    printLine();
+    printLine(c("bold", "--- What would you like to do? ---"));
+    printLine();
 
     const action = await promptSelect("Select an action:", [
       { label: "Run Agent            - Execute pipeline with default settings", value: "run" },
@@ -924,9 +1847,9 @@ async function postGenerationMenu(config, goals, filepath) {
 
       case "exit":
       default:
-        console.log();
-        console.log(`${c("green", "[+]")} Goals exported to: ${c("cyan", filepath)}`);
-        console.log(c("dim", "Exiting."));
+        printLine();
+        printLine(`${c("green", "[+]")} Goals exported to: ${c("cyan", filepath)}`);
+        printLine(c("dim", "Exiting."));
         continueLoop = false;
         break;
     }
@@ -938,20 +1861,29 @@ async function postGenerationMenu(config, goals, filepath) {
 // Goals description step (extracted for reuse)
 async function getGoalsDescription() {
   clearScreen();
-  printHeader();
-  console.log(c("bold", "Step 2: Describe Your Goals\n"));
+  setHeaderSubtitle("Step 2: Describe Your Goals");
 
-  console.log(c("cyan", "Instructions"));
-  console.log(c("dim", "─".repeat(40)));
-  console.log();
-  console.log("  Enter a description of what you want to accomplish.");
-  console.log("  Be as detailed as possible - include objectives,");
-  console.log("  priorities, success criteria, and any constraints.");
-  console.log();
-  console.log(c("dim", "  Type .done on a new line when finished."));
-  console.log();
+  // Calculate vertical center
+  const { rows } = getTerminalSize();
+  const contentAreaHeight = rows - (BORDER_HEIGHT * 2); // Subtract header and footer
+  const instructionLines = 8; // Number of instruction lines we'll print
+  const centerStartRow = BORDER_HEIGHT + 1 + Math.floor((contentAreaHeight - instructionLines) / 2);
 
-  const description = await promptMultiline("Goals description:", "Type .done on a new line when finished");
+  // Position at vertical center
+  currentContentRow = Math.max(BORDER_HEIGHT + 1, centerStartRow);
+  moveTo(currentContentRow, 1);
+
+  printCentered(c("cyan", "Instructions"));
+  printCentered(c("dim", "─".repeat(40)));
+  printLine();
+  printCentered("Enter a description of what you want to accomplish.");
+  printCentered("Be as detailed as possible - include objectives,");
+  printCentered("priorities, success criteria, and any constraints.");
+  printLine();
+  printCentered(c("dim", "Type .done on a new line when finished."));
+  printLine();
+
+  const description = await promptMultiline("Goals description:", "Type .done on a new line when finished", true);
 
   if (!description.trim()) {
     return null;
@@ -963,8 +1895,7 @@ async function getGoalsDescription() {
 // Generate and validate goals step
 async function generateAndValidateGoals(config, description) {
   clearScreen();
-  printHeader();
-  console.log(c("bold", "Step 3: Generating Goals\n"));
+  setHeaderSubtitle("Step 3: Generating Goals");
 
   const spinner = createSpinner("Generating goals via LLM...");
   spinner.start();
@@ -975,38 +1906,97 @@ async function generateAndValidateGoals(config, description) {
     spinner.stop("Goals generated successfully");
   } catch (error) {
     spinner.fail("Failed to generate goals");
-    console.log(c("red", `Error: ${error.message}`));
+    printLine(c("red", `Error: ${error.message}`));
     return null;
   }
 
-  // Validate and display
-  console.log();
+  // Validate
+  printLine();
   const errors = validateGoals(goals);
 
   if (errors.length > 0) {
-    console.log(c("yellow", "Validation warnings:"));
+    printLine(c("yellow", "Validation warnings:"));
     for (const err of errors) {
-      console.log(`  ${c("yellow", "[!]")} ${err}`);
+      printLine(`  ${c("yellow", "[!]")} ${err}`);
     }
-    console.log();
+    printLine();
   }
 
-  // Display goals summary as a form field (clean, no border)
-  console.log(c("green", "Generated Goals"));
-  console.log(c("dim", "─".repeat(40)));
-  console.log();
-  console.log(formatGoalsSummary(goals));
+  // Brief summary before review
+  printLine(`${c("green", "[+]")} Generated ${c("bold", goals.goals.length)} goals`);
+  if (goals.metadata?.name) {
+    printLine(`${c("dim", "    Project:")} ${goals.metadata.name}`);
+  }
+  printLine();
+  printLine(c("dim", "Press any key to review goals..."));
+
+  // Wait for keypress
+  await waitForKey();
+
+  // Paged review
+  clearScreen();
+  setHeaderSubtitle("Step 4: Review Goals");
+
+  const confirmed = await reviewGoals(goals);
+
+  // Clear content area after review
+  clearContentArea();
+  setHeaderSubtitle("Step 5: Save & Execute");
+
+  if (!confirmed) {
+    printLine(c("yellow", "Review cancelled."));
+    return null;
+  }
+
+  printLine(`${c("green", "[+]")} Goals reviewed and confirmed`);
+  printLine();
 
   return goals;
 }
 
+/**
+ * Wait for any keypress
+ */
+async function waitForKey() {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    const onKey = (key) => {
+      stdin.setRawMode(false);
+      stdin.removeListener("data", onKey);
+      if (key === "\u0003") {
+        process.exit(0);
+      }
+      resolve();
+    };
+
+    stdin.once("data", onKey);
+  });
+}
+
+// Cleanup handler
+function cleanup() {
+  stopBorderAnimation();
+  resetScrollRegion();
+  showCursor();
+}
+
 // Main application
 async function main() {
-  clearScreen();
-  printHeader();
+  // Setup cleanup on exit
+  process.on('exit', cleanup);
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+
+  // Clear and setup display with scroll region
+  process.stdout.write("\x1b[2J\x1b[H");
+  startBorderAnimation(); // Sets up scroll region and positions cursor
 
   // Step 1: Configure LLM (done once)
-  console.log(c("bold", "Step 1: Configure LLM Provider\n"));
+  setHeaderSubtitle("Step 1: Configure LLM Provider");
 
   const provider = await promptSelect("Select your LLM provider:", [
     { label: "Anthropic (Claude)", value: LLMProvider.ANTHROPIC },
@@ -1014,14 +2004,14 @@ async function main() {
     { label: "Custom Provider", value: LLMProvider.CUSTOM },
   ]);
 
-  console.log();
+  printLine(); // blank line
 
   const defaultEndpoint = DEFAULT_ENDPOINTS[provider];
   const defaultModel = DEFAULT_MODELS[provider];
 
   const endpoint = await prompt("API Endpoint", defaultEndpoint);
   if (!endpoint) {
-    console.log(c("red", "Endpoint is required. Exiting."));
+    printLine(c("red", "Endpoint is required. Exiting."));
     process.exit(1);
   }
 
@@ -1029,7 +2019,7 @@ async function main() {
 
   const apiKey = await promptPassword("API Key");
   if (!apiKey) {
-    console.log(c("red", "API key is required. Exiting."));
+    printLine(c("red", "API key is required. Exiting."));
     process.exit(1);
   }
 
@@ -1040,16 +2030,16 @@ async function main() {
     apiKey,
   };
 
-  console.log();
-  console.log(`${c("green", "[+]")} Provider: ${c("cyan", config.provider)}`);
-  console.log(`${c("green", "[+]")} Endpoint: ${c("cyan", config.endpoint)}`);
-  console.log(`${c("green", "[+]")} Model: ${c("cyan", config.model || "default")}`);
-  console.log(`${c("green", "[+]")} API Key: ${c("cyan", "*".repeat(8) + "..." + config.apiKey.slice(-4))}`);
-  console.log();
+  printLine();
+  printLine(`${c("green", "[+]")} Provider: ${c("cyan", config.provider)}`);
+  printLine(`${c("green", "[+]")} Endpoint: ${c("cyan", config.endpoint)}`);
+  printLine(`${c("green", "[+]")} Model: ${c("cyan", config.model || "default")}`);
+  printLine(`${c("green", "[+]")} API Key: ${c("cyan", "*".repeat(8) + "..." + config.apiKey.slice(-4))}`);
+  printLine();
 
   const proceed = await promptConfirm("Continue with these settings?", true);
   if (!proceed) {
-    console.log(c("yellow", "Cancelled."));
+    printLine(c("yellow", "Cancelled."));
     process.exit(0);
   }
 
@@ -1065,11 +2055,11 @@ async function main() {
     if (!description) {
       if (allGoals) {
         // Already have some goals, just skip this round
-        console.log(c("yellow", "No description provided. Returning to menu."));
+        printLine(c("yellow", "No description provided. Returning to menu."));
         continueGenerating = false;
         continue;
       } else {
-        console.log(c("red", "No description provided. Exiting."));
+        printLine(c("red", "No description provided. Exiting."));
         process.exit(1);
       }
     }
@@ -1079,7 +2069,7 @@ async function main() {
 
     if (!goals) {
       if (allGoals) {
-        console.log(c("yellow", "Generation failed. Returning to menu."));
+        printLine(c("yellow", "Generation failed. Returning to menu."));
         continueGenerating = false;
         continue;
       } else {
@@ -1101,14 +2091,14 @@ async function main() {
         existingIds.add(newId);
         allGoals.goals.push(goal);
       }
-      console.log();
-      console.log(`${c("green", "[+]")} Added ${goals.goals.length} new goal(s). Total: ${allGoals.goals.length} goals.`);
+      printLine();
+      printLine(`${c("green", "[+]")} Added ${goals.goals.length} new goal(s). Total: ${allGoals.goals.length} goals.`);
     } else {
       allGoals = goals;
     }
 
     // Step 5: Save
-    console.log();
+    printLine();
     const shouldSave = await promptConfirm("Save goals to file?", true);
 
     if (shouldSave) {
@@ -1117,7 +2107,8 @@ async function main() {
 
       if (filename) {
         savedFilepath = await saveGoals(allGoals, filename);
-        console.log(`\n${c("green", "[+]")} Saved to: ${c("cyan", savedFilepath)}`);
+        printLine();
+        printLine(`${c("green", "[+]")} Saved to: ${c("cyan", savedFilepath)}`);
 
         // Step 6: Post-generation menu
         const result = await postGenerationMenu(config, allGoals, savedFilepath);
@@ -1132,7 +2123,8 @@ async function main() {
         continueGenerating = false;
       }
     } else {
-      console.log(`\n${c("dim", "Exiting without saving.")}`);
+      printLine();
+      printLine(c("dim", "Exiting without saving."));
       continueGenerating = false;
     }
   }
@@ -1140,6 +2132,7 @@ async function main() {
 
 // Run
 main().catch((err) => {
-  console.error(c("red", `Fatal error: ${err.message}`));
+  cleanup();
+  printLine(c("red", `Fatal error: ${err.message}`));
   process.exit(1);
 });
