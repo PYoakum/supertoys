@@ -27,10 +27,10 @@ export default {
   llm: {
     provider: process.env.LLM_PROVIDER || 'anthropic',
     endpoint: process.env.LLM_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-    apiKey: process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
+    apiKey: process.env.LLM_API_KEY || process.env.PRIMARY_LLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
     model: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
     anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
-    timeout: parseInt(process.env.LLM_TIMEOUT, 10) || 120000,
+    timeout: parseInt(process.env.LLM_TIMEOUT, 10) || 300000, // 5 minute default
     requestDelayMs: parseInt(process.env.LLM_REQUEST_DELAY_MS, 10) || 0, // Delay between requests to avoid rate limits
     retry: {
       maxAttempts: parseInt(process.env.LLM_MAX_RETRIES, 10) || 5,
