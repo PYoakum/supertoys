@@ -216,50 +216,51 @@ export class ReviewResearchTool {
   objective: Evaluate research content against stated intent/objectives
 
 evaluation_criteria:
-  topic_relevance:
-    weight: 0.30
-    description: How well does the content match the research intent
-  information_quality:
-    weight: 0.25
-    description: Accuracy, depth, and usefulness of information
-  source_credibility:
-    weight: 0.15
-    description: Authority and trustworthiness of sources
-  content_clarity:
-    weight: 0.15
-    description: How clear and well-organized is the content
-  context_fit:
-    weight: 0.15
-    description: How well content fits into broader context window
+  topic_relevance: weight 0.30 - How well content matches research intent
+  information_quality: weight 0.25 - Accuracy, depth, usefulness
+  source_credibility: weight 0.15 - Authority and trustworthiness
+  content_clarity: weight 0.15 - How clear and well-organized
+  context_fit: weight 0.15 - How well it fits broader context
 
-output_format:
-  type: yaml_object
-  structure:
-    overall_score: float (0-1, weighted average)
-    verdict: string (excellent/good/acceptable/needs_improvement/poor)
-    criteria_scores:
-      topic_relevance: float (0-1)
-      information_quality: float (0-1)
-      source_credibility: float (0-1)
-      content_clarity: float (0-1)
-      context_fit: float (0-1)
-    item_reviews:
-      - source: string (file path)
-        score: float (0-1)
-        strengths: list of strings
-        weaknesses: list of strings
-        keep: boolean (recommend keeping in context)
-    recommendations:
-      keep: list of source paths to keep
-      remove: list of source paths to remove
-      refine: list of {source: path, suggestion: string}
-    summary: string (2-3 sentences)
-    context_efficiency:
-      total_tokens_estimate: integer
-      recommended_tokens: integer
-      reduction_possible: float (0-1)
+output_format: TOML (resilient to truncation)
 
-CRITICAL: Output ONLY valid YAML. No markdown, no explanations.`;
+TOML_TEMPLATE:
+# Research Review Output
+overall_score = 0.85
+verdict = "good"
+summary = "Brief 2-3 sentence assessment"
+
+[criteria_scores]
+topic_relevance = 0.90
+information_quality = 0.85
+source_credibility = 0.75
+content_clarity = 0.80
+context_fit = 0.80
+
+[context_efficiency]
+total_tokens_estimate = 5000
+recommended_tokens = 4000
+reduction_possible = 0.20
+
+[[item_reviews]]
+source = "context/file1.md"
+score = 0.85
+keep = true
+strengths = ["strength1", "strength2"]
+weaknesses = ["weakness1"]
+
+[[item_reviews]]
+source = "context/file2.md"
+score = 0.70
+keep = true
+strengths = ["strength1"]
+weaknesses = ["weakness1", "weakness2"]
+
+[recommendations]
+keep = ["context/file1.md", "context/file2.md"]
+remove = []
+
+CRITICAL: Output ONLY valid TOML. No markdown blocks, no explanations.`;
 
     // Build content summary for review
     const contentSummary = research.map((r, i) => {
@@ -298,15 +299,158 @@ Evaluate all research items against the stated intent. Score each item and provi
   }
 
   /**
-   * Parse LLM review response
-   * @param {string} yamlStr
+   * Parse TOML string into object
+   * Handles partial/truncated TOML gracefully
+   * @param {string} tomlStr
    * @returns {Object}
    * @private
    */
-  _parseReviewResponse(yamlStr) {
+  _parseToml(tomlStr) {
+    const result = {};
+    let currentSection = null;
+    let currentArraySection = null;
+    let currentArrayItem = null;
+
+    const lines = tomlStr.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      // Array of tables: [[section]]
+      const arrayMatch = trimmed.match(/^\[\[([^\]]+)\]\]$/);
+      if (arrayMatch) {
+        // Save previous array item
+        if (currentArrayItem && currentArraySection) {
+          if (!result[currentArraySection]) result[currentArraySection] = [];
+          result[currentArraySection].push(currentArrayItem);
+        }
+        currentArraySection = arrayMatch[1].trim();
+        currentArrayItem = {};
+        currentSection = null;
+        continue;
+      }
+
+      // Regular section: [section]
+      const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+      if (sectionMatch) {
+        // Save previous array item
+        if (currentArrayItem && currentArraySection) {
+          if (!result[currentArraySection]) result[currentArraySection] = [];
+          result[currentArraySection].push(currentArrayItem);
+          currentArrayItem = null;
+          currentArraySection = null;
+        }
+        currentSection = sectionMatch[1].trim();
+        if (!result[currentSection]) result[currentSection] = {};
+        continue;
+      }
+
+      // Key-value pair
+      const kvMatch = trimmed.match(/^([^=]+)=(.*)$/);
+      if (kvMatch) {
+        const key = kvMatch[1].trim();
+        let value = kvMatch[2].trim();
+
+        // Parse value
+        const parsedValue = this._parseTomlValue(value);
+
+        // Store in appropriate place
+        if (currentArrayItem) {
+          currentArrayItem[key] = parsedValue;
+        } else if (currentSection) {
+          result[currentSection][key] = parsedValue;
+        } else {
+          result[key] = parsedValue;
+        }
+      }
+    }
+
+    // Save final array item
+    if (currentArrayItem && currentArraySection) {
+      if (!result[currentArraySection]) result[currentArraySection] = [];
+      result[currentArraySection].push(currentArrayItem);
+    }
+
+    return result;
+  }
+
+  /**
+   * Parse a TOML value
+   * @param {string} value
+   * @returns {*}
+   * @private
+   */
+  _parseTomlValue(value) {
+    // String (double or single quoted)
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1);
+    }
+
+    // Boolean
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+
+    // Array
+    if (value.startsWith('[')) {
+      // Handle array - try to parse
+      try {
+        // Simple array parsing
+        const inner = value.slice(1, -1).trim();
+        if (!inner) return [];
+
+        // Split by comma, respecting quotes
+        const items = [];
+        let current = '';
+        let inQuote = false;
+        let quoteChar = '';
+
+        for (const char of inner) {
+          if ((char === '"' || char === "'") && !inQuote) {
+            inQuote = true;
+            quoteChar = char;
+            current += char;
+          } else if (char === quoteChar && inQuote) {
+            inQuote = false;
+            current += char;
+          } else if (char === ',' && !inQuote) {
+            items.push(this._parseTomlValue(current.trim()));
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        if (current.trim()) {
+          items.push(this._parseTomlValue(current.trim()));
+        }
+        return items;
+      } catch {
+        return [];
+      }
+    }
+
+    // Number
+    if (/^-?\d*\.?\d+$/.test(value)) {
+      return parseFloat(value);
+    }
+
+    // Return as string
+    return value;
+  }
+
+  /**
+   * Parse LLM review response (TOML format)
+   * @param {string} tomlStr
+   * @returns {Object}
+   * @private
+   */
+  _parseReviewResponse(tomlStr) {
     // Clean markdown artifacts
-    let clean = yamlStr
-      .replace(/^```ya?ml?\n?/i, '')
+    let clean = tomlStr
+      .replace(/^```toml?\n?/i, '')
       .replace(/\n?```$/i, '')
       .trim();
 
@@ -334,20 +478,35 @@ Evaluate all research items against the stated intent. Score each item and provi
       }
     };
 
-    // Parse the YAML response
-    const parsed = this._parseYaml(clean);
+    // Parse the TOML response
+    const parsed = this._parseToml(clean);
 
-    // Map parsed values to result structure
+    // Map top-level values
     if (parsed.overall_score !== undefined) result.overall_score = parsed.overall_score;
     if (parsed.verdict) result.verdict = parsed.verdict;
     if (parsed.summary) result.summary = parsed.summary;
 
-    // Handle criteria scores (may be nested)
-    if (parsed.topic_relevance !== undefined) result.criteria_scores.topic_relevance = parsed.topic_relevance;
-    if (parsed.information_quality !== undefined) result.criteria_scores.information_quality = parsed.information_quality;
-    if (parsed.source_credibility !== undefined) result.criteria_scores.source_credibility = parsed.source_credibility;
-    if (parsed.content_clarity !== undefined) result.criteria_scores.content_clarity = parsed.content_clarity;
-    if (parsed.context_fit !== undefined) result.criteria_scores.context_fit = parsed.context_fit;
+    // Map criteria_scores section
+    if (parsed.criteria_scores) {
+      Object.assign(result.criteria_scores, parsed.criteria_scores);
+    }
+
+    // Map context_efficiency section
+    if (parsed.context_efficiency) {
+      Object.assign(result.context_efficiency, parsed.context_efficiency);
+    }
+
+    // Map item_reviews array
+    if (parsed.item_reviews && Array.isArray(parsed.item_reviews)) {
+      result.item_reviews = parsed.item_reviews;
+    }
+
+    // Map recommendations section
+    if (parsed.recommendations) {
+      if (parsed.recommendations.keep) result.recommendations.keep = parsed.recommendations.keep;
+      if (parsed.recommendations.remove) result.recommendations.remove = parsed.recommendations.remove;
+      if (parsed.recommendations.refine) result.recommendations.refine = parsed.recommendations.refine;
+    }
 
     return result;
   }

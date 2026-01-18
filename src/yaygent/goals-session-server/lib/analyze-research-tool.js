@@ -155,32 +155,41 @@ export class AnalyzeResearchTool {
   objective: Extract structured metadata from research content
   iteration: ${iteration}
 
-output_format:
-  type: yaml_object
-  structure:
-    title: string
-    summary: string (2-3 sentences)
-    tags: list of relevant topic tags (5-15 tags)
-    key_concepts: list of main concepts/terms
-    relevant_information:
-      - heading: string
-        content: string (refined/clarified excerpt)
-        relevance_score: float (0-1)
-    clarity_improvements:
-      - original: string
-        improved: string
-    confidence_score: float (0-1)
-    needs_refinement: boolean
+output_format: TOML (resilient to truncation)
+
+TOML_TEMPLATE:
+# Research Analysis
+title = "Document Title"
+summary = "2-3 sentence summary of the content"
+confidence_score = 0.85
+needs_refinement = false
+
+tags = ["tag1", "tag2", "tag3", "tag4", "tag5"]
+key_concepts = ["concept1", "concept2", "concept3"]
+
+[[relevant_information]]
+heading = "Section Title"
+content = "Key excerpt from this section"
+relevance_score = 0.9
+
+[[relevant_information]]
+heading = "Another Section"
+content = "Another key excerpt"
+relevance_score = 0.8
+
+[[clarity_improvements]]
+original = "unclear text from source"
+improved = "clearer rewrite of the text"
 
 instructions:
-  - Extract meaningful tags that categorize the content
+  - Extract 5-15 meaningful tags that categorize the content
   - Identify key concepts and terminology
   - Pull out the most relevant information sections
   - Suggest clarity improvements for unclear passages
-  - Rate your confidence in the analysis
-  - Set needs_refinement=true if confidence < 0.7
+  - Rate your confidence in the analysis (0-1)
+  - Set needs_refinement = true if confidence < 0.7
 
-CRITICAL: Output ONLY valid YAML. No markdown, no explanations.`;
+CRITICAL: Output ONLY valid TOML. No markdown blocks, no explanations.`;
 
     const userPrompt = `Analyze this research content:
 
@@ -197,8 +206,8 @@ ${content.slice(0, this.maxContentLength)}`;
         parameters: { temperature: 0.3, maxTokens: 4096 }
       });
 
-      // Parse YAML response
-      return this._parseYamlResponse(response.content);
+      // Parse TOML response
+      return this._parseTomlResponse(response.content);
     } catch (err) {
       console.error('LLM analysis failed:', err.message);
       return this._basicAnalysis(content, existingMetadata);
@@ -206,19 +215,80 @@ ${content.slice(0, this.maxContentLength)}`;
   }
 
   /**
-   * Parse YAML response from LLM
-   * @param {string} yamlStr
+   * Parse a TOML value
+   * @param {string} value
+   * @returns {*}
+   * @private
+   */
+  _parseTomlValue(value) {
+    // String (double or single quoted)
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1);
+    }
+
+    // Boolean
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+
+    // Array
+    if (value.startsWith('[')) {
+      try {
+        const inner = value.slice(1, -1).trim();
+        if (!inner) return [];
+
+        // Split by comma, respecting quotes
+        const items = [];
+        let current = '';
+        let inQuote = false;
+        let quoteChar = '';
+
+        for (const char of inner) {
+          if ((char === '"' || char === "'") && !inQuote) {
+            inQuote = true;
+            quoteChar = char;
+            current += char;
+          } else if (char === quoteChar && inQuote) {
+            inQuote = false;
+            current += char;
+          } else if (char === ',' && !inQuote) {
+            items.push(this._parseTomlValue(current.trim()));
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        if (current.trim()) {
+          items.push(this._parseTomlValue(current.trim()));
+        }
+        return items;
+      } catch {
+        return [];
+      }
+    }
+
+    // Number
+    if (/^-?\d*\.?\d+$/.test(value)) {
+      return parseFloat(value);
+    }
+
+    return value;
+  }
+
+  /**
+   * Parse TOML response from LLM
+   * Handles partial/truncated TOML gracefully
+   * @param {string} tomlStr
    * @returns {Object}
    * @private
    */
-  _parseYamlResponse(yamlStr) {
+  _parseTomlResponse(tomlStr) {
     // Clean up potential markdown artifacts
-    let clean = yamlStr
-      .replace(/^```ya?ml?\n?/i, '')
+    let clean = tomlStr
+      .replace(/^```toml?\n?/i, '')
       .replace(/\n?```$/i, '')
       .trim();
 
-    // Simple YAML-like parsing
     const result = {
       title: '',
       summary: '',
@@ -230,85 +300,62 @@ ${content.slice(0, this.maxContentLength)}`;
       needs_refinement: true
     };
 
+    let currentArraySection = null;
+    let currentArrayItem = null;
+
     const lines = clean.split('\n');
-    let currentKey = null;
-    let currentList = null;
-    let currentObject = null;
-    let indent = 0;
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed) continue;
 
-      // Check for list item
-      if (trimmed.startsWith('- ')) {
-        const value = trimmed.slice(2).trim();
-        if (currentList && Array.isArray(result[currentList])) {
-          if (value.includes(':')) {
-            // Start of object in list
-            const colonIdx = value.indexOf(':');
-            const key = value.slice(0, colonIdx).trim();
-            const val = value.slice(colonIdx + 1).trim();
-            currentObject = { [key]: val.replace(/^["']|["']$/g, '') };
-          } else {
-            result[currentList].push(value.replace(/^["']|["']$/g, ''));
-          }
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      // Array of tables: [[section]]
+      const arrayMatch = trimmed.match(/^\[\[([^\]]+)\]\]$/);
+      if (arrayMatch) {
+        // Save previous array item
+        if (currentArrayItem && currentArraySection) {
+          if (!result[currentArraySection]) result[currentArraySection] = [];
+          result[currentArraySection].push(currentArrayItem);
+        }
+        currentArraySection = arrayMatch[1].trim();
+        currentArrayItem = {};
+        continue;
+      }
+
+      // Regular section (skip for now, we handle flat structure)
+      if (trimmed.match(/^\[[^\]]+\]$/)) {
+        // Save previous array item
+        if (currentArrayItem && currentArraySection) {
+          if (!result[currentArraySection]) result[currentArraySection] = [];
+          result[currentArraySection].push(currentArrayItem);
+          currentArrayItem = null;
+          currentArraySection = null;
         }
         continue;
       }
 
-      // Check for key-value
-      const colonIdx = trimmed.indexOf(':');
-      if (colonIdx > 0) {
-        const key = trimmed.slice(0, colonIdx).trim();
-        let value = trimmed.slice(colonIdx + 1).trim();
+      // Key-value pair
+      const kvMatch = trimmed.match(/^([^=]+)=(.*)$/);
+      if (kvMatch) {
+        const key = kvMatch[1].trim();
+        const value = kvMatch[2].trim();
+        const parsedValue = this._parseTomlValue(value);
 
-        // Handle indented object properties
-        if (currentObject && line.startsWith('    ')) {
-          currentObject[key] = value.replace(/^["']|["']$/g, '');
-          continue;
-        }
-
-        // Complete previous object
-        if (currentObject && currentList) {
-          result[currentList].push(currentObject);
-          currentObject = null;
-        }
-
-        // Map keys to result
-        const keyMap = {
-          'title': 'title',
-          'summary': 'summary',
-          'tags': 'tags',
-          'key_concepts': 'key_concepts',
-          'relevant_information': 'relevant_information',
-          'clarity_improvements': 'clarity_improvements',
-          'confidence_score': 'confidence_score',
-          'needs_refinement': 'needs_refinement'
-        };
-
-        if (keyMap[key]) {
-          if (value === '' || value === '[]') {
-            currentList = keyMap[key];
-            currentKey = keyMap[key];
-          } else {
-            // Direct value
-            if (key === 'confidence_score') {
-              result[keyMap[key]] = parseFloat(value) || 0.5;
-            } else if (key === 'needs_refinement') {
-              result[keyMap[key]] = value.toLowerCase() === 'true';
-            } else {
-              result[keyMap[key]] = value.replace(/^["']|["']$/g, '');
-            }
-            currentList = null;
-          }
+        // Store in appropriate place
+        if (currentArrayItem) {
+          currentArrayItem[key] = parsedValue;
+        } else if (result.hasOwnProperty(key)) {
+          result[key] = parsedValue;
         }
       }
     }
 
-    // Complete final object
-    if (currentObject && currentList) {
-      result[currentList].push(currentObject);
+    // Save final array item
+    if (currentArrayItem && currentArraySection) {
+      if (!result[currentArraySection]) result[currentArraySection] = [];
+      result[currentArraySection].push(currentArrayItem);
     }
 
     return result;
