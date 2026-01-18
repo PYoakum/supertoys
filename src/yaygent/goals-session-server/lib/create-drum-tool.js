@@ -9,10 +9,16 @@
 import { spawn, execSync } from 'child_process';
 import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
-import { join, resolve, basename, extname } from 'path';
+import { join, resolve, basename, extname, dirname } from 'path';
 import { tmpdir, homedir, platform } from 'os';
+import { fileURLToPath } from 'url';
 import https from 'https';
 import http from 'http';
+
+// Bundled assets directory (relative to this module)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const BUNDLED_SAMPLES_DIR = join(__dirname, '..', 'assets', 'audio', 'drums808');
 
 /**
  * TR-808 sample mapping
@@ -20,30 +26,18 @@ import http from 'http';
  */
 const SAMPLE_MAP = {
   // Kicks
-  'BD': { name: 'kick', file: 'kick.mp3', category: 'kicks', aliases: ['kick', 'bass_drum', 'bd'] },
+  'BD': { name: 'kick', file: 'bd.mp3', category: 'kicks', aliases: ['kick', 'bass_drum', 'bd'], bundled: true },
   // Snares
-  'SD': { name: 'snare', file: 'snare.mp3', category: 'snares', aliases: ['snare', 'sd'] },
+  'SD': { name: 'snare', file: 'sd.mp3', category: 'snares', aliases: ['snare', 'sd'], bundled: true },
   // Clap
-  'CP': { name: 'clap', file: 'clap.mp3', category: 'percussion', aliases: ['clap', 'cp', 'handclap'] },
+  'CP': { name: 'clap', file: 'cp.mp3', category: 'percussion', aliases: ['clap', 'cp', 'handclap'], bundled: true },
   // Hi-hats
-  'CH': { name: 'hihat-closed', file: 'hihat-closed.mp3', category: 'hihats', aliases: ['hihat', 'hh', 'closed_hihat', 'ch'] },
-  'OH': { name: 'hihat-open', file: 'hihat-open.mp3', category: 'hihats', aliases: ['open_hihat', 'oh'] },
-  // Toms
-  'LT': { name: 'tom-low', file: 'tom-low.mp3', category: 'toms', aliases: ['low_tom', 'lt'] },
-  'MT': { name: 'tom-mid', file: 'tom-mid.mp3', category: 'toms', aliases: ['mid_tom', 'mt'] },
-  'HT': { name: 'tom-high', file: 'tom-high.mp3', category: 'toms', aliases: ['high_tom', 'ht'] },
-  // Cymbals
-  'CY': { name: 'cymbal', file: 'cymbal.mp3', category: 'cymbals', aliases: ['cymbal', 'cy', 'crash'] },
-  'CB': { name: 'cowbell', file: 'cowbell.mp3', category: 'percussion', aliases: ['cowbell', 'cb'] },
+  'CH': { name: 'hihat-closed', file: 'hc.mp3', category: 'hihats', aliases: ['hihat', 'hh', 'closed_hihat', 'ch'], bundled: true },
+  'OH': { name: 'hihat-open', file: 'ho.mp3', category: 'hihats', aliases: ['open_hihat', 'oh'], bundled: true },
+  // Cowbell
+  'CB': { name: 'cowbell', file: 'cb.mp3', category: 'percussion', aliases: ['cowbell', 'cb'], bundled: true },
   // Rimshot
-  'RS': { name: 'rimshot', file: 'rimshot.mp3', category: 'percussion', aliases: ['rimshot', 'rs', 'rim'] },
-  // Congas
-  'LC': { name: 'conga-low', file: 'conga-low.mp3', category: 'congas', aliases: ['low_conga', 'lc'] },
-  'MC': { name: 'conga-mid', file: 'conga-mid.mp3', category: 'congas', aliases: ['mid_conga', 'mc'] },
-  'HC': { name: 'conga-high', file: 'conga-high.mp3', category: 'congas', aliases: ['high_conga', 'hc'] },
-  // Others
-  'MA': { name: 'maracas', file: 'maracas.mp3', category: 'percussion', aliases: ['maracas', 'ma'] },
-  'CL': { name: 'claves', file: 'claves.mp3', category: 'percussion', aliases: ['claves', 'cl'] }
+  'RS': { name: 'rimshot', file: 'rs.mp3', category: 'percussion', aliases: ['rimshot', 'rs', 'rim'], bundled: true }
 };
 
 /**
@@ -327,11 +321,20 @@ export class CreateDrumTool {
   }
 
   /**
-   * Get path to sample file, downloading if needed
+   * Get path to sample file (bundled assets)
    */
   async _getSamplePath(sampleInfo) {
-    await this._ensureDirs();
+    // Use bundled samples
+    if (sampleInfo.bundled) {
+      const bundledPath = join(BUNDLED_SAMPLES_DIR, sampleInfo.file);
+      if (existsSync(bundledPath)) {
+        return bundledPath;
+      }
+      throw new Error(`Bundled sample not found: ${sampleInfo.file}`);
+    }
 
+    // Fallback to cache dir for any future non-bundled samples
+    await this._ensureDirs();
     const samplePath = join(this.config.sampleCacheDir, sampleInfo.file);
 
     if (!existsSync(samplePath)) {
@@ -811,50 +814,47 @@ export class CreateDrumTool {
    * Handle check_backends action
    */
   async _handleCheckBackends() {
-    // Check sample availability
+    // Check bundled sample availability
     let samplesReady = false;
     try {
-      await this._ensureDirs();
-      const samplePath = join(this.config.sampleCacheDir, 'kick.mp3');
+      const samplePath = join(BUNDLED_SAMPLES_DIR, 'bd.mp3');
       samplesReady = existsSync(samplePath);
     } catch {}
 
     return {
       success: true,
       ffmpeg_available: this.hasFfmpeg,
-      samples_cached: samplesReady,
-      sample_cache_dir: this.config.sampleCacheDir,
-      ready: this.hasFfmpeg,
+      samples_bundled: samplesReady,
+      bundled_samples_dir: BUNDLED_SAMPLES_DIR,
+      ready: this.hasFfmpeg && samplesReady,
       presets_available: Object.keys(PRESET_PATTERNS).length,
       samples_available: Object.keys(SAMPLE_MAP).length
     };
   }
 
   /**
-   * Handle download_samples action
+   * Handle verify_samples action (samples are now bundled)
    */
   async _handleDownloadSamples() {
-    await this._ensureDirs();
-
-    const downloaded = [];
-    const failed = [];
+    const available = [];
+    const missing = [];
 
     for (const [code, sample] of Object.entries(SAMPLE_MAP)) {
       try {
         await this._getSamplePath(sample);
-        downloaded.push(code);
+        available.push(code);
       } catch (err) {
-        failed.push({ code, error: err.message });
+        missing.push({ code, error: err.message });
       }
     }
 
     return {
-      success: failed.length === 0,
-      downloaded_count: downloaded.length,
-      failed_count: failed.length,
-      downloaded,
-      failed,
-      cache_dir: this.config.sampleCacheDir
+      success: missing.length === 0,
+      available_count: available.length,
+      missing_count: missing.length,
+      available,
+      missing,
+      bundled_dir: BUNDLED_SAMPLES_DIR
     };
   }
 
