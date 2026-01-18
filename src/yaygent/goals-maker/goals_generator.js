@@ -2225,21 +2225,14 @@ async function runVigilantMode(goalsFilePath, config) {
 
 // Run goals-cli in advanced TUI mode
 async function runAdvancedMode(goalsFilePath) {
-  // Reset content area for fresh output
-  clearContentArea();
-
   // Create context directory if not exists (same pattern as vigilant mode)
   const contextDir = join(dirname(goalsFilePath), "context");
   await mkdir(contextDir, { recursive: true });
 
-  printLine();
-  printLine(c("dim", "Launching goals-cli TUI..."));
-  printLine(c("dim", `Goals: ${goalsFilePath}`));
-  printLine(c("dim", `Context: ${contextDir}`));
-  printLine();
+  // Stop all animations and clear the screen completely
+  stopBorderAnimation();
 
   // Clean up stdin before handing off to TUI
-  // The TUI needs full control of the terminal
   const stdin = process.stdin;
   stdin.removeAllListeners("data");
   stdin.removeAllListeners("keypress");
@@ -2248,11 +2241,14 @@ async function runAdvancedMode(goalsFilePath) {
   }
   stdin.pause();
 
-  // Clear screen and reset cursor for clean TUI handoff
+  // Clear screen completely and reset terminal state
   process.stdout.write("\x1b[?25h");  // Show cursor
+  process.stdout.write("\x1b[2J");    // Clear entire screen
+  process.stdout.write("\x1b[H");     // Move cursor to home position
+  process.stdout.write("\x1b[0m");    // Reset all attributes
 
   // Small delay to let terminal settle
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 50));
 
   // Spawn TUI - it will take over the terminal
   const proc = spawn("bun", [
