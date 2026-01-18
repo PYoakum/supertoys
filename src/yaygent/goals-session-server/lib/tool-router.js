@@ -125,15 +125,65 @@ export class ToolRouter {
 /**
  * Notepad Tool Implementation
  * Provides file creation, reading, writing capabilities
+ * Notes are stored in session memory (preferred) with file backup
  */
 export class NotepadTool {
   /**
-   * @param {string} [baseDir='./notes'] - Base directory for notes
+   * @param {string} [baseDir='./notes'] - Base directory for notes (file backup)
+   * @param {Object} [options={}] - Options
+   * @param {import('./session-manager.js').SessionManager} [options.sessionManager] - Session manager for session-based storage
    */
-  constructor(baseDir = './notes') {
+  constructor(baseDir = './notes', options = {}) {
     /** @type {string} */
     this.baseDir = baseDir;
+    /** @type {import('./session-manager.js').SessionManager|null} */
+    this.sessionManager = options.sessionManager || null;
     this.ensureBaseDir();
+  }
+
+  /**
+   * Get notes object from session
+   * @param {string} sessionId
+   * @returns {Object|null} Notes object from session or null if not available
+   * @private
+   */
+  _getSessionNotes(sessionId) {
+    if (!this.sessionManager || !sessionId) return null;
+    try {
+      const session = this.sessionManager.getSession(sessionId);
+      return session.notes || {};
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Update notes in session
+   * @param {string} sessionId
+   * @param {Object} notes
+   * @private
+   */
+  _setSessionNotes(sessionId, notes) {
+    if (!this.sessionManager || !sessionId) return;
+    try {
+      this.sessionManager.store.update(sessionId, { notes });
+    } catch (err) {
+      console.error('Failed to update session notes:', err.message);
+    }
+  }
+
+  /**
+   * Get safe filename (sanitized)
+   * @param {string} filename
+   * @returns {string}
+   * @private
+   */
+  _getSafeFilename(filename) {
+    let safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!safeName.includes('.')) {
+      safeName += '.txt';
+    }
+    return safeName;
   }
 
   /**
@@ -157,12 +207,7 @@ export class NotepadTool {
    * @private
    */
   getFilePath(filename, sessionId) {
-    // Sanitize filename to prevent directory traversal
-    let safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    // Auto-add .txt extension if no extension present
-    if (!safeName.includes('.')) {
-      safeName += '.txt';
-    }
+    const safeName = this._getSafeFilename(filename);
     const dir = sessionId ? join(this.baseDir, sessionId) : this.baseDir;
     return join(dir, safeName);
   }
@@ -181,9 +226,20 @@ export class NotepadTool {
       throw new Error('filename is required');
     }
 
+    const safeName = this._getSafeFilename(filename);
+    const noteContent = content || '';
+
+    // Store in session if sessionId provided and sessionManager available
+    if (sessionId && this.sessionManager) {
+      const notes = this._getSessionNotes(sessionId) || {};
+      notes[safeName] = noteContent;
+      this._setSessionNotes(sessionId, notes);
+    }
+
+    // Also write to file as backup
     const filePath = this.getFilePath(filename, sessionId);
     await this.ensureBaseDir(sessionId);
-    await writeFile(filePath, content || '', 'utf-8');
+    await writeFile(filePath, noteContent, 'utf-8');
 
     return {
       content: [
@@ -213,6 +269,20 @@ export class NotepadTool {
       throw new Error('content is required');
     }
 
+    const safeName = this._getSafeFilename(filename);
+    let finalContent = content;
+
+    // Handle session storage
+    if (sessionId && this.sessionManager) {
+      const notes = this._getSessionNotes(sessionId) || {};
+      if (append && notes[safeName]) {
+        finalContent = notes[safeName] + content;
+      }
+      notes[safeName] = finalContent;
+      this._setSessionNotes(sessionId, notes);
+    }
+
+    // Also write to file as backup
     await this.ensureBaseDir(sessionId);
     const filePath = this.getFilePath(filename, sessionId);
 
@@ -220,7 +290,7 @@ export class NotepadTool {
       const existing = await readFile(filePath, 'utf-8');
       await writeFile(filePath, existing + content, 'utf-8');
     } else {
-      await writeFile(filePath, content, 'utf-8');
+      await writeFile(filePath, finalContent, 'utf-8');
     }
 
     return {
@@ -246,6 +316,24 @@ export class NotepadTool {
       throw new Error('filename is required');
     }
 
+    const safeName = this._getSafeFilename(filename);
+
+    // Try to read from session storage first (primary source)
+    if (sessionId && this.sessionManager) {
+      const notes = this._getSessionNotes(sessionId);
+      if (notes && notes[safeName] !== undefined) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: notes[safeName]
+            }
+          ]
+        };
+      }
+    }
+
+    // Fallback to file storage
     const filePath = this.getFilePath(filename, sessionId);
     if (!existsSync(filePath)) {
       // List available notes to help with debugging
@@ -274,25 +362,36 @@ export class NotepadTool {
    * @returns {Promise<string[]>}
    */
   async _listAvailableNotes(sessionId) {
+    const allNotes = new Set();
+
+    // Get notes from session storage
+    if (sessionId && this.sessionManager) {
+      const notes = this._getSessionNotes(sessionId);
+      if (notes) {
+        Object.keys(notes).forEach(name => allNotes.add(name));
+      }
+    }
+
+    // Also get notes from file storage
     try {
       const dir = await this.ensureBaseDir(sessionId);
       const files = await readdir(dir);
-      const noteFiles = [];
       for (const file of files) {
         const filePath = join(dir, file);
         try {
           const stats = await import('fs').then(fs => fs.statSync(filePath));
           if (stats.isFile()) {
-            noteFiles.push(file);
+            allNotes.add(file);
           }
         } catch {
           // Skip files we can't stat
         }
       }
-      return noteFiles;
     } catch {
-      return [];
+      // Ignore file system errors
     }
+
+    return Array.from(allNotes);
   }
 
   /**
@@ -303,18 +402,8 @@ export class NotepadTool {
    */
   async list(args = {}) {
     const { sessionId } = args;
-    const dir = await this.ensureBaseDir(sessionId);
-    const files = await readdir(dir);
-    // Filter out directories (session subdirs) if listing root
-    const noteFiles = [];
-    for (const file of files) {
-      const filePath = join(dir, file);
-      const stats = await import('fs').then(fs => fs.statSync(filePath));
-      if (stats.isFile()) {
-        noteFiles.push(file);
-      }
-    }
-    const fileList = noteFiles.join('\n');
+    const allNotes = await this._listAvailableNotes(sessionId);
+    const fileList = allNotes.join('\n');
 
     return {
       content: [
@@ -339,14 +428,31 @@ export class NotepadTool {
       throw new Error('filename is required');
     }
 
-    const filePath = this.getFilePath(filename, sessionId);
-    if (!existsSync(filePath)) {
-      throw new Error(`Note not found: ${filename}`);
+    const safeName = this._getSafeFilename(filename);
+    let foundInSession = false;
+    let foundInFile = false;
+
+    // Delete from session storage
+    if (sessionId && this.sessionManager) {
+      const notes = this._getSessionNotes(sessionId);
+      if (notes && notes[safeName] !== undefined) {
+        delete notes[safeName];
+        this._setSessionNotes(sessionId, notes);
+        foundInSession = true;
+      }
     }
 
-    // Use fs/promises unlink which works in both Node.js and Bun
-    const { unlink } = await import('fs/promises');
-    await unlink(filePath);
+    // Delete from file storage
+    const filePath = this.getFilePath(filename, sessionId);
+    if (existsSync(filePath)) {
+      const { unlink } = await import('fs/promises');
+      await unlink(filePath);
+      foundInFile = true;
+    }
+
+    if (!foundInSession && !foundInFile) {
+      throw new Error(`Note not found: ${filename}`);
+    }
 
     return {
       content: [
@@ -496,6 +602,7 @@ export class NotepadTool {
  * Create and initialize the tool router with default tools
  * @param {Object} [options={}]
  * @param {string} [options.notepadDir='./notes']
+ * @param {import('./session-manager.js').SessionManager} [options.sessionManager] - Session manager for notepad session storage
  * @param {string} [options.sandboxDir='./sandbox']
  * @param {string[]} [options.httpAllowedHosts=[]] - Allowed hosts for http_request
  * @param {number} [options.httpTimeout=30000] - Default timeout for http_request
@@ -533,7 +640,10 @@ export function createToolRouter(options = {}) {
   const router = new ToolRouter(sandboxManager);
 
   // Initialize and register notepad tool
-  const notepad = new NotepadTool(options.notepadDir || './notes');
+  // Pass sessionManager for session-based note storage
+  const notepad = new NotepadTool(options.notepadDir || './notes', {
+    sessionManager: options.sessionManager || null
+  });
   notepad.registerTools(router);
 
   // Initialize and register code editor tool
