@@ -811,6 +811,9 @@ async function prompt(question, defaultValue = "") {
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
 
+  // Pause animation during input to prevent cursor interference
+  const wasAnimating = pauseBorderAnimation();
+
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -835,6 +838,9 @@ async function prompt(question, defaultValue = "") {
         process.stdout.write("\x1b[2K");
       }
 
+      // Resume animation
+      if (wasAnimating) resumeBorderAnimation();
+
       resolve(answer.trim() || defaultValue);
     });
   });
@@ -842,6 +848,9 @@ async function prompt(question, defaultValue = "") {
 
 async function promptPassword(question) {
   const rl = createRL();
+
+  // Pause animation during input to prevent cursor interference
+  const wasAnimating = pauseBorderAnimation();
 
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
@@ -900,6 +909,9 @@ async function promptPassword(question) {
           process.stdout.write("\n");
           currentContentRow = promptRow + 1; // Track the row after input
 
+          // Resume animation
+          if (wasAnimating) resumeBorderAnimation();
+
           rl.close();
           resolve(password);
           return;
@@ -928,6 +940,9 @@ async function promptPassword(question) {
 
 async function promptSelect(question, choices) {
   let selectedIndex = 0;
+
+  // Pause animation during input to prevent cursor interference
+  const wasAnimating = pauseBorderAnimation();
 
   // Capture the starting row from our tracker
   const menuStartRow = getCurrentRow();
@@ -981,6 +996,9 @@ async function promptSelect(question, choices) {
           moveTo(rows - i, 1);
           process.stdout.write("\x1b[2K");
         }
+
+        // Resume animation
+        if (wasAnimating) resumeBorderAnimation();
 
         // Move cursor below menu
         moveTo(currentContentRow, 1);
