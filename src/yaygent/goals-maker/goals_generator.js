@@ -224,6 +224,15 @@ function printLine(text = "") {
       process.stdout.write("\x1b[2K");
       if (text) process.stdout.write(text);
       currentContentRow++;
+
+      // Clean up row 5 from the bottom to fix border artifacts
+      const { rows } = getTerminalSize();
+      const cleanupRow = rows - 5;
+      moveTo(cleanupRow, 1);
+      process.stdout.write("\x1b[2K");
+
+      // Restore cursor position
+      moveTo(currentContentRow, 1);
     }
   }
 }
