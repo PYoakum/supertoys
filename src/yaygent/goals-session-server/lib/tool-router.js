@@ -30,6 +30,7 @@ import { ContextResearchBrowserTool } from './context-research-browser-tool.js';
 import { TablemakerTool } from './tablemaker-tool.js';
 import { PersonaComposeTool } from './persona-compose-tool.js';
 import { ReadFileTool } from './read-file-tool.js';
+import { ReadEmailTool } from './read-email-tool.js';
 
 /**
  * Tool Router Class
@@ -667,6 +668,15 @@ export function createToolRouter(options = {}) {
       allowAbsolutePaths: options.readFileAllowAbsolutePaths !== false
     });
     readFile.registerTools(router);
+
+    // Initialize and register read email tool (requires sessionManager)
+    const readEmail = new ReadEmailTool(options.sessionManager, {
+      maxFileSize: options.readEmailMaxSize || 10 * 1024 * 1024,  // 10MB for emails with attachments
+      maxEmails: options.readEmailMaxEmails || 20,
+      allowedPaths: options.readEmailAllowedPaths || [],
+      allowAbsolutePaths: options.readEmailAllowAbsolutePaths !== false
+    });
+    readEmail.registerTools(router);
   }
 
   // Store sandbox manager reference for other tools to use
@@ -675,4 +685,4 @@ export function createToolRouter(options = {}) {
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SandboxManager, createToolRouter };
