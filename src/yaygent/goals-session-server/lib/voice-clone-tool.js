@@ -98,15 +98,33 @@ function getVoiceCacheDir() {
 }
 
 /**
- * Check if TTS CLI is available
+ * Check if TTS CLI is available and determine how to run it
+ * Returns: { available: boolean, method: 'direct' | 'pipx' | null }
  */
 function checkTtsCli() {
+  // First check if tts is directly available (e.g., installed via pip in PATH)
   try {
     execSync('which tts', { stdio: 'ignore' });
-    return true;
+    return { available: true, method: 'direct' };
   } catch {
-    return false;
+    // Not directly available, check for pipx
   }
+
+  // Check if pipx is available and TTS is installed via pipx
+  try {
+    execSync('which pipx', { stdio: 'ignore' });
+    // Check if TTS package is installed in pipx
+    const result = execSync('pipx list', { encoding: 'utf-8' });
+    if (result.includes('tts') || result.includes('TTS')) {
+      return { available: true, method: 'pipx' };
+    }
+    // pipx is available but TTS not installed - can still use pipx run
+    return { available: true, method: 'pipx' };
+  } catch {
+    // pipx not available
+  }
+
+  return { available: false, method: null };
 }
 
 /**
@@ -232,7 +250,9 @@ export class VoiceCloneTool {
       ...options
     };
 
-    this.hasTts = checkTtsCli();
+    const ttsStatus = checkTtsCli();
+    this.hasTts = ttsStatus.available;
+    this.ttsMethod = ttsStatus.method; // 'direct' | 'pipx' | null
     this.hasFfmpeg = checkFfmpeg();
     this.warmedUpModels = new Set(); // Track which models have been warmed up
 
@@ -246,6 +266,25 @@ export class VoiceCloneTool {
    */
   _getTtsEnv() {
     return this.ttsEnv;
+  }
+
+  /**
+   * Run a TTS command using the appropriate method (direct or pipx)
+   * @param {string[]} args - Arguments to pass to the tts command
+   * @param {Object} options - Options for runCommand
+   * @returns {Promise<{stdout: string, stderr: string}>}
+   */
+  async _runTts(args, options = {}) {
+    const env = { ...this._getTtsEnv(), ...options.env };
+    const timeout = options.timeout || this.config.timeout;
+
+    if (this.ttsMethod === 'pipx') {
+      // Use pipx run TTS tts <args>
+      return runCommand('pipx', ['run', 'TTS', 'tts', ...args], { ...options, env, timeout });
+    } else {
+      // Direct tts command
+      return runCommand('tts', args, { ...options, env, timeout });
+    }
   }
 
   /**
@@ -273,7 +312,7 @@ export class VoiceCloneTool {
         args.push('--language_idx', 'en');
       }
 
-      await runCommand('tts', args, { timeout: this.config.timeout, env: this._getTtsEnv() });
+      await this._runTts(args, { timeout: this.config.timeout });
 
       // Give the model a moment to stabilize
       await sleep(1000);
@@ -388,7 +427,7 @@ export class VoiceCloneTool {
     if (!reference_audio) throw new Error('reference_audio is required');
 
     if (!this.hasTts) {
-      throw new Error('Coqui TTS is not installed. Install with: pip install TTS');
+      throw new Error('Coqui TTS is not installed. Install with: pipx install TTS (recommended) or pip install TTS');
     }
 
     // Validate language
@@ -430,13 +469,13 @@ export class VoiceCloneTool {
       await this._warmupModel(this.config.xttsModel);
 
       // Run TTS with XTTS and speaker_wav
-      await runCommand('tts', [
+      await this._runTts([
         '--text', text,
         '--model_name', this.config.xttsModel,
         '--speaker_wav', processedRef,
         '--language_idx', language,
         '--out_path', tempOutput
-      ], { timeout: this.config.timeout, env: this._getTtsEnv() });
+      ], { timeout: this.config.timeout });
 
       // Convert to final format if needed
       if (ext !== '.wav' && this.hasFfmpeg) {
@@ -491,7 +530,7 @@ export class VoiceCloneTool {
     if (!target_audio) throw new Error('target_audio is required');
 
     if (!this.hasTts) {
-      throw new Error('Coqui TTS is not installed. Install with: pip install TTS');
+      throw new Error('Coqui TTS is not installed. Install with: pipx install TTS (recommended) or pip install TTS');
     }
 
     await this._ensureDirs();
@@ -530,12 +569,12 @@ export class VoiceCloneTool {
     await this._warmupModel(this.config.freevcModel);
 
     // Run voice conversion
-    await runCommand('tts', [
+    await this._runTts([
       '--model_name', this.config.freevcModel,
       '--source_wav', sourcePath,
       '--target_wav', targetPath,
       '--out_path', finalPath
-    ], { timeout: this.config.timeout, env: this._getTtsEnv() });
+    ], { timeout: this.config.timeout });
 
     // Get output info and audio level
     const outputInfo = await getAudioInfo(finalPath);
@@ -571,7 +610,7 @@ export class VoiceCloneTool {
     if (!text) throw new Error('text is required');
 
     if (!this.hasTts) {
-      throw new Error('Coqui TTS is not installed. Install with: pip install TTS');
+      throw new Error('Coqui TTS is not installed. Install with: pipx install TTS (recommended) or pip install TTS');
     }
 
     await this._ensureDirs();
@@ -621,7 +660,7 @@ export class VoiceCloneTool {
     // Warm up the model
     await this._warmupModel(this.config.xttsModel);
 
-    await runCommand('tts', ttsArgs, { timeout: this.config.timeout, env: this._getTtsEnv() });
+    await this._runTts(ttsArgs, { timeout: this.config.timeout });
 
     // Convert format if needed
     if (ext !== '.wav' && this.hasFfmpeg) {

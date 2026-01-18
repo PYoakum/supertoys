@@ -23,10 +23,16 @@ mkdir -p "${MODEL_DIR}"
 # Set TTS_HOME to use our custom directory
 export TTS_HOME="${MODEL_DIR}"
 
-# Check if tts CLI is available
-if ! command -v tts &> /dev/null; then
+# Check if tts CLI is available (via direct install or pipx)
+TTS_CMD=""
+if command -v tts &> /dev/null; then
+    TTS_CMD="tts"
+elif command -v pipx &> /dev/null; then
+    TTS_CMD="pipx run TTS tts"
+    echo "Using pipx to run TTS..."
+else
     echo "ERROR: Coqui TTS is not installed."
-    echo "Install with: pip install TTS"
+    echo "Install with: pipx install TTS (recommended) or pip install TTS"
     exit 1
 fi
 
@@ -39,7 +45,7 @@ echo "1. Downloading XTTS v2 (multilingual voice cloning)"
 echo "   Model: tts_models/multilingual/multi-dataset/xtts_v2"
 echo "   Size: ~1.8GB"
 echo "----------------------------------------------"
-tts --model_name "tts_models/multilingual/multi-dataset/xtts_v2" --list_speaker_idxs 2>/dev/null || true
+$TTS_CMD --model_name "tts_models/multilingual/multi-dataset/xtts_v2" --list_speaker_idxs 2>/dev/null || true
 echo "XTTS v2 download complete."
 echo ""
 
@@ -50,7 +56,7 @@ echo "   Model: voice_conversion_models/multilingual/vctk/freevc24"
 echo "   Size: ~100MB"
 echo "----------------------------------------------"
 # FreeVC doesn't have a list_speaker_idxs, so we do a minimal test
-tts --model_name "voice_conversion_models/multilingual/vctk/freevc24" --help 2>/dev/null || true
+$TTS_CMD --model_name "voice_conversion_models/multilingual/vctk/freevc24" --help 2>/dev/null || true
 echo "FreeVC24 download complete."
 echo ""
 
@@ -60,7 +66,7 @@ echo "3. Downloading Fast English VITS (quick TTS)"
 echo "   Model: tts_models/en/ljspeech/vits"
 echo "   Size: ~100MB"
 echo "----------------------------------------------"
-tts --model_name "tts_models/en/ljspeech/vits" --text "test" --out_path "${MODEL_DIR}/warmup_test.wav" 2>/dev/null || true
+$TTS_CMD --model_name "tts_models/en/ljspeech/vits" --text "test" --out_path "${MODEL_DIR}/warmup_test.wav" 2>/dev/null || true
 rm -f "${MODEL_DIR}/warmup_test.wav"
 echo "Fast English VITS download complete."
 echo ""

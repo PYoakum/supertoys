@@ -129,15 +129,33 @@ function getModelCacheDir() {
 }
 
 /**
- * Check if TTS CLI is available
+ * Check if TTS CLI is available and determine how to run it
+ * Returns: { available: boolean, method: 'direct' | 'pipx' | null }
  */
 function checkTtsCli() {
+  // First check if tts is directly available (e.g., installed via pip in PATH)
   try {
     execSync('which tts', { stdio: 'ignore' });
-    return true;
+    return { available: true, method: 'direct' };
   } catch {
-    return false;
+    // Not directly available, check for pipx
   }
+
+  // Check if pipx is available and TTS is installed via pipx
+  try {
+    execSync('which pipx', { stdio: 'ignore' });
+    // Check if TTS package is installed in pipx
+    const result = execSync('pipx list', { encoding: 'utf-8' });
+    if (result.includes('tts') || result.includes('TTS')) {
+      return { available: true, method: 'pipx' };
+    }
+    // pipx is available but TTS not installed - can still use pipx run
+    return { available: true, method: 'pipx' };
+  } catch {
+    // pipx not available
+  }
+
+  return { available: false, method: null };
 }
 
 /**
@@ -254,7 +272,9 @@ export class TtsTool {
       ...options
     };
 
-    this.hasTts = checkTtsCli();
+    const ttsStatus = checkTtsCli();
+    this.hasTts = ttsStatus.available;
+    this.ttsMethod = ttsStatus.method; // 'direct' | 'pipx' | null
     this.hasFfmpeg = checkFfmpeg();
     this.modelCache = null; // Cached model list
     this.warmedUpModels = new Set(); // Track which models have been warmed up
@@ -272,6 +292,25 @@ export class TtsTool {
   }
 
   /**
+   * Run a TTS command using the appropriate method (direct or pipx)
+   * @param {string[]} args - Arguments to pass to the tts command
+   * @param {Object} options - Options for runCommand
+   * @returns {Promise<{stdout: string, stderr: string}>}
+   */
+  async _runTts(args, options = {}) {
+    const env = { ...this._getTtsEnv(), ...options.env };
+    const timeout = options.timeout || this.config.timeout;
+
+    if (this.ttsMethod === 'pipx') {
+      // Use pipx run TTS tts <args>
+      return runCommand('pipx', ['run', 'TTS', 'tts', ...args], { ...options, env, timeout });
+    } else {
+      // Direct tts command
+      return runCommand('tts', args, { ...options, env, timeout });
+    }
+  }
+
+  /**
    * Warm up a model by running a short test synthesis
    * This ensures the model is fully loaded before actual synthesis
    */
@@ -285,11 +324,11 @@ export class TtsTool {
 
     try {
       // Run a short test synthesis to load the model
-      await runCommand('tts', [
+      await this._runTts([
         '--text', 'test',
         '--model_name', model,
         '--out_path', warmupPath
-      ], { timeout: this.config.timeout, env: this._getTtsEnv() });
+      ], { timeout: this.config.timeout });
 
       // Give the model a moment to stabilize
       await sleep(1000);
@@ -348,7 +387,7 @@ export class TtsTool {
     if (this.modelCache) return this.modelCache;
 
     try {
-      const result = await runCommand('tts', ['--list_models'], { timeout: 30000, env: this._getTtsEnv() });
+      const result = await this._runTts(['--list_models'], { timeout: 30000 });
       const lines = result.stdout.split('\n');
       const models = [];
 
@@ -430,7 +469,7 @@ export class TtsTool {
       args.push('--language_idx', language);
     }
 
-    await runCommand('tts', args, { timeout: this.config.timeout, env: this._getTtsEnv() });
+    await this._runTts(args, { timeout: this.config.timeout });
 
     return outputPath;
   }
@@ -503,7 +542,7 @@ export class TtsTool {
     if (!text) throw new Error('text is required');
 
     if (!this.hasTts) {
-      throw new Error('Coqui TTS is not installed. Install with: pip install TTS');
+      throw new Error('Coqui TTS is not installed. Install with: pipx install TTS (recommended) or pip install TTS');
     }
 
     if (text.length > this.config.maxTextLength) {
@@ -651,10 +690,10 @@ export class TtsTool {
     const resolvedModel = this._resolveModel(model);
 
     try {
-      const result = await runCommand('tts', [
+      const result = await this._runTts([
         '--model_name', resolvedModel,
         '--list_speaker_idxs'
-      ], { timeout: 60000, env: this._getTtsEnv() });
+      ], { timeout: 60000 });
 
       // Parse speaker output
       const speakers = [];
@@ -801,6 +840,7 @@ export class TtsTool {
     return {
       success: true,
       tts_available: this.hasTts,
+      tts_method: this.ttsMethod, // 'direct' | 'pipx' | null
       ffmpeg_available: this.hasFfmpeg,
       gpu_available: hasGpu,
       ready: this.hasTts,
