@@ -10,7 +10,7 @@
 import { spawn, execSync } from 'child_process';
 import { readFile, writeFile, unlink, mkdir, readdir, stat, copyFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, resolve, basename, extname } from 'path';
+import { join, resolve, basename, extname, dirname } from 'path';
 import { tmpdir, homedir, platform } from 'os';
 import crypto from 'crypto';
 
@@ -322,6 +322,12 @@ export class VoiceCloneTool {
         finalPath = join(this.config.tempDir, `clone_output_${Date.now()}${ext}`);
       }
 
+      // Ensure parent directory exists
+      const parentDir = dirname(finalPath);
+      if (!existsSync(parentDir)) {
+        await mkdir(parentDir, { recursive: true });
+      }
+
       // Create temp WAV output
       const tempOutput = join(this.config.tempDir, `clone_temp_${Date.now()}.wav`);
 
@@ -412,6 +418,12 @@ export class VoiceCloneTool {
       finalPath = join(this.config.tempDir, `convert_${Date.now()}.wav`);
     }
 
+    // Ensure parent directory exists
+    const parentDir = dirname(finalPath);
+    if (!existsSync(parentDir)) {
+      await mkdir(parentDir, { recursive: true });
+    }
+
     // Run voice conversion
     await runCommand('tts', [
       '--model_name', this.config.freevcModel,
@@ -461,6 +473,12 @@ export class VoiceCloneTool {
       finalPath = this._resolvePath(output_path, session);
     } else {
       finalPath = join(this.config.tempDir, `synth_${Date.now()}${ext}`);
+    }
+
+    // Ensure parent directory exists
+    const parentDir = dirname(finalPath);
+    if (!existsSync(parentDir)) {
+      await mkdir(parentDir, { recursive: true });
     }
 
     const tempOutput = join(this.config.tempDir, `synth_temp_${Date.now()}.wav`);
