@@ -1125,19 +1125,19 @@ OUTPUT ONLY THE NOTE STRING. Do not include any other text, explanation, or mark
       }, session);
     }, {
       name: 'make_music',
-      description: 'CREATE AN AUDIO FILE (MP3/WAV) from note notation. This is the primary tool for generating music - it synthesizes notes into a real audio file you can play. Use this tool when you need to create music, melodies, or songs. Returns output_path to the created audio file.',
+      description: `CREATE AN AUDIO FILE (MP3/WAV) directly from a song description or note notation. CALL THIS TOOL DIRECTLY - do NOT write notes to a file first, do NOT use notepad. This tool handles everything: describe the music you want (e.g., "Happy Birthday melody") or provide notes, and it creates the audio file. Returns output_path to the playable audio file.`,
       inputSchema: {
         type: 'object',
         properties: {
           notes: {
             type: 'string',
-            description: noteFormatDescription
+            description: 'Music to create. Can be: (1) A description like "Happy Birthday melody" or "upbeat jazz riff", OR (2) Note notation like "C4:q D4:q E4:h". The tool will convert descriptions to notes automatically.'
           },
           tempo: { type: 'number', description: 'Tempo in BPM (default: 120)' },
           instrument: { type: ['number', 'string'], description: 'Instrument: "piano", "violin", "guitar", "flute", "trumpet", "strings", or number 0-127' },
           format: { type: 'string', enum: ['mp3', 'wav', 'midi'], description: 'Output format (default: mp3)' },
           output_path: { type: 'string', description: 'Output file path' },
-          llm_preprocess: { type: 'boolean', description: 'Use LLM to extract clean note notation (default: true)' }
+          llm_preprocess: { type: 'boolean', description: 'Convert descriptions to notes (default: true)' }
         },
         required: ['notes']
       }
