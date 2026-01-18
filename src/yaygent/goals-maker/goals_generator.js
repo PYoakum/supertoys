@@ -1125,8 +1125,6 @@ async function prompt(question, defaultValue = "") {
 }
 
 async function promptPassword(question) {
-  const rl = createRL();
-
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -1190,7 +1188,6 @@ async function promptPassword(question) {
           currentContentRow = promptRow + 1; // Track the row after input
           currentContentCol = 1; // Reset column to start
 
-          rl.close();
           resolve(password);
           return;
         } else if (char === "\u0003") {
