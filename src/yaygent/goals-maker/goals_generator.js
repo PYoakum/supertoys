@@ -869,10 +869,23 @@ async function promptPassword(question) {
         if (char === "\r" || char === "\n") {
           stdin.setRawMode(false);
           stdin.removeListener("data", onData);
+
+          // Clean up row 5 from the bottom (above separator) to fix border artifacts
+          const { rows } = getTerminalSize();
+          const cleanupRow = rows - 4; // 5th row from bottom (1-indexed from bottom)
+          moveTo(cleanupRow, 1);
+          process.stdout.write("\x1b[2K"); // Clear the entire line
+
           // Move to end of prompt row before newline
           moveTo(promptRow, promptPrefixLen + 1 + password.length);
           process.stdout.write("\n");
           currentContentRow = promptRow + 1; // Track the row after input
+
+          // Force redraw the borders to ensure clean state
+          if (animationInterval) {
+            renderAnimatedBorders();
+          }
+
           rl.close();
           resolve(password);
           return;
