@@ -377,11 +377,11 @@ async function testReviewResearch(sessionManager, llmClient) {
 
   // Verify artifact was created
   const sandboxPath = sessionManager.sandboxPath;
-  const reviewExists = existsSync(join(sandboxPath, 'artifacts', 'research_review.yml'));
-  console.log('  research_review.yml exists:', reviewExists);
+  const reviewExists = existsSync(join(sandboxPath, 'artifacts', 'research_review.toml'));
+  console.log('  research_review.toml exists:', reviewExists);
 
   if (reviewExists) {
-    const content = await readFile(join(sandboxPath, 'artifacts', 'research_review.yml'), 'utf-8');
+    const content = await readFile(join(sandboxPath, 'artifacts', 'research_review.toml'), 'utf-8');
     console.log('  Preview (first 800 chars):');
     console.log('    ' + content.slice(0, 800).replace(/\n/g, '\n    '));
     console.log('');

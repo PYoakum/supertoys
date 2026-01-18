@@ -6,7 +6,7 @@
  * Creates YAML metadata files and raw research clones for debugging/context.
  *
  * Output artifacts:
- * - {source}_analysis.yml - Structured metadata with tags, relevance, summaries
+ * - {source}_analysis.toml - Structured metadata with tags, relevance, summaries
  * - raw_research.md - Clone of research content for debug/toolchain context
  */
 
@@ -403,67 +403,112 @@ ${content.slice(0, this.maxContentLength)}`;
   }
 
   /**
-   * Write analysis to YAML artifact
+   * Write analysis to TOML artifact
    * @param {string} artifactsDir
    * @param {string} sourceName
    * @param {Object} analysis
    * @returns {Promise<string>}
    * @private
    */
-  async _writeAnalysisYaml(artifactsDir, sourceName, analysis) {
-    const filename = `${sourceName}_analysis.yml`;
+  async _writeAnalysisToml(artifactsDir, sourceName, analysis) {
+    const filename = `${sourceName}_analysis.toml`;
     const filepath = join(artifactsDir, filename);
 
-    const yamlContent = this._objectToYaml(analysis);
-    await writeFile(filepath, yamlContent, 'utf-8');
+    const tomlContent = this._objectToToml(analysis);
+    await writeFile(filepath, tomlContent, 'utf-8');
 
     return filepath;
   }
 
   /**
-   * Convert object to YAML string
-   * @param {Object} obj
-   * @param {number} indent
+   * Escape a string for TOML
+   * @param {string} str
    * @returns {string}
    * @private
    */
-  _objectToYaml(obj, indent = 0) {
-    const spaces = '  '.repeat(indent);
-    const lines = [];
+  _escapeTomlString(str) {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+  }
 
+  /**
+   * Convert object to TOML string
+   * @param {Object} obj
+   * @returns {string}
+   * @private
+   */
+  _objectToToml(obj) {
+    const lines = ['# Research Analysis Output'];
+    const sections = [];
+    const arrayTables = [];
+
+    // First pass: collect top-level values, sections, and array tables
     for (const [key, value] of Object.entries(obj)) {
       if (value === null || value === undefined) {
-        lines.push(`${spaces}${key}: null`);
+        continue; // Skip null values in TOML
       } else if (Array.isArray(value)) {
         if (value.length === 0) {
-          lines.push(`${spaces}${key}: []`);
+          lines.push(`${key} = []`);
+        } else if (typeof value[0] === 'object') {
+          // Array of tables
+          arrayTables.push({ key, items: value });
         } else {
-          lines.push(`${spaces}${key}:`);
-          for (const item of value) {
-            if (typeof item === 'object') {
-              lines.push(`${spaces}  -`);
-              const nested = this._objectToYaml(item, indent + 2);
-              lines.push(nested);
-            } else {
-              lines.push(`${spaces}  - "${String(item).replace(/"/g, '\\"')}"`);
-            }
-          }
+          // Simple array
+          const items = value.map(v => `"${this._escapeTomlString(String(v))}"`);
+          lines.push(`${key} = [${items.join(', ')}]`);
         }
       } else if (typeof value === 'object') {
-        lines.push(`${spaces}${key}:`);
-        lines.push(this._objectToYaml(value, indent + 1));
+        sections.push({ key, obj: value });
       } else if (typeof value === 'string') {
-        // Handle multi-line strings
-        if (value.includes('\n')) {
-          lines.push(`${spaces}${key}: |`);
-          for (const line of value.split('\n')) {
-            lines.push(`${spaces}  ${line}`);
-          }
-        } else {
-          lines.push(`${spaces}${key}: "${value.replace(/"/g, '\\"')}"`);
-        }
+        lines.push(`${key} = "${this._escapeTomlString(value)}"`);
+      } else if (typeof value === 'boolean') {
+        lines.push(`${key} = ${value}`);
       } else {
-        lines.push(`${spaces}${key}: ${value}`);
+        lines.push(`${key} = ${value}`);
+      }
+    }
+
+    // Add sections
+    for (const { key, obj: sectionObj } of sections) {
+      lines.push('');
+      lines.push(`[${key}]`);
+      for (const [k, v] of Object.entries(sectionObj)) {
+        if (v === null || v === undefined) continue;
+        if (typeof v === 'string') {
+          lines.push(`${k} = "${this._escapeTomlString(v)}"`);
+        } else if (typeof v === 'boolean') {
+          lines.push(`${k} = ${v}`);
+        } else if (Array.isArray(v)) {
+          const items = v.map(item => `"${this._escapeTomlString(String(item))}"`);
+          lines.push(`${k} = [${items.join(', ')}]`);
+        } else {
+          lines.push(`${k} = ${v}`);
+        }
+      }
+    }
+
+    // Add array of tables
+    for (const { key, items } of arrayTables) {
+      for (const item of items) {
+        lines.push('');
+        lines.push(`[[${key}]]`);
+        for (const [k, v] of Object.entries(item)) {
+          if (v === null || v === undefined) continue;
+          if (typeof v === 'string') {
+            lines.push(`${k} = "${this._escapeTomlString(v)}"`);
+          } else if (typeof v === 'boolean') {
+            lines.push(`${k} = ${v}`);
+          } else if (Array.isArray(v)) {
+            const items = v.map(i => `"${this._escapeTomlString(String(i))}"`);
+            lines.push(`${k} = [${items.join(', ')}]`);
+          } else {
+            lines.push(`${k} = ${v}`);
+          }
+        }
       }
     }
 
@@ -558,13 +603,13 @@ ${content.slice(0, this.maxContentLength)}`;
         .replace(/[^a-zA-Z0-9-_]/g, '_')
         .slice(0, 50);
 
-      // Write analysis YAML
-      const yamlPath = await this._writeAnalysisYaml(artifactsDir, sourceName, analysis);
+      // Write analysis TOML
+      const tomlPath = await this._writeAnalysisToml(artifactsDir, sourceName, analysis);
 
       results.push({
         source: item.path,
-        analysis_file: `artifacts/${sourceName}_analysis.yml`,
-        absolute_path: yamlPath,
+        analysis_file: `artifacts/${sourceName}_analysis.toml`,
+        absolute_path: tomlPath,
         iterations: iteration,
         confidence: analysis.confidence_score,
         tags_count: analysis.tags.length,
@@ -634,11 +679,11 @@ WORKFLOW:
 1. Retrieves research content from session context
 2. Iteratively analyzes with LLM (up to max_iterations)
 3. Extracts tags, concepts, and relevant sections
-4. Generates YAML analysis file per research item
+4. Generates TOML analysis file per research item
 5. Creates raw_research.md clone for debugging
 
 OUTPUT ARTIFACTS:
-- {source}_analysis.yml - Structured YAML with:
+- {source}_analysis.toml - Structured TOML with:
   - title, summary, tags, key_concepts
   - relevant_information (scored excerpts)
   - clarity_improvements (suggested rewrites)

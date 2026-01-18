@@ -128,7 +128,7 @@ export class ReviewResearchTool {
         const files = await readdir(artifactsDir);
 
         for (const file of files) {
-          if (file.endsWith('_analysis.yml')) {
+          if (file.endsWith('_analysis.toml')) {
             const content = await readFile(join(artifactsDir, file), 'utf-8');
             analyses.push({
               path: `artifacts/${file}`,
@@ -146,7 +146,7 @@ export class ReviewResearchTool {
   }
 
   /**
-   * Simple YAML parser
+   * Simple TOML parser for analysis files
    * @param {string} yamlStr
    * @returns {Object}
    * @private
@@ -595,16 +595,16 @@ Evaluate all research items against the stated intent. Score each item and provi
   }
 
   /**
-   * Write review to artifact
+   * Write review to TOML artifact
    * @param {string} artifactsDir
    * @param {Object} review
    * @returns {Promise<string>}
    * @private
    */
   async _writeReviewArtifact(artifactsDir, review) {
-    const filepath = join(artifactsDir, 'research_review.yml');
+    const filepath = join(artifactsDir, 'research_review.toml');
 
-    const yamlContent = this._objectToYaml({
+    const tomlContent = this._objectToToml({
       review_metadata: {
         generated_at: new Date().toISOString(),
         tool: 'review_research',
@@ -613,53 +613,99 @@ Evaluate all research items against the stated intent. Score each item and provi
       ...review
     });
 
-    await writeFile(filepath, yamlContent, 'utf-8');
+    await writeFile(filepath, tomlContent, 'utf-8');
     return filepath;
   }
 
   /**
-   * Convert object to YAML string
-   * @param {Object} obj
-   * @param {number} indent
+   * Escape a string for TOML
+   * @param {string} str
    * @returns {string}
    * @private
    */
-  _objectToYaml(obj, indent = 0) {
-    const spaces = '  '.repeat(indent);
-    const lines = [];
+  _escapeTomlString(str) {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+  }
 
+  /**
+   * Convert object to TOML string
+   * @param {Object} obj
+   * @returns {string}
+   * @private
+   */
+  _objectToToml(obj) {
+    const lines = ['# Research Review Output'];
+    const sections = [];
+    const arrayTables = [];
+
+    // First pass: collect top-level values, sections, and array tables
     for (const [key, value] of Object.entries(obj)) {
       if (value === null || value === undefined) {
-        lines.push(`${spaces}${key}: null`);
+        continue; // Skip null values in TOML
       } else if (Array.isArray(value)) {
         if (value.length === 0) {
-          lines.push(`${spaces}${key}: []`);
+          lines.push(`${key} = []`);
+        } else if (typeof value[0] === 'object') {
+          // Array of tables
+          arrayTables.push({ key, items: value });
         } else {
-          lines.push(`${spaces}${key}:`);
-          for (const item of value) {
-            if (typeof item === 'object') {
-              lines.push(`${spaces}  -`);
-              const nested = this._objectToYaml(item, indent + 2);
-              lines.push(nested);
-            } else {
-              lines.push(`${spaces}  - "${String(item).replace(/"/g, '\\"')}"`);
-            }
-          }
+          // Simple array
+          const items = value.map(v => `"${this._escapeTomlString(String(v))}"`);
+          lines.push(`${key} = [${items.join(', ')}]`);
         }
       } else if (typeof value === 'object') {
-        lines.push(`${spaces}${key}:`);
-        lines.push(this._objectToYaml(value, indent + 1));
+        sections.push({ key, obj: value });
       } else if (typeof value === 'string') {
-        if (value.includes('\n')) {
-          lines.push(`${spaces}${key}: |`);
-          for (const line of value.split('\n')) {
-            lines.push(`${spaces}  ${line}`);
-          }
-        } else {
-          lines.push(`${spaces}${key}: "${value.replace(/"/g, '\\"')}"`);
-        }
+        lines.push(`${key} = "${this._escapeTomlString(value)}"`);
+      } else if (typeof value === 'boolean') {
+        lines.push(`${key} = ${value}`);
       } else {
-        lines.push(`${spaces}${key}: ${value}`);
+        lines.push(`${key} = ${value}`);
+      }
+    }
+
+    // Add sections
+    for (const { key, obj: sectionObj } of sections) {
+      lines.push('');
+      lines.push(`[${key}]`);
+      for (const [k, v] of Object.entries(sectionObj)) {
+        if (v === null || v === undefined) continue;
+        if (typeof v === 'string') {
+          lines.push(`${k} = "${this._escapeTomlString(v)}"`);
+        } else if (typeof v === 'boolean') {
+          lines.push(`${k} = ${v}`);
+        } else if (Array.isArray(v)) {
+          const items = v.map(item => `"${this._escapeTomlString(String(item))}"`);
+          lines.push(`${k} = [${items.join(', ')}]`);
+        } else {
+          lines.push(`${k} = ${v}`);
+        }
+      }
+    }
+
+    // Add array of tables
+    for (const { key, items } of arrayTables) {
+      for (const item of items) {
+        lines.push('');
+        lines.push(`[[${key}]]`);
+        for (const [k, v] of Object.entries(item)) {
+          if (v === null || v === undefined) continue;
+          if (typeof v === 'string') {
+            lines.push(`${k} = "${this._escapeTomlString(v)}"`);
+          } else if (typeof v === 'boolean') {
+            lines.push(`${k} = ${v}`);
+          } else if (Array.isArray(v)) {
+            const items = v.map(i => `"${this._escapeTomlString(String(i))}"`);
+            lines.push(`${k} = [${items.join(', ')}]`);
+          } else {
+            lines.push(`${k} = ${v}`);
+          }
+        }
       }
     }
 
@@ -723,7 +769,7 @@ Evaluate all research items against the stated intent. Score each item and provi
         remove: review.recommendations.remove
       },
       context_efficiency: review.context_efficiency,
-      review_artifact: 'artifacts/research_review.yml',
+      review_artifact: 'artifacts/research_review.toml',
       absolute_path: reviewPath
     };
 
@@ -786,7 +832,7 @@ WORKFLOW:
    - Content Clarity (15%)
    - Context Fit (15%)
 5. Generates recommendations
-6. Exports research_review.yml artifact
+6. Exports research_review.toml artifact
 
 EVALUATION MODEL:
 - Uses evaluation_client if configured (separate provider/model)
@@ -802,7 +848,7 @@ OUTPUT:
 - context_efficiency: token estimates and reduction potential
 
 ARTIFACT:
-- artifacts/research_review.yml - Complete review with all scores and recommendations`,
+- artifacts/research_review.toml - Complete review with all scores and recommendations`,
         inputSchema: {
           type: 'object',
           properties: {
