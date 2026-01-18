@@ -1012,14 +1012,17 @@ async function promptConfirm(question, defaultValue = true) {
 }
 
 async function promptMultiline(question, instruction, centered = false) {
-  if (centered) {
-    printCentered(`${c("cyan", "?")} ${c("bold", question)}`);
-    printCentered(c("dim", instruction));
-  } else {
-    printLine(`${c("cyan", "?")} ${c("bold", question)}`);
-    printLine(c("dim", `   ${instruction}`));
+  // Only print question/instruction if provided
+  if (question) {
+    if (centered) {
+      printCentered(`${c("cyan", "?")} ${c("bold", question)}`);
+      if (instruction) printCentered(c("dim", instruction));
+    } else {
+      printLine(`${c("cyan", "?")} ${c("bold", question)}`);
+      if (instruction) printLine(c("dim", `   ${instruction}`));
+    }
+    printLine();
   }
-  printLine();
 
   // For centered input, move cursor to center for typing
   if (centered) {
@@ -1941,7 +1944,7 @@ async function getGoalsDescription() {
   printCentered(c("dim", "Type .done on a new line when finished."));
   printLine();
 
-  const description = await promptMultiline("Goals description:", "Type .done on a new line when finished", true);
+  const description = await promptMultiline(null, null, true);
 
   if (!description.trim()) {
     return null;
