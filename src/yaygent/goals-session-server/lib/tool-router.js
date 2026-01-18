@@ -32,6 +32,11 @@ import { PersonaComposeTool } from './persona-compose-tool.js';
 import { ReadFileTool } from './read-file-tool.js';
 import { ReadEmailTool } from './read-email-tool.js';
 import { SttTool } from './stt-tool.js';
+import { EditAudioTool } from './edit-audio-tool.js';
+import { CreateDrumTool } from './create-drum-tool.js';
+import { MidiMp3Tool } from './midi-mp3-tool.js';
+import { TtsTool } from './tts-tool.js';
+import { VoiceCloneTool } from './voice-clone-tool.js';
 
 /**
  * Tool Router Class
@@ -718,6 +723,39 @@ export function createToolRouter(options = {}) {
       maxRecordDuration: options.sttMaxRecordDuration || 300
     });
     stt.registerTools(router);
+
+    // Initialize and register audio editing tool
+    const editAudio = new EditAudioTool(options.sessionManager, {
+      timeout: options.editAudioTimeout || 300000
+    });
+    editAudio.registerTools(router);
+
+    // Initialize and register drum machine tool
+    const createDrum = new CreateDrumTool(options.sessionManager, {
+      defaultBpm: options.drumDefaultBpm || 120
+    });
+    createDrum.registerTools(router);
+
+    // Initialize and register MIDI to MP3 tool
+    const midiMp3 = new MidiMp3Tool(options.sessionManager, {
+      defaultBpm: options.midiDefaultBpm || 120,
+      mp3Bitrate: options.midiBitrate || '192k'
+    });
+    midiMp3.registerTools(router);
+
+    // Initialize and register text-to-speech tool
+    const tts = new TtsTool(options.sessionManager, {
+      maxTextLength: options.ttsMaxTextLength || 5000,
+      chunkSize: options.ttsChunkSize || 500
+    });
+    tts.registerTools(router);
+
+    // Initialize and register voice cloning tool
+    const voiceClone = new VoiceCloneTool(options.sessionManager, {
+      minReferenceSeconds: options.voiceCloneMinRef || 3,
+      maxReferenceSeconds: options.voiceCloneMaxRef || 30
+    });
+    voiceClone.registerTools(router);
   }
 
   // Store sandbox manager reference for other tools to use
@@ -726,4 +764,4 @@ export function createToolRouter(options = {}) {
   return router;
 }
 
-export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SttTool, SandboxManager, createToolRouter };
+export default { ToolRouter, NotepadTool, CodeEditorTool, FileCreateTool, JavaScriptExecuteTool, SQLiteTool, HttpRequestTool, TcpConnectTool, BrowserRequestTool, MakeGoalsTool, BashCommandTool, PythonRunnerTool, NetToolsTool, ProjectScaffoldTool, FrameworkExecTool, DocxMdTool, TokenReplaceTool, MdDocxTool, PdfExportTool, ComposeEmailTool, GolangExecTool, ContextResearchBrowserTool, TablemakerTool, PersonaComposeTool, ReadFileTool, ReadEmailTool, SttTool, EditAudioTool, CreateDrumTool, MidiMp3Tool, TtsTool, VoiceCloneTool, SandboxManager, createToolRouter };
