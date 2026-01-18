@@ -43,9 +43,11 @@ import { VoiceCloneTool } from './voice-clone-tool.js';
  * Manages available tools and provides manifest for task binding
  */
 export class ToolRouter {
-  constructor() {
+  constructor(sandboxManager = null) {
     /** @type {Map<string, {handler: Function, schema: Object}>} */
     this.tools = new Map();
+    /** @type {SandboxManager|null} */
+    this.sandboxManager = sandboxManager;
   }
 
   /**
@@ -86,7 +88,15 @@ export class ToolRouter {
     if (!tool) {
       throw new Error(`Tool not found: ${name}`);
     }
-    return await tool.handler(args);
+
+    // Build session object with sandbox path if sessionId is provided
+    let session = null;
+    if (args.sessionId && this.sandboxManager) {
+      const sandboxPath = await this.sandboxManager.ensureSandbox(args.sessionId);
+      session = { sandboxPath, sessionId: args.sessionId };
+    }
+
+    return await tool.handler(args, session);
   }
 
   /**
@@ -512,18 +522,19 @@ export class NotepadTool {
  * @returns {ToolRouter}
  */
 export function createToolRouter(options = {}) {
-  const router = new ToolRouter();
-
-  // Initialize and register notepad tool
-  const notepad = new NotepadTool(options.notepadDir || './notes');
-  notepad.registerTools(router);
-
-  // Initialize sandbox manager (shared by code_editor, file_create, javascript_execute)
+  // Initialize sandbox manager first (shared by code_editor, file_create, javascript_execute, and audio tools)
   const sandboxManager = new SandboxManager({
     baseDir: options.sandboxDir || './sandbox',
     maxFileSize: options.maxFileSize,
     maxTotalSize: options.maxTotalSize
   });
+
+  // Create router with sandbox manager for session resolution
+  const router = new ToolRouter(sandboxManager);
+
+  // Initialize and register notepad tool
+  const notepad = new NotepadTool(options.notepadDir || './notes');
+  notepad.registerTools(router);
 
   // Initialize and register code editor tool
   const codeEditor = new CodeEditorTool(sandboxManager);
