@@ -244,7 +244,19 @@ export class HttpRequestTool {
       this.execute.bind(this),
       {
         name: 'http_request',
-        description: 'Make HTTP requests to allowed hosts. Supports GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS methods with custom headers, body, and response parsing.',
+        description: `Make HTTP API requests to allowed hosts. For REST APIs and JSON endpoints only.
+
+IMPORTANT: For web page research and content extraction, use context_research_browser instead.
+context_research_browser handles JavaScript rendering, HTML-to-markdown conversion, and automatic content analysis.
+
+Use http_request ONLY for:
+- REST API calls returning JSON
+- Webhooks and callbacks
+- Programmatic API integrations
+
+NOT for: web scraping, page research, documentation lookup, or content extraction.
+
+Supports GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS methods.`,
         inputSchema: {
           type: 'object',
           properties: {
