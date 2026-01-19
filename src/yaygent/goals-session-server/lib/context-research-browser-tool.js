@@ -261,51 +261,59 @@ export class ContextResearchBrowserTool {
    * Analyze content using LLM
    * @param {string} content - Markdown content to analyze
    * @param {Object} metadata - Page metadata (title, url, etc.)
+   * @param {string} [intent] - Research intent/objective to guide analysis
    * @returns {Promise<Object>} Analysis result
    * @private
    */
-  async _analyzeContent(content, metadata) {
+  async _analyzeContent(content, metadata, intent = null) {
     if (!this.llmClient) {
       return this._basicAnalysis(content, metadata);
     }
 
+    const intentSection = intent
+      ? `\nRESEARCH INTENT: ${intent}\nFocus your analysis on extracting information relevant to this intent. Prioritize findings that directly address this objective.\n`
+      : '';
+
     const systemPrompt = `task:
   role: Research Content Analyzer
   objective: Extract structured insights from research content
-
+${intentSection}
 output_format: TOML (resilient to truncation)
 
 TOML_TEMPLATE:
 # Research Analysis
-summary = "2-3 sentence summary of the key findings and main topics"
+summary = "2-3 sentence summary directly addressing the research intent and key findings"
 
 tags = ["tag1", "tag2", "tag3", "tag4", "tag5"]
 key_concepts = ["concept1", "concept2", "concept3"]
 
 [[key_findings]]
 topic = "Topic Area"
-finding = "Key insight or finding from the content"
+finding = "Specific factual finding with details, examples, or data points extracted from the content"
 importance = "high"
 
 [[key_findings]]
 topic = "Another Topic"
-finding = "Another key finding"
+finding = "Another detailed finding with concrete information"
 importance = "medium"
 
 instructions:
-  - Write a clear summary capturing the main topics and findings
+  - Write a summary that directly addresses the research intent (if provided)
   - Extract 5-10 meaningful tags that categorize the content
-  - Identify key concepts and terminology (3-8 items)
-  - Pull out 3-6 key findings with their topics and importance (high/medium/low)
-  - Focus on actionable insights and factual information
+  - Identify key concepts, terminology, and technical terms (5-10 items)
+  - Extract 5-10 key findings with SPECIFIC details, not vague statements
+  - Each finding should contain concrete facts, examples, numbers, or techniques
+  - Rate importance based on relevance to the research intent
+  - Focus on extracting actionable, specific information rather than general observations
 
 CRITICAL: Output ONLY valid TOML. No markdown blocks, no explanations.`;
 
+    const intentPrompt = intent ? `\nResearch Intent: ${intent}\n` : '';
     const userPrompt = `Analyze this research content:
 
 Title: ${metadata.title || 'Unknown'}
 Source: ${metadata.url || 'Unknown'}
-
+${intentPrompt}
 Content:
 ${content.slice(0, this.analysisMaxContentLength)}`;
 
@@ -526,6 +534,7 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
       includeMetadata = true,
       addToContext = true,
       analyze = true,    // Auto-analyze content after fetching
+      intent,            // Optional: Research intent to guide analysis
       timeout = this.timeout
     } = args;
 
@@ -730,7 +739,7 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
         // Analyze content if enabled
         let analysis = null;
         if (analyze) {
-          analysis = await this._analyzeContent(markdown, { title: pageTitle, url: pageUrl });
+          analysis = await this._analyzeContent(markdown, { title: pageTitle, url: pageUrl }, intent);
         }
 
         return this.formatResponse({
@@ -829,7 +838,7 @@ WORKFLOW:
 1. Fetches URL with headless browser (handles JavaScript-rendered content)
 2. Extracts main content (or specific selector)
 3. Converts HTML to clean Markdown
-4. Analyzes content to extract key findings, tags, and concepts
+4. Analyzes content to extract key findings, tags, and concepts (guided by intent if provided)
 5. Saves to context directory in sandbox
 6. Optionally adds to session's context object
 
@@ -840,17 +849,23 @@ OUTPUT:
 - Analysis includes: summary, tags, key_concepts, key_findings
 
 ANALYSIS OUTPUT:
-- summary: 2-3 sentence summary of key findings
+- summary: 2-3 sentence summary directly addressing research intent
 - tags: Topic categorization (5-10 tags)
-- key_concepts: Main terminology and concepts
-- key_findings: Array of {topic, finding, importance}
+- key_concepts: Main terminology and technical terms (5-10 items)
+- key_findings: Array of {topic, finding, importance} with specific details
+
+INTENT-DRIVEN ANALYSIS:
+When 'intent' parameter is provided, analysis focuses on extracting information relevant to that objective.
+Example intent: "identify video game music styles, chord progressions, and compositional techniques"
+The analysis will then prioritize findings about styles, progressions, and techniques.
 
 FEATURES:
 - Handles JavaScript-rendered pages
 - Removes navigation, ads, popups automatically
 - Extracts main content area intelligently
 - Supports custom CSS selectors for specific content
-- Automatic LLM-powered content analysis`,
+- Automatic LLM-powered content analysis
+- Intent-driven analysis for task-specific extraction`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -892,6 +907,10 @@ FEATURES:
               type: 'boolean',
               default: true,
               description: 'Analyze content and include summary, tags, key_concepts, and key_findings in response'
+            },
+            intent: {
+              type: 'string',
+              description: 'Research intent/objective to guide analysis. When provided, the analysis will focus on extracting information relevant to this goal. Example: "identify video game music styles, chord progressions, and compositional techniques"'
             },
             timeout: {
               type: 'integer',
