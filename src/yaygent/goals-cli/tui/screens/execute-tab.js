@@ -386,7 +386,7 @@ export class ExecuteTabScreen {
    */
   _updateServerMenuItem() {
     const items = this.dashboardMenu.items.slice();
-    items[1] = this.serverRunning ? 'Stop Server' : 'Start Server';
+    items[2] = this.serverRunning ? 'Stop Server' : 'Start Server';
     this.dashboardMenu.setItems(items);
   }
 
@@ -579,7 +579,7 @@ export class ExecuteTabScreen {
       this.runAllPhase = 'server';
       if (!this.serverStatus.connected) {
         this.logViewer.addLine('info', '');
-        this.logViewer.addLine('info', '▶ Phase 1/5: Starting Server...');
+        this.logViewer.addLine('info', '[>] Phase 1/5: Starting Server...');
 
         if (!this.serverRunning) {
           this._startServer();
@@ -601,17 +601,17 @@ export class ExecuteTabScreen {
         if (!serverReady) {
           throw new Error('Server failed to start within 30 seconds');
         }
-        this.logViewer.addLine('success', '✓ Server is running');
+        this.logViewer.addLine('success', '[+] Server is running');
       } else {
         this.logViewer.addLine('info', '');
-        this.logViewer.addLine('info', '▶ Phase 1/5: Server already running');
-        this.logViewer.addLine('success', '✓ Server is connected');
+        this.logViewer.addLine('info', '[>] Phase 1/5: Server already running');
+        this.logViewer.addLine('success', '[+] Server is connected');
       }
 
       // Phase 2: Create Session
       this.runAllPhase = 'session';
       this.logViewer.addLine('info', '');
-      this.logViewer.addLine('info', '▶ Phase 2/5: Creating Session...');
+      this.logViewer.addLine('info', '[>] Phase 2/5: Creating Session...');
 
       const context = this.state.context || {
         files: [],
@@ -644,12 +644,12 @@ export class ExecuteTabScreen {
 
       this.state.sessionId = createResult.sessionId;
       const sessionId = createResult.sessionId;
-      this.logViewer.addLine('success', `✓ Session created: ${sessionId.slice(0, 8)}...`);
+      this.logViewer.addLine('success', `[+] Session created: ${sessionId.slice(0, 8)}...`);
 
       // Phase 3: Prepare Session (Evaluate + Generate Tasks)
       this.runAllPhase = 'prepare';
       this.logViewer.addLine('info', '');
-      this.logViewer.addLine('info', '▶ Phase 3/5: Preparing Session...');
+      this.logViewer.addLine('info', '[>] Phase 3/5: Preparing Session...');
       this.logViewer.addLine('info', '  → Evaluating dependencies...');
 
       const evalResponse = await this._withRetry(
@@ -666,12 +666,18 @@ export class ExecuteTabScreen {
       );
       const taskResult = taskResponse.data || taskResponse;
       const taskCount = taskResult.taskList?.tasks?.length || 0;
-      this.logViewer.addLine('success', `✓ Prepared ${taskCount} tasks`);
+
+      // Remove any self-dependencies (task depending on itself)
+      if (taskResult.taskList?.tasks) {
+        this._removeSelfDependencies(taskResult.taskList.tasks);
+      }
+
+      this.logViewer.addLine('success', `[+] Prepared ${taskCount} tasks`);
 
       // Phase 4: Execute Action Plan
       this.runAllPhase = 'execute';
       this.logViewer.addLine('info', '');
-      this.logViewer.addLine('info', '▶ Phase 4/5: Executing Action Plan...');
+      this.logViewer.addLine('info', '[>] Phase 4/5: Executing Action Plan...');
 
       // Clean sandbox if enabled
       if (this.cleanSandbox && !this.dryRun) {
@@ -710,13 +716,13 @@ export class ExecuteTabScreen {
       if (!execResult.success) {
         this.logViewer.addLine('warn', `  → Execution completed with exit code: ${execResult.exitCode}`);
       } else {
-        this.logViewer.addLine('success', '✓ All tasks completed');
+        this.logViewer.addLine('success', '[+] All tasks completed');
       }
 
       // Phase 5: Run Output Eval
       this.runAllPhase = 'eval';
       this.logViewer.addLine('info', '');
-      this.logViewer.addLine('info', '▶ Phase 5/5: Running Output Evaluation...');
+      this.logViewer.addLine('info', '[>] Phase 5/5: Running Output Evaluation...');
 
       // Find the bundle path - it should be in the output directory
       const outputDir = this.envVars.OUTPUT_DIR || './output';
@@ -734,9 +740,9 @@ export class ExecuteTabScreen {
       );
 
       if (evalRunResult.scores) {
-        this.logViewer.addLine('success', `✓ Evaluation complete: ${evalRunResult.scores.overall}/100 (${evalRunResult.scores.grade})`);
+        this.logViewer.addLine('success', `[+] Evaluation complete: ${evalRunResult.scores.overall}/100 (${evalRunResult.scores.grade})`);
       } else {
-        this.logViewer.addLine('success', '✓ Evaluation complete');
+        this.logViewer.addLine('success', '[+] Evaluation complete');
       }
 
       // Complete!
@@ -828,7 +834,7 @@ export class ExecuteTabScreen {
         const delay = baseDelay * Math.pow(2, attempt - 1);
         const delaySeconds = Math.round(delay / 1000);
 
-        this.logViewer.addLine('warn', `  ⏳ Rate limit hit for ${operationName}`);
+        this.logViewer.addLine('warn', `  [...] Rate limit hit for ${operationName}`);
         this.logViewer.addLine('info', `  → Retry ${attempt}/${maxRetries} in ${delaySeconds}s...`);
 
         await this._sleep(delay);
@@ -1113,6 +1119,10 @@ export class ExecuteTabScreen {
 
       if (taskResult.taskList) {
         const tasks = taskResult.taskList.tasks || [];
+
+        // Remove any self-dependencies (task depending on itself)
+        this._removeSelfDependencies(tasks);
+
         this.logViewer.addLine('success', `Generated ${tasks.length} tasks. State: ${taskResult.state}`);
 
         // Show task summary with dependencies
@@ -1132,7 +1142,7 @@ export class ExecuteTabScreen {
           const depGraph = this._buildTaskDepGraph(tasks);
           const cycles = this._detectCycles(depGraph);
           if (cycles.length > 0) {
-            this.logViewer.addLine('error', `⚠ Circular dependencies detected!`);
+            this.logViewer.addLine('error', `[!] Circular dependencies detected!`);
             cycles.forEach(cycle => {
               this.logViewer.addLine('error', `  Cycle: ${cycle.map(id => String(id).slice(0, 8)).join(' → ')}`);
             });
@@ -1248,9 +1258,9 @@ export class ExecuteTabScreen {
       this.logViewer.addLine('info', '── Goals ──');
       goals.forEach((goal, idx) => {
         const state = goal.status?.state || 'pending';
-        const stateIcon = state === 'completed' ? '✓' :
-                         state === 'blocked' ? '⊘' :
-                         state === 'in_progress' ? '▶' : '○';
+        const stateIcon = state === 'completed' ? '+' :
+                         state === 'blocked' ? '#' :
+                         state === 'in_progress' ? '>' : 'o';
         this.logViewer.addLine('info', `${stateIcon} ${idx + 1}. ${goal.id.slice(0, 8)}... [${state}]`);
         this.logViewer.addLine('debug', `   ${(goal.objective || '').slice(0, 60)}`);
 
@@ -1261,7 +1271,7 @@ export class ExecuteTabScreen {
             const depGoal = goals.find(g => g.id === depId);
             const depState = depGoal?.status?.state || 'unknown';
             const satisfied = depState === 'completed';
-            const arrow = satisfied ? '✓→' : '⊘→';
+            const arrow = satisfied ? '+->' : '#->';
             this.logViewer.addLine('debug', `   ${arrow} ${String(depId).slice(0, 8)}... (${depState})`);
           });
         }
@@ -1279,7 +1289,7 @@ export class ExecuteTabScreen {
       const cycles = this._detectCycles(depGraph);
 
       if (cycles.length > 0) {
-        this.logViewer.addLine('error', `⚠ CIRCULAR DEPENDENCIES DETECTED:`);
+        this.logViewer.addLine('error', `[!] CIRCULAR DEPENDENCIES DETECTED:`);
         cycles.forEach(cycle => {
           this.logViewer.addLine('error', `  ${cycle.map(id => String(id).slice(0, 8)).join(' → ')}`);
         });
@@ -1289,9 +1299,9 @@ export class ExecuteTabScreen {
       // Show each task with its dependencies
       tasks.forEach((task, idx) => {
         const state = task.state || 'pending';
-        const stateIcon = state === 'completed' ? '✓' :
-                         state === 'running' ? '▶' :
-                         state === 'failed' ? '✗' : '○';
+        const stateIcon = state === 'completed' ? '+' :
+                         state === 'running' ? '>' :
+                         state === 'failed' ? 'x' : 'o';
         const toolStr = typeof task.tool === 'string' ? task.tool :
                        (task.tool?.toolName || task.tool?.name || '?');
 
@@ -1304,7 +1314,7 @@ export class ExecuteTabScreen {
             const depTask = tasks.find(t => t.id === depId);
             const depState = depTask?.state || 'unknown';
             const satisfied = depState === 'completed';
-            const arrow = satisfied ? '✓→' : '⊘→';
+            const arrow = satisfied ? '+->' : '#->';
             const depType = dep.type || 'completion';
             this.logViewer.addLine('debug', `   ${arrow} ${String(depId).slice(0, 12)}... [${depType}] (${depState})`);
           });
@@ -1338,7 +1348,7 @@ export class ExecuteTabScreen {
     }
 
     this.logViewer.addLine('info', '');
-    this.logViewer.addLine('info', 'Legend: ✓=completed ○=pending ▶=running ⊘=blocked ✗=failed');
+    this.logViewer.addLine('info', 'Legend: +=completed o=pending >=running #=blocked x=failed');
   }
 
   /**
@@ -1450,7 +1460,7 @@ export class ExecuteTabScreen {
         onComplete: (success, result) => {
           if (success) {
             this.logViewer.addLine('success', '════════════════════════════════════════');
-            this.logViewer.addLine('success', '✓ ALL TASKS COMPLETED SUCCESSFULLY');
+            this.logViewer.addLine('success', '[+] ALL TASKS COMPLETED SUCCESSFULLY');
             this.logViewer.addLine('success', '════════════════════════════════════════');
           } else if (result.aborted) {
             this.logViewer.addLine('warn', 'Execution aborted by user');
@@ -1469,7 +1479,7 @@ export class ExecuteTabScreen {
       }
 
       this.mode = 'dashboard';
-      this._setStatus(result.success ? '✓ Execution complete' : '✗ Execution failed', result.success ? 'success' : 'error', 5000);
+      this._setStatus(result.success ? '[+] Execution complete' : '[x] Execution failed', result.success ? 'success' : 'error', 5000);
     } catch (err) {
       this.logViewer.addLine('error', `Execution error: ${err.message}`);
       this.mode = 'dashboard';
@@ -1513,7 +1523,7 @@ export class ExecuteTabScreen {
         onComplete: (success, res) => {
           if (success) {
             this.logViewer.addLine('success', '════════════════════════════════════════');
-            this.logViewer.addLine('success', '✓ ALL TASKS COMPLETED SUCCESSFULLY');
+            this.logViewer.addLine('success', '[+] ALL TASKS COMPLETED SUCCESSFULLY');
             this.logViewer.addLine('success', '════════════════════════════════════════');
           } else if (res.aborted) {
             this.logViewer.addLine('warn', 'Execution aborted by user');
@@ -1525,7 +1535,7 @@ export class ExecuteTabScreen {
 
       if (result.sessionId) {
         this.logViewer.addLine('info', `Session: ${result.sessionId}`);
-        this._setStatus(result.success ? '✓ Execution complete' : '✗ Execution failed', result.success ? 'success' : 'error', 5000);
+        this._setStatus(result.success ? '[+] Execution complete' : '[x] Execution failed', result.success ? 'success' : 'error', 5000);
       } else if (result.exitCode === 0 && !result.sessionId) {
         this.logViewer.addLine('info', 'No sessions ready for execution');
       }
@@ -2205,7 +2215,7 @@ export class ExecuteTabScreen {
       };
 
       await writeFile(exportPath, JSON.stringify(exportData, null, 2));
-      this._setStatus(`✓ Exported ${tasks.length} tasks to ${filename}`, 'success', 4000);
+      this._setStatus(`[+] Exported ${tasks.length} tasks to ${filename}`, 'success', 4000);
       this.logViewer.addLine('success', `Exported ${tasks.length} tasks to ${filename}`);
     } catch (err) {
       this._setStatus(`Export failed: ${err.message}`, 'error', 4000);
@@ -2323,7 +2333,7 @@ export class ExecuteTabScreen {
       // Resolve dependencies by title matching
       this._resolveImportedDependencies(existingTasks);
 
-      this._setStatus(`✓ Imported ${imported} tasks from ${filename}`, 'success', 4000);
+      this._setStatus(`[+] Imported ${imported} tasks from ${filename}`, 'success', 4000);
       this.logViewer.addLine('success', `Imported ${imported} tasks from ${filename}`);
       this.logViewer.addLine('info', 'Press [Ctrl+S] to save changes');
     } catch (err) {
@@ -2353,6 +2363,32 @@ export class ExecuteTabScreen {
           .map(depTitle => titleToId.get(depTitle))
           .filter(id => id != null);
         delete task._importedDeps;
+      }
+    }
+
+    // Remove any self-dependencies
+    this._removeSelfDependencies(tasks);
+  }
+
+  /**
+   * Remove self-referential dependencies (task depending on itself)
+   * @param {Object[]} tasks
+   * @private
+   */
+  _removeSelfDependencies(tasks) {
+    for (const task of tasks) {
+      if (!task.dependencies || task.dependencies.length === 0) continue;
+
+      const originalLength = task.dependencies.length;
+      task.dependencies = task.dependencies.filter(dep => {
+        const depId = typeof dep === 'string' ? dep : (dep.taskId || dep.id || String(dep));
+        return depId !== task.id;
+      });
+
+      if (task.dependencies.length < originalLength) {
+        const removed = originalLength - task.dependencies.length;
+        const taskLabel = task.title || task.id.slice(0, 8);
+        this.logViewer.addLine('warn', `[!] Removed circular dependency: task "${taskLabel}" depended on itself`);
       }
     }
   }
@@ -3004,12 +3040,12 @@ export class ExecuteTabScreen {
 
     // Status section
     const statusY = y + 1;
-    const connIcon = this.serverStatus.connected ? '●' : '○';
+    const connIcon = this.serverStatus.connected ? '*' : 'o';
     const connText = this.serverStatus.connected ? 'Connected' : 'Disconnected';
     const connStyle = this.serverStatus.connected ? styles.success : styles.error;
 
     // Show both connection status and local process status
-    const procIcon = this.serverRunning ? '▶' : '■';
+    const procIcon = this.serverRunning ? '>' : '#';
     const procText = this.serverRunning ? 'Running' : 'Stopped';
     const procStyle = this.serverRunning ? styles.success : styles.dim;
 
@@ -3146,11 +3182,11 @@ export class ExecuteTabScreen {
         });
         const inCycle = cycleTaskIds.has(task.id);
 
-        const stateIcon = inCycle ? '⟳' :
-                         task.state === 'completed' ? '✓' :
-                         task.state === 'running' ? '▶' :
-                         task.state === 'failed' ? '✗' :
-                         isBlocked ? '⊘' : '○';
+        const stateIcon = inCycle ? '@' :
+                         task.state === 'completed' ? '+' :
+                         task.state === 'running' ? '>' :
+                         task.state === 'failed' ? 'x' :
+                         isBlocked ? '#' : 'o';
         const stateStyle = inCycle ? styles.error :
                           task.state === 'completed' ? styles.success :
                           task.state === 'failed' ? styles.error :
@@ -3185,7 +3221,7 @@ export class ExecuteTabScreen {
       // Show cycle warning at bottom if detected
       if (cycles.length > 0 && line < y + h - 1) {
         line++;
-        screen.drawText(x + 2, line, `⚠ ${cycles.length} circular dep(s) - press [G] for details`, styles.error);
+        screen.drawText(x + 2, line, `[!] ${cycles.length} circular dep(s) - press [G] for details`, styles.error);
       }
     } else {
       screen.drawText(x + 2, line++, '(No tasks - run "Prepare Session" first)', styles.dim);
@@ -3298,7 +3334,7 @@ export class ExecuteTabScreen {
       const isSelected = taskIdx === this.editTaskIndex;
       const line = y + 1 + i;
 
-      const prefix = isSelected ? '►' : ' ';
+      const prefix = isSelected ? '>' : ' ';
       const priority = task.priority || 5;
       const num = String(taskIdx + 1).padStart(2, ' ');
 
@@ -3335,7 +3371,7 @@ export class ExecuteTabScreen {
       const isSelected = i === this.editFieldIndex;
       const isEditing = isSelected && this.editingField;
 
-      const prefix = isSelected ? '►' : ' ';
+      const prefix = isSelected ? '>' : ' ';
       const labelStyle = isSelected ? styles.highlight : styles.normal;
 
       screen.drawText(x, line, `${prefix} ${this._fieldLabel(field)}:`, labelStyle);
@@ -3480,8 +3516,8 @@ export class ExecuteTabScreen {
       const isNavSelected = i === this._depNavIndex;
       const isDepSelected = this.editDepSelected.has(task.id);
 
-      const checkbox = isDepSelected ? '[✓]' : '[ ]';
-      const prefix = isNavSelected ? '►' : ' ';
+      const checkbox = isDepSelected ? '[+]' : '[ ]';
+      const prefix = isNavSelected ? '>' : ' ';
 
       const titleStr = task.title || task.description || '(untitled)';
       const title = typeof titleStr === 'string' ? titleStr : (titleStr.text || titleStr.description || '');
@@ -3537,7 +3573,7 @@ export class ExecuteTabScreen {
       const isSelected = idx === this.toolNavIndex;
       const isCurrent = tool.name === currentToolName;
 
-      const prefix = isSelected ? '►' : ' ';
+      const prefix = isSelected ? '>' : ' ';
       const marker = isCurrent ? ' ◄' : '';
       const num = String(idx + 1).padStart(2, ' ');
 
@@ -3599,7 +3635,7 @@ export class ExecuteTabScreen {
       const isSelected = i === this.llmTierNavIndex;
       const isCurrent = tier === currentTier;
 
-      const prefix = isSelected ? '►' : ' ';
+      const prefix = isSelected ? '>' : ' ';
       const marker = isCurrent ? ' ◄' : '';
       const num = String(i + 1);
 
