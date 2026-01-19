@@ -184,6 +184,7 @@ export class ContextResearchBrowserTool {
    * @param {import('./sandbox-manager.js').SandboxManager} sandboxManager
    * @param {import('./session-manager.js').SessionManager} [sessionManager]
    * @param {Object} [config]
+   * @param {import('./llm-client.js').LLMClient} [config.llmClient]
    */
   constructor(sandboxManager, sessionManager = null, config = {}) {
     if (!sandboxManager) {
@@ -195,6 +196,9 @@ export class ContextResearchBrowserTool {
 
     /** @type {import('./session-manager.js').SessionManager|null} */
     this.sessionManager = sessionManager;
+
+    /** @type {import('./llm-client.js').LLMClient|null} */
+    this.llmClient = config.llmClient || null;
 
     /** @type {string[]} */
     this.allowedHosts = config.allowedHosts || ['*'];  // Allow all by default for research
@@ -216,6 +220,9 @@ export class ContextResearchBrowserTool {
 
     /** @type {Object|null} */
     this.playwright = null;
+
+    /** @type {number} */
+    this.analysisMaxContentLength = config.analysisMaxContentLength || 100000;
   }
 
   /**
@@ -248,6 +255,238 @@ export class ContextResearchBrowserTool {
       await this.browser.close();
       this.browser = null;
     }
+  }
+
+  /**
+   * Analyze content using LLM
+   * @param {string} content - Markdown content to analyze
+   * @param {Object} metadata - Page metadata (title, url, etc.)
+   * @returns {Promise<Object>} Analysis result
+   * @private
+   */
+  async _analyzeContent(content, metadata) {
+    if (!this.llmClient) {
+      return this._basicAnalysis(content, metadata);
+    }
+
+    const systemPrompt = `task:
+  role: Research Content Analyzer
+  objective: Extract structured insights from research content
+
+output_format: TOML (resilient to truncation)
+
+TOML_TEMPLATE:
+# Research Analysis
+summary = "2-3 sentence summary of the key findings and main topics"
+
+tags = ["tag1", "tag2", "tag3", "tag4", "tag5"]
+key_concepts = ["concept1", "concept2", "concept3"]
+
+[[key_findings]]
+topic = "Topic Area"
+finding = "Key insight or finding from the content"
+importance = "high"
+
+[[key_findings]]
+topic = "Another Topic"
+finding = "Another key finding"
+importance = "medium"
+
+instructions:
+  - Write a clear summary capturing the main topics and findings
+  - Extract 5-10 meaningful tags that categorize the content
+  - Identify key concepts and terminology (3-8 items)
+  - Pull out 3-6 key findings with their topics and importance (high/medium/low)
+  - Focus on actionable insights and factual information
+
+CRITICAL: Output ONLY valid TOML. No markdown blocks, no explanations.`;
+
+    const userPrompt = `Analyze this research content:
+
+Title: ${metadata.title || 'Unknown'}
+Source: ${metadata.url || 'Unknown'}
+
+Content:
+${content.slice(0, this.analysisMaxContentLength)}`;
+
+    try {
+      const response = await this.llmClient.send({
+        systemPrompt,
+        userPrompt,
+        parameters: { temperature: 0.3, maxTokens: 2048 }
+      });
+
+      return this._parseTomlResponse(response.content);
+    } catch (err) {
+      console.error('LLM analysis failed:', err.message);
+      return this._basicAnalysis(content, metadata);
+    }
+  }
+
+  /**
+   * Parse TOML response from LLM
+   * @param {string} tomlStr
+   * @returns {Object}
+   * @private
+   */
+  _parseTomlResponse(tomlStr) {
+    let clean = tomlStr
+      .replace(/^```toml?\n?/i, '')
+      .replace(/\n?```$/i, '')
+      .trim();
+
+    const result = {
+      summary: '',
+      tags: [],
+      key_concepts: [],
+      key_findings: []
+    };
+
+    let currentArraySection = null;
+    let currentArrayItem = null;
+
+    for (const line of clean.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      // Array of tables: [[section]]
+      const arrayMatch = trimmed.match(/^\[\[([^\]]+)\]\]$/);
+      if (arrayMatch) {
+        if (currentArrayItem && currentArraySection) {
+          if (!result[currentArraySection]) result[currentArraySection] = [];
+          result[currentArraySection].push(currentArrayItem);
+        }
+        currentArraySection = arrayMatch[1].trim();
+        currentArrayItem = {};
+        continue;
+      }
+
+      // Regular section (end array mode)
+      if (trimmed.match(/^\[[^\]]+\]$/)) {
+        if (currentArrayItem && currentArraySection) {
+          if (!result[currentArraySection]) result[currentArraySection] = [];
+          result[currentArraySection].push(currentArrayItem);
+          currentArrayItem = null;
+          currentArraySection = null;
+        }
+        continue;
+      }
+
+      // Key-value pair
+      const kvMatch = trimmed.match(/^([^=]+)=(.*)$/);
+      if (kvMatch) {
+        const key = kvMatch[1].trim();
+        const value = this._parseTomlValue(kvMatch[2].trim());
+
+        if (currentArrayItem) {
+          currentArrayItem[key] = value;
+        } else if (result.hasOwnProperty(key)) {
+          result[key] = value;
+        }
+      }
+    }
+
+    // Save final array item
+    if (currentArrayItem && currentArraySection) {
+      if (!result[currentArraySection]) result[currentArraySection] = [];
+      result[currentArraySection].push(currentArrayItem);
+    }
+
+    return result;
+  }
+
+  /**
+   * Parse a TOML value
+   * @param {string} value
+   * @returns {*}
+   * @private
+   */
+  _parseTomlValue(value) {
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1);
+    }
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+
+    if (value.startsWith('[')) {
+      try {
+        const inner = value.slice(1, -1).trim();
+        if (!inner) return [];
+        const items = [];
+        let current = '';
+        let inQuote = false;
+        let quoteChar = '';
+
+        for (const char of inner) {
+          if ((char === '"' || char === "'") && !inQuote) {
+            inQuote = true;
+            quoteChar = char;
+            current += char;
+          } else if (char === quoteChar && inQuote) {
+            inQuote = false;
+            current += char;
+          } else if (char === ',' && !inQuote) {
+            items.push(this._parseTomlValue(current.trim()));
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        if (current.trim()) {
+          items.push(this._parseTomlValue(current.trim()));
+        }
+        return items;
+      } catch {
+        return [];
+      }
+    }
+
+    if (/^-?\d*\.?\d+$/.test(value)) {
+      return parseFloat(value);
+    }
+
+    return value;
+  }
+
+  /**
+   * Basic analysis without LLM
+   * @param {string} content
+   * @param {Object} metadata
+   * @returns {Object}
+   * @private
+   */
+  _basicAnalysis(content, metadata) {
+    // Extract headings as tags
+    const headings = content.match(/^#{1,3}\s+(.+)$/gm) || [];
+    const tags = headings.map(h => h.replace(/^#+\s*/, '').toLowerCase().replace(/[^a-z0-9-]/g, '-')).filter(Boolean);
+
+    // Word frequency for concepts
+    const words = content.toLowerCase().match(/\b[a-z]{4,}\b/g) || [];
+    const freq = {};
+    words.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+    const concepts = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([word]) => word);
+
+    // Extract first paragraph as summary
+    const paragraphs = content.split(/\n\n+/).filter(p => p.trim() && !p.startsWith('#') && !p.startsWith('>'));
+    const summary = paragraphs[0]?.slice(0, 300)?.replace(/\n/g, ' ') + '...' || 'No summary available';
+
+    // Create basic findings from headings
+    const findings = headings.slice(0, 5).map((h, i) => ({
+      topic: h.replace(/^#+\s*/, ''),
+      finding: `Section covering ${h.replace(/^#+\s*/, '')}`,
+      importance: i < 2 ? 'high' : 'medium'
+    }));
+
+    return {
+      summary,
+      tags: [...new Set(tags)].slice(0, 10),
+      key_concepts: concepts,
+      key_findings: findings
+    };
   }
 
   /**
@@ -286,6 +525,7 @@ export class ContextResearchBrowserTool {
       waitForSelector,   // Optional: Wait for specific element
       includeMetadata = true,
       addToContext = true,
+      analyze = true,    // Auto-analyze content after fetching
       timeout = this.timeout
     } = args;
 
@@ -487,6 +727,12 @@ export class ContextResearchBrowserTool {
           }
         }
 
+        // Analyze content if enabled
+        let analysis = null;
+        if (analyze) {
+          analysis = await this._analyzeContent(markdown, { title: pageTitle, url: pageUrl });
+        }
+
         return this.formatResponse({
           success: true,
           url: pageUrl,
@@ -497,7 +743,8 @@ export class ContextResearchBrowserTool {
           contentHash,
           contextUpdated,
           sandboxPath,
-          message: `Research content saved to context/${outputFilename}`
+          message: `Research content saved to context/${outputFilename}`,
+          analysis
         });
 
       } finally {
@@ -570,31 +817,40 @@ export class ContextResearchBrowserTool {
       this.execute.bind(this),
       {
         name: 'context_research_browser',
-        description: `Fetch web page content using a headless browser, convert to markdown, and add to session context.
+        description: `Fetch web page content, convert to markdown, analyze key findings, and add to session context.
 
 USE CASES:
 - Research documentation for a task
 - Gather reference material from websites
 - Add external resources to session context
-- Extract specific content from web pages
+- Extract and analyze specific content from web pages
 
 WORKFLOW:
 1. Fetches URL with headless browser (handles JavaScript-rendered content)
 2. Extracts main content (or specific selector)
 3. Converts HTML to clean Markdown
-4. Saves to context directory in sandbox
-5. Optionally adds to session's context object
+4. Analyzes content to extract key findings, tags, and concepts
+5. Saves to context directory in sandbox
+6. Optionally adds to session's context object
 
 OUTPUT:
 - Markdown file in sandbox/context/ directory
 - Includes YAML frontmatter with source URL, title, fetch date
 - Content is cleaned and formatted for LLM consumption
+- Analysis includes: summary, tags, key_concepts, key_findings
+
+ANALYSIS OUTPUT:
+- summary: 2-3 sentence summary of key findings
+- tags: Topic categorization (5-10 tags)
+- key_concepts: Main terminology and concepts
+- key_findings: Array of {topic, finding, importance}
 
 FEATURES:
 - Handles JavaScript-rendered pages
 - Removes navigation, ads, popups automatically
 - Extracts main content area intelligently
-- Supports custom CSS selectors for specific content`,
+- Supports custom CSS selectors for specific content
+- Automatic LLM-powered content analysis`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -631,6 +887,11 @@ FEATURES:
               type: 'boolean',
               default: true,
               description: 'Add the file to session context object (if session exists)'
+            },
+            analyze: {
+              type: 'boolean',
+              default: true,
+              description: 'Analyze content and include summary, tags, key_concepts, and key_findings in response'
             },
             timeout: {
               type: 'integer',

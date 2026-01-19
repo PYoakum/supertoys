@@ -803,7 +803,8 @@ export function createToolRouter(options = {}) {
     options.sessionManager || null,
     {
       allowedHosts: options.researchAllowedHosts || ['*'],
-      timeout: options.researchTimeout || 30000
+      timeout: options.researchTimeout || 30000,
+      llmClient: options.llmClient || null
     }
   );
   contextResearchBrowser.registerTools(router);
