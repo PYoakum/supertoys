@@ -535,7 +535,7 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
       addToContext = true,
       analyze = true,    // Auto-analyze content after fetching
       intent,            // Optional: Research intent to guide analysis
-      timeout = this.timeout
+      timeout: requestTimeout
     } = args;
 
     // Validate
@@ -545,6 +545,16 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
 
     if (!url) {
       return this.formatError('url is required');
+    }
+
+    // Get timeout from session manager or use default
+    let timeout = requestTimeout || this.timeout;
+    if (this.sessionManager) {
+      try {
+        timeout = this.sessionManager.getToolTimeout(sessionId, 'context_research_browser');
+      } catch {
+        // Session might not exist yet, use default
+      }
     }
 
     // Parse URL
@@ -563,6 +573,7 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
     // Get sandbox path
     const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
     const contextDir = join(sandboxPath, 'context');
+    const startTime = Date.now();
 
     // Ensure context directory exists
     if (!existsSync(contextDir)) {
@@ -742,6 +753,16 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
           analysis = await this._analyzeContent(markdown, { title: pageTitle, url: pageUrl }, intent);
         }
 
+        // Record successful completion for timeout learning
+        const duration = Date.now() - startTime;
+        if (this.sessionManager) {
+          try {
+            this.sessionManager.recordTimeoutEvent(sessionId, 'context_research_browser', false, duration);
+          } catch {
+            // Ignore if session doesn't exist
+          }
+        }
+
         return this.formatResponse({
           success: true,
           url: pageUrl,
@@ -753,7 +774,8 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
           contextUpdated,
           sandboxPath,
           message: `Research content saved to context/${outputFilename}`,
-          analysis
+          analysis,
+          duration
         });
 
       } finally {
@@ -761,6 +783,16 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
       }
 
     } catch (err) {
+      // Record timeout/failure for adaptive learning
+      const duration = Date.now() - startTime;
+      const timedOut = err.message.includes('timeout') || err.message.includes('Timeout');
+      if (this.sessionManager) {
+        try {
+          this.sessionManager.recordTimeoutEvent(sessionId, 'context_research_browser', timedOut, duration);
+        } catch {
+          // Ignore if session doesn't exist
+        }
+      }
       return this.formatError(`Failed to fetch content: ${err.message}`);
     }
   }

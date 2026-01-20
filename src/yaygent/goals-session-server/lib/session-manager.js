@@ -100,6 +100,7 @@ export class SessionManager {
       evaluation: null,
       taskList: null,
       llmRouting: llmConfig,
+      timeouts: this._buildDefaultTimeouts(),
       metadata: {
         ...metadata,
         createdAt: new Date().toISOString(),
@@ -141,6 +142,100 @@ export class SessionManager {
     }
 
     return routing;
+  }
+
+  /**
+   * Build default timeout configuration for a session
+   * @returns {Object}
+   * @private
+   */
+  _buildDefaultTimeouts() {
+    return {
+      default: 60000,  // 60 seconds default
+      tools: {
+        // Tool-specific defaults
+        context_research_browser: 90000,  // 90s for page research
+        http_request: 30000,              // 30s for API calls
+        code_editor: 30000,               // 30s for file ops
+        project_scaffold: 120000,         // 2 min for scaffolding
+        midi_mp3: 180000,                 // 3 min for audio conversion
+        tts: 120000,                      // 2 min for TTS
+        edit_audio: 300000                // 5 min for audio editing
+      },
+      history: [],  // Track timeout events for adaptive learning
+      adaptiveMultiplier: 1.0  // Grows if timeouts are frequent
+    };
+  }
+
+  /**
+   * Get timeout for a specific tool in a session
+   * @param {string} sessionId
+   * @param {string} toolName
+   * @returns {number} Timeout in milliseconds
+   */
+  getToolTimeout(sessionId, toolName) {
+    const session = this.store.get(sessionId);
+    const timeouts = session.timeouts || this._buildDefaultTimeouts();
+
+    // Get tool-specific or default timeout
+    const baseTimeout = timeouts.tools[toolName] || timeouts.default;
+
+    // Apply adaptive multiplier
+    const multiplier = timeouts.adaptiveMultiplier || 1.0;
+
+    return Math.round(baseTimeout * multiplier);
+  }
+
+  /**
+   * Update timeout for a specific tool in a session
+   * @param {string} sessionId
+   * @param {string} toolName
+   * @param {number} timeout - New timeout in milliseconds
+   */
+  updateToolTimeout(sessionId, toolName, timeout) {
+    const session = this.store.get(sessionId);
+    const timeouts = session.timeouts || this._buildDefaultTimeouts();
+
+    timeouts.tools[toolName] = timeout;
+
+    this.store.update(sessionId, { timeouts });
+  }
+
+  /**
+   * Record a timeout event for adaptive learning
+   * @param {string} sessionId
+   * @param {string} toolName
+   * @param {boolean} timedOut - Whether the request timed out
+   * @param {number} duration - Actual duration in milliseconds
+   */
+  recordTimeoutEvent(sessionId, toolName, timedOut, duration) {
+    const session = this.store.get(sessionId);
+    const timeouts = session.timeouts || this._buildDefaultTimeouts();
+
+    // Add to history (keep last 20 events)
+    timeouts.history.push({
+      toolName,
+      timedOut,
+      duration,
+      timestamp: Date.now()
+    });
+    if (timeouts.history.length > 20) {
+      timeouts.history.shift();
+    }
+
+    // Adjust adaptive multiplier based on recent timeout rate
+    const recentEvents = timeouts.history.slice(-10);
+    const timeoutRate = recentEvents.filter(e => e.timedOut).length / recentEvents.length;
+
+    if (timeoutRate > 0.3) {
+      // More than 30% timeouts - increase multiplier
+      timeouts.adaptiveMultiplier = Math.min(3.0, (timeouts.adaptiveMultiplier || 1.0) * 1.5);
+    } else if (timeoutRate < 0.1 && timeouts.adaptiveMultiplier > 1.0) {
+      // Less than 10% timeouts - decrease multiplier slowly
+      timeouts.adaptiveMultiplier = Math.max(1.0, (timeouts.adaptiveMultiplier || 1.0) * 0.9);
+    }
+
+    this.store.update(sessionId, { timeouts });
   }
 
   /**
