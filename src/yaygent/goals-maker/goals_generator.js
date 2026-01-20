@@ -1238,9 +1238,6 @@ async function prompt(question, defaultValue = "") {
   // Drain any buffered input and ensure clean stdin state
   await new Promise(resolve => setImmediate(resolve));
 
-  // Clean separator rows before starting input
-  cleanSeparatorRows();
-
   process.stdin.resume();
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
@@ -1251,17 +1248,20 @@ async function prompt(question, defaultValue = "") {
   if (currentContentRow < minRow) currentContentRow = minRow;
   if (currentContentRow > maxRow) currentContentRow = maxRow;
 
-  // Position at current tracked row
-  moveTo(currentContentRow, 1);
-  process.stdout.write("\x1b[2K"); // Clear line
-
   // Calculate prompt length for cursor tracking
   // "? " + question + " (default)" + ": "
   const defaultHintLen = defaultValue ? defaultValue.length + 3 : 0; // " (default)"
   const promptLen = 2 + question.length + defaultHintLen + 2; // "? " + question + hint + ": "
 
-  // Enable prompt input mode so animation preserves cursor position
+  // Enable prompt input mode FIRST so animation preserves cursor position
   inPromptInput = true;
+
+  // Clean separator rows after enabling prompt mode to prevent race condition
+  cleanSeparatorRows();
+
+  // Position at current tracked row
+  moveTo(currentContentRow, 1);
+  process.stdout.write("\x1b[2K"); // Clear line
 
   return new Promise((resolve) => {
     // Set column position for animation (will be at end of prompt when waiting for input)
@@ -1284,9 +1284,6 @@ async function prompt(question, defaultValue = "") {
 }
 
 async function promptPassword(question) {
-  // Clean separator rows before starting input
-  cleanSeparatorRows();
-
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -1296,16 +1293,19 @@ async function promptPassword(question) {
   // Capture the row we're using for this prompt
   const promptRow = currentContentRow;
 
-  // Position at current tracked row
-  moveTo(promptRow, 1);
-  process.stdout.write("\x1b[2K"); // Clear line
-
   // Build the prompt prefix
   const promptPrefix = `${c("cyan", "?")} ${c("bold", question)}: `;
   const promptPrefixLen = question.length + 4; // "? " + question + ": "
 
-  // Enable prompt input mode so animation preserves cursor position
+  // Enable prompt input mode FIRST so animation preserves cursor position
   inPromptInput = true;
+
+  // Clean separator rows after enabling prompt mode to prevent race condition
+  cleanSeparatorRows();
+
+  // Position at current tracked row and clear
+  moveTo(promptRow, 1);
+  process.stdout.write("\x1b[2K"); // Clear line
 
   return new Promise((resolve) => {
     process.stdout.write(promptPrefix);
@@ -1378,16 +1378,16 @@ async function promptPassword(question) {
 }
 
 async function promptSelect(question, choices) {
-  // Clean separator rows before starting input
-  cleanSeparatorRows();
-
   let selectedIndex = 0;
 
   // Capture the starting row from our tracker
   const menuStartRow = getCurrentRow();
 
-  // Enable prompt input mode so animation preserves cursor position
+  // Enable prompt input mode FIRST so animation preserves cursor position
   inPromptInput = true;
+
+  // Clean separator rows after enabling prompt mode to prevent race condition
+  cleanSeparatorRows();
 
   // Render choice at specific index
   const renderChoice = (index) => {
@@ -1471,9 +1471,6 @@ async function promptConfirm(question, defaultValue = true) {
   // Drain any buffered input and ensure clean stdin state
   await new Promise(resolve => setImmediate(resolve));
 
-  // Clean separator rows before starting input
-  cleanSeparatorRows();
-
   process.stdin.resume();
   const rl = createRL();
   const hint = defaultValue ? c("dim", " (Y/n)") : c("dim", " (y/N)");
@@ -1484,15 +1481,18 @@ async function promptConfirm(question, defaultValue = true) {
   if (currentContentRow < minRow) currentContentRow = minRow;
   if (currentContentRow > maxRow) currentContentRow = maxRow;
 
-  // Position at current tracked row
-  moveTo(currentContentRow, 1);
-  process.stdout.write("\x1b[2K"); // Clear line
-
   // Calculate prompt length: "? " + question + " (Y/n) " (single space before input)
   const promptLen = 2 + question.length + 7; // "? " + question + " (Y/n) "
 
-  // Enable prompt input mode so animation preserves cursor position
+  // Enable prompt input mode FIRST so animation preserves cursor position
   inPromptInput = true;
+
+  // Clean separator rows after enabling prompt mode to prevent race condition
+  cleanSeparatorRows();
+
+  // Position at current tracked row
+  moveTo(currentContentRow, 1);
+  process.stdout.write("\x1b[2K"); // Clear line
 
   return new Promise((resolve) => {
     // Set column position for animation
@@ -2702,6 +2702,9 @@ async function main() {
   }
 
   const model = await prompt("Model name (optional)", defaultModel);
+
+  // Extra cleanup before API key to prevent border creep between prompts
+  cleanSeparatorRows();
 
   const apiKey = await promptPassword("API Key");
   if (!apiKey) {
