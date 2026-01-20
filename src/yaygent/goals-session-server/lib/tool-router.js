@@ -127,19 +127,22 @@ export class ToolRouter {
 /**
  * Notepad Tool Implementation
  * Provides file creation, reading, writing capabilities
- * Notes are stored in session memory (preferred) with file backup
+ * Notes are stored in session memory (primary) with file backup in sandbox
  */
 export class NotepadTool {
   /**
-   * @param {string} [baseDir='./notes'] - Base directory for notes (file backup)
+   * @param {string} [baseDir='./notes'] - Base directory for notes (fallback backup)
    * @param {Object} [options={}] - Options
    * @param {import('./session-manager.js').SessionManager} [options.sessionManager] - Session manager for session-based storage
+   * @param {import('./sandbox-manager.js').SandboxManager} [options.sandboxManager] - Sandbox manager for file backups
    */
   constructor(baseDir = './notes', options = {}) {
     /** @type {string} */
     this.baseDir = baseDir;
     /** @type {import('./session-manager.js').SessionManager|null} */
     this.sessionManager = options.sessionManager || null;
+    /** @type {import('./sandbox-manager.js').SandboxManager|null} */
+    this.sandboxManager = options.sandboxManager || null;
     this.ensureBaseDir();
   }
 
@@ -215,6 +218,30 @@ export class NotepadTool {
   }
 
   /**
+   * Get backup file path in sandbox
+   * @param {string} filename
+   * @param {string} sessionId
+   * @returns {Promise<string|null>}
+   * @private
+   */
+  async _getBackupPath(filename, sessionId) {
+    if (!this.sandboxManager || !sessionId) return null;
+
+    try {
+      const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
+      const notesDir = join(sandboxPath, 'notes');
+      if (!existsSync(notesDir)) {
+        await mkdir(notesDir, { recursive: true });
+      }
+      const safeName = this._getSafeFilename(filename);
+      return join(notesDir, safeName);
+    } catch (err) {
+      console.warn('Could not get backup path:', err.message);
+      return null;
+    }
+  }
+
+  /**
    * Create a new note
    * @param {Object} args
    * @param {string} args.filename - Note filename
@@ -231,23 +258,47 @@ export class NotepadTool {
     const safeName = this._getSafeFilename(filename);
     const noteContent = content || '';
 
-    // Store in session if sessionId provided and sessionManager available
+    // Store in session storage (primary)
     if (sessionId && this.sessionManager) {
       const notes = this._getSessionNotes(sessionId) || {};
       notes[safeName] = noteContent;
       this._setSessionNotes(sessionId, notes);
     }
 
-    // Also write to file as backup
-    const filePath = this.getFilePath(filename, sessionId);
-    await this.ensureBaseDir(sessionId);
-    await writeFile(filePath, noteContent, 'utf-8');
+    // Write backup to sandbox for review
+    let backupPath = null;
+    if (sessionId) {
+      backupPath = await this._getBackupPath(filename, sessionId);
+      if (backupPath) {
+        await writeFile(backupPath, noteContent, 'utf-8');
+      }
+    }
+
+    // Fallback: write to baseDir if no sandbox available
+    if (!backupPath) {
+      const filePath = this.getFilePath(filename, sessionId);
+      await this.ensureBaseDir(sessionId);
+      await writeFile(filePath, noteContent, 'utf-8');
+      backupPath = filePath;
+    }
+
+    const result = {
+      success: true,
+      filename: safeName,
+      sessionStored: !!(sessionId && this.sessionManager),
+      backupPath: backupPath ? backupPath.replace(process.cwd(), '.') : null,
+      message: `Created note: ${safeName}`
+    };
+
+    if (sessionId) {
+      result.sessionId = sessionId.slice(0, 8) + '...';
+    }
 
     return {
       content: [
         {
           type: 'text',
-          text: `Successfully created note: ${filename}${sessionId ? ` (session: ${sessionId.slice(0, 8)}...)` : ''}`
+          text: JSON.stringify(result, null, 2)
         }
       ]
     };
@@ -274,7 +325,7 @@ export class NotepadTool {
     const safeName = this._getSafeFilename(filename);
     let finalContent = content;
 
-    // Handle session storage
+    // Handle session storage (primary)
     if (sessionId && this.sessionManager) {
       const notes = this._getSessionNotes(sessionId) || {};
       if (append && notes[safeName]) {
@@ -284,22 +335,43 @@ export class NotepadTool {
       this._setSessionNotes(sessionId, notes);
     }
 
-    // Also write to file as backup
-    await this.ensureBaseDir(sessionId);
-    const filePath = this.getFilePath(filename, sessionId);
-
-    if (append && existsSync(filePath)) {
-      const existing = await readFile(filePath, 'utf-8');
-      await writeFile(filePath, existing + content, 'utf-8');
-    } else {
-      await writeFile(filePath, finalContent, 'utf-8');
+    // Write backup to sandbox
+    let backupPath = null;
+    if (sessionId) {
+      backupPath = await this._getBackupPath(filename, sessionId);
+      if (backupPath) {
+        await writeFile(backupPath, finalContent, 'utf-8');
+      }
     }
+
+    // Fallback: write to baseDir if no sandbox available
+    if (!backupPath) {
+      await this.ensureBaseDir(sessionId);
+      const filePath = this.getFilePath(filename, sessionId);
+
+      if (append && existsSync(filePath)) {
+        const existing = await readFile(filePath, 'utf-8');
+        await writeFile(filePath, existing + content, 'utf-8');
+      } else {
+        await writeFile(filePath, finalContent, 'utf-8');
+      }
+      backupPath = filePath;
+    }
+
+    const result = {
+      success: true,
+      filename: safeName,
+      action: append ? 'appended' : 'wrote',
+      contentLength: finalContent.length,
+      sessionStored: !!(sessionId && this.sessionManager),
+      backupPath: backupPath ? backupPath.replace(process.cwd(), '.') : null
+    };
 
     return {
       content: [
         {
           type: 'text',
-          text: `Successfully ${append ? 'appended to' : 'wrote'} note: ${filename}`
+          text: JSON.stringify(result, null, 2)
         }
       ]
     };
@@ -319,26 +391,52 @@ export class NotepadTool {
     }
 
     const safeName = this._getSafeFilename(filename);
+    let source = 'unknown';
+    let content = null;
 
     // Try to read from session storage first (primary source)
     if (sessionId && this.sessionManager) {
       const notes = this._getSessionNotes(sessionId);
       if (notes && notes[safeName] !== undefined) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: notes[safeName]
-            }
-          ]
-        };
+        content = notes[safeName];
+        source = 'session';
       }
     }
 
-    // Fallback to file storage
-    const filePath = this.getFilePath(filename, sessionId);
-    if (!existsSync(filePath)) {
-      // List available notes and find best fuzzy match
+    // If not in session, try sandbox backup
+    if (content === null && sessionId) {
+      const backupPath = await this._getBackupPath(filename, sessionId);
+      if (backupPath && existsSync(backupPath)) {
+        content = await readFile(backupPath, 'utf-8');
+        source = 'sandbox';
+
+        // Sync back to session storage for consistency
+        if (this.sessionManager) {
+          const notes = this._getSessionNotes(sessionId) || {};
+          notes[safeName] = content;
+          this._setSessionNotes(sessionId, notes);
+        }
+      }
+    }
+
+    // Fallback to baseDir file storage
+    if (content === null) {
+      const filePath = this.getFilePath(filename, sessionId);
+      if (existsSync(filePath)) {
+        content = await readFile(filePath, 'utf-8');
+        source = 'file';
+
+        // Sync back to session storage for consistency
+        if (sessionId && this.sessionManager) {
+          const notes = this._getSessionNotes(sessionId) || {};
+          notes[safeName] = content;
+          this._setSessionNotes(sessionId, notes);
+        }
+      }
+    }
+
+    // Note not found - provide helpful error
+    if (content === null) {
       const availableNotes = await this._listAvailableNotes(sessionId);
       const { match, score } = this._findBestMatch(filename, availableNotes);
 
@@ -361,8 +459,7 @@ export class NotepadTool {
       throw new Error(errorMsg);
     }
 
-    const content = await readFile(filePath, 'utf-8');
-
+    // Return the content directly for compatibility
     return {
       content: [
         {
@@ -434,7 +531,7 @@ export class NotepadTool {
   async _listAvailableNotes(sessionId) {
     const allNotes = new Set();
 
-    // Get notes from session storage
+    // Get notes from session storage (primary)
     if (sessionId && this.sessionManager) {
       const notes = this._getSessionNotes(sessionId);
       if (notes) {
@@ -442,14 +539,38 @@ export class NotepadTool {
       }
     }
 
-    // Also get notes from file storage
+    // Get notes from sandbox backup
+    if (sessionId && this.sandboxManager) {
+      try {
+        const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
+        const notesDir = join(sandboxPath, 'notes');
+        if (existsSync(notesDir)) {
+          const files = await readdir(notesDir);
+          for (const file of files) {
+            const filePath = join(notesDir, file);
+            try {
+              const stats = (await import('fs')).statSync(filePath);
+              if (stats.isFile()) {
+                allNotes.add(file);
+              }
+            } catch {
+              // Skip files we can't stat
+            }
+          }
+        }
+      } catch {
+        // Ignore sandbox errors
+      }
+    }
+
+    // Fallback: get notes from baseDir file storage
     try {
       const dir = await this.ensureBaseDir(sessionId);
       const files = await readdir(dir);
       for (const file of files) {
         const filePath = join(dir, file);
         try {
-          const stats = await import('fs').then(fs => fs.statSync(filePath));
+          const stats = (await import('fs')).statSync(filePath);
           if (stats.isFile()) {
             allNotes.add(file);
           }
@@ -500,9 +621,10 @@ export class NotepadTool {
 
     const safeName = this._getSafeFilename(filename);
     let foundInSession = false;
+    let foundInSandbox = false;
     let foundInFile = false;
 
-    // Delete from session storage
+    // Delete from session storage (primary)
     if (sessionId && this.sessionManager) {
       const notes = this._getSessionNotes(sessionId);
       if (notes && notes[safeName] !== undefined) {
@@ -512,7 +634,17 @@ export class NotepadTool {
       }
     }
 
-    // Delete from file storage
+    // Delete from sandbox backup
+    if (sessionId) {
+      const backupPath = await this._getBackupPath(filename, sessionId);
+      if (backupPath && existsSync(backupPath)) {
+        const { unlink } = await import('fs/promises');
+        await unlink(backupPath);
+        foundInSandbox = true;
+      }
+    }
+
+    // Delete from baseDir file storage
     const filePath = this.getFilePath(filename, sessionId);
     if (existsSync(filePath)) {
       const { unlink } = await import('fs/promises');
@@ -520,15 +652,25 @@ export class NotepadTool {
       foundInFile = true;
     }
 
-    if (!foundInSession && !foundInFile) {
+    if (!foundInSession && !foundInSandbox && !foundInFile) {
       throw new Error(`Note not found: ${filename}`);
     }
+
+    const result = {
+      success: true,
+      filename: safeName,
+      deletedFrom: {
+        session: foundInSession,
+        sandbox: foundInSandbox,
+        file: foundInFile
+      }
+    };
 
     return {
       content: [
         {
           type: 'text',
-          text: `Successfully deleted note: ${filename}`
+          text: JSON.stringify(result, null, 2)
         }
       ]
     };
@@ -714,9 +856,10 @@ export function createToolRouter(options = {}) {
   const router = new ToolRouter(sandboxManager);
 
   // Initialize and register notepad tool
-  // Pass sessionManager for session-based note storage
+  // Pass sessionManager for session-based storage (primary) and sandboxManager for file backups
   const notepad = new NotepadTool(options.notepadDir || './notes', {
-    sessionManager: options.sessionManager || null
+    sessionManager: options.sessionManager || null,
+    sandboxManager: sandboxManager
   });
   notepad.registerTools(router);
 
