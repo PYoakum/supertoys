@@ -1466,11 +1466,55 @@ async function promptSelect(question, choices) {
 }
 
 async function promptConfirm(question, defaultValue = true) {
-  const hint = defaultValue ? c("dim", " (Y/n)") : c("dim", " (y/N)");
-  const answer = await prompt(`${question}${hint}`);
+  // Drain any buffered input and ensure clean stdin state
+  await new Promise(resolve => setImmediate(resolve));
 
-  if (!answer) return defaultValue;
-  return answer.toLowerCase().startsWith("y");
+  process.stdin.resume();
+  const rl = createRL();
+  const hint = defaultValue ? c("dim", " (Y/n)") : c("dim", " (y/N)");
+
+  // Ensure currentContentRow is within valid bounds
+  const minRow = getMinContentRow();
+  const maxRow = getMaxContentRow();
+  if (currentContentRow < minRow) currentContentRow = minRow;
+  if (currentContentRow > maxRow) currentContentRow = maxRow;
+
+  // Position at current tracked row
+  moveTo(currentContentRow, 1);
+  process.stdout.write("\x1b[2K"); // Clear line
+
+  // Calculate prompt length: "? " + question + " (Y/n) " (single space before input)
+  const promptLen = 2 + question.length + 7; // "? " + question + " (Y/n) "
+
+  // Enable prompt input mode so animation preserves cursor position
+  inPromptInput = true;
+
+  return new Promise((resolve) => {
+    // Set column position for animation
+    currentContentCol = promptLen + 1;
+
+    // Prompt ends with single space, no colon
+    rl.question(`${c("cyan", "?")} ${c("bold", question)}${hint} `, (answer) => {
+      rl.close();
+      inPromptInput = false;
+      currentContentRow++;
+      currentContentCol = 1;
+      if (currentContentRow > maxRow) currentContentRow = maxRow;
+
+      // Clean up rows near separator to fix border artifacts
+      const { rows } = getTerminalSize();
+      for (let i = 5; i <= 7; i++) {
+        moveTo(rows - i, 1);
+        process.stdout.write("\x1b[2K");
+      }
+
+      if (!answer) {
+        resolve(defaultValue);
+      } else {
+        resolve(answer.toLowerCase().startsWith("y"));
+      }
+    });
+  });
 }
 
 async function promptMultiline(question, instruction, centered = false, startRow = 14) {

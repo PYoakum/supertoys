@@ -28,6 +28,87 @@ import {
 import { SessionState } from '../lib/session-manager.js';
 
 /**
+ * Repair task dependencies by resolving cross-goal references
+ *
+ * The LLM sometimes generates dependencies that reference tasks from previous goals
+ * by title instead of taskId. This function builds a lookup map and repairs those
+ * references.
+ *
+ * @param {Object[]} tasks - Array of all accumulated tasks
+ * @returns {{ tasks: Object[], repaired: number, unresolved: number }}
+ */
+function repairTaskDependencies(tasks) {
+  // Build lookup maps: taskId -> task, and title -> taskId
+  const taskById = new Map();
+  const taskIdByTitle = new Map();
+
+  for (const task of tasks) {
+    taskById.set(task.id, task);
+    // Normalize title for matching (lowercase, trimmed)
+    const normalizedTitle = task.title.toLowerCase().trim();
+    taskIdByTitle.set(normalizedTitle, task.id);
+  }
+
+  let repairedCount = 0;
+  let unresolvedCount = 0;
+
+  for (const task of tasks) {
+    const repairedDeps = [];
+
+    for (const dep of task.dependencies) {
+      // Check if the taskId actually exists
+      if (taskById.has(dep.taskId)) {
+        repairedDeps.push(dep);
+        continue;
+      }
+
+      // Try to find the task by treating taskId as a title reference
+      const normalizedRef = dep.taskId.toLowerCase().trim();
+      const resolvedId = taskIdByTitle.get(normalizedRef);
+
+      if (resolvedId) {
+        console.log(`[TaskGen] Repaired dependency: "${dep.taskId}" -> "${resolvedId}" for task ${task.id}`);
+        repairedDeps.push({
+          taskId: resolvedId,
+          type: dep.type || 'completion'
+        });
+        repairedCount++;
+        continue;
+      }
+
+      // Try partial matching (title contains or starts with)
+      let foundMatch = null;
+      for (const [title, id] of taskIdByTitle) {
+        if (title.includes(normalizedRef) || normalizedRef.includes(title)) {
+          foundMatch = id;
+          break;
+        }
+      }
+
+      if (foundMatch) {
+        console.log(`[TaskGen] Repaired dependency (partial match): "${dep.taskId}" -> "${foundMatch}" for task ${task.id}`);
+        repairedDeps.push({
+          taskId: foundMatch,
+          type: dep.type || 'completion'
+        });
+        repairedCount++;
+      } else {
+        console.warn(`[TaskGen] Unresolved dependency: "${dep.taskId}" for task ${task.id} - dropping`);
+        unresolvedCount++;
+      }
+    }
+
+    task.dependencies = repairedDeps;
+  }
+
+  if (repairedCount > 0 || unresolvedCount > 0) {
+    console.log(`[TaskGen] Dependency repair: ${repairedCount} repaired, ${unresolvedCount} unresolved`);
+  }
+
+  return { tasks, repaired: repairedCount, unresolved: unresolvedCount };
+}
+
+/**
  * Simple router for HTTP request handling
  */
 export class Router {
@@ -820,7 +901,11 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
       let taskStartNumber = 1;
       let totalTokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
-      console.log(`[TaskGen] Starting batched task generation for ${executionOrder.length} goals`);
+      console.log(`[TaskGen] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`[TaskGen] [>] Starting task generation for ${executionOrder.length} goal(s)`);
+      console.log(`[TaskGen] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+      const skippedGoals = [];
 
       for (let i = 0; i < executionOrder.length; i++) {
         const goalId = executionOrder[i];
@@ -831,73 +916,127 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
           continue;
         }
 
-        console.log(`[TaskGen] Processing goal ${i + 1}/${executionOrder.length}: ${goal.objective.slice(0, 50)}...`);
+        const goalStartTime = Date.now();
+        console.log(`[TaskGen] ━━━ Goal ${i + 1}/${executionOrder.length} ━━━`);
+        console.log(`[TaskGen] [.] "${goal.objective.slice(0, 60)}${goal.objective.length > 60 ? '...' : ''}"`);
+        console.log(`[TaskGen] [...] Generating tasks...`);
 
-        // Build prompt for this single goal
-        const { systemPrompt, userPrompt } = buildTaskGenerationPrompt({
-          goal,
-          goalIndex: i,
-          totalGoals: executionOrder.length,
-          formattedContext: session.context.formattedContent,
-          toolManifest,
-          previousTasks: allTasks,
-          taskStartNumber
-        });
+        try {
+          // Build prompt for this single goal
+          const { systemPrompt, userPrompt } = buildTaskGenerationPrompt({
+            goal,
+            goalIndex: i,
+            totalGoals: executionOrder.length,
+            formattedContext: session.context.formattedContent,
+            toolManifest,
+            previousTasks: allTasks,
+            taskStartNumber
+          });
 
-        // Send to LLM
-        const response = await llmClient.send({
-          systemPrompt,
-          userPrompt,
-          parameters: options,
-          sessionId,
-          operation: `taskGen-goal-${i + 1}`
-        });
+          // Send to LLM
+          const response = await llmClient.send({
+            systemPrompt,
+            userPrompt,
+            parameters: options,
+            sessionId,
+            operation: `taskGen-goal-${i + 1}`
+          });
 
-        // Accumulate token usage
-        if (response.usage) {
-          totalTokenUsage.inputTokens += response.usage.inputTokens || 0;
-          totalTokenUsage.outputTokens += response.usage.outputTokens || 0;
-          totalTokenUsage.totalTokens += response.usage.totalTokens || 0;
-        }
+          const llmDuration = ((Date.now() - goalStartTime) / 1000).toFixed(1);
+          console.log(`[TaskGen] [+] LLM responded in ${llmDuration}s`);
 
-        // Parse TOML response
-        const parsed = parseTaskToml(response.content);
+          // Accumulate token usage
+          if (response.usage) {
+            totalTokenUsage.inputTokens += response.usage.inputTokens || 0;
+            totalTokenUsage.outputTokens += response.usage.outputTokens || 0;
+            totalTokenUsage.totalTokens += response.usage.totalTokens || 0;
+            console.log(`[TaskGen] [#] Tokens: ${response.usage.inputTokens || 0} in / ${response.usage.outputTokens || 0} out`);
+          }
 
-        // Validate
-        const validation = validateTaskTomlResponse(parsed);
-        if (!validation.valid) {
-          throw new ValidationError(
-            `Invalid LLM response for goal ${goalId}: ${validation.errors.join(', ')}`,
-            'llmResponse'
-          );
-        }
+          // Parse TOML response
+          const parsed = parseTaskToml(response.content);
 
-        // Collect unbound tasks
-        if (parsed.unboundTasks && parsed.unboundTasks.length > 0) {
-          allUnboundTasks.push(...parsed.unboundTasks);
-        }
+          // Validate
+          const validation = validateTaskTomlResponse(parsed);
+          if (!validation.valid) {
+            throw new ValidationError(
+              `Invalid LLM response for goal ${goalId}: ${validation.errors.join(', ')}`,
+              'llmResponse'
+            );
+          }
 
-        // Validate tool bindings for this goal's tasks
-        for (const task of parsed.tasks) {
-          if (!toolRouter.hasTool(task.tool.toolName)) {
-            allUnboundTasks.push({
-              goalId: task.goalId,
-              taskTitle: task.title,
-              taskDescription: task.description,
-              reason: `Tool '${task.tool.toolName}' not found in manifest`,
-              suggestedTools: []
+          // Collect unbound tasks
+          if (parsed.unboundTasks && parsed.unboundTasks.length > 0) {
+            allUnboundTasks.push(...parsed.unboundTasks);
+          }
+
+          // Validate tool bindings for this goal's tasks
+          let boundCount = 0;
+          for (const task of parsed.tasks) {
+            if (!toolRouter.hasTool(task.tool.toolName)) {
+              allUnboundTasks.push({
+                goalId: task.goalId,
+                taskTitle: task.title,
+                taskDescription: task.description,
+                reason: `Tool '${task.tool.toolName}' not found in manifest`,
+                suggestedTools: []
+              });
+              continue;
+            }
+
+            // Add to all tasks
+            allTasks.push(task);
+            boundCount++;
+          }
+
+          // Update task start number for next goal
+          taskStartNumber = allTasks.length + 1;
+
+          const totalDuration = ((Date.now() - goalStartTime) / 1000).toFixed(1);
+          console.log(`[TaskGen] [+] Created ${boundCount} task(s) for "${goalId}" (${totalDuration}s total)`);
+        } catch (goalError) {
+          // Check if this is a content moderation block or similar API error
+          const isContentBlocked = goalError.details?.statusCode === 400 &&
+            (goalError.details?.body?.includes('Output blocked') ||
+             goalError.details?.body?.includes('content_policy') ||
+             goalError.details?.body?.includes('safety'));
+
+          if (isContentBlocked) {
+            console.warn(`[TaskGen] Goal ${goalId} blocked by content moderation, skipping`);
+            skippedGoals.push({
+              goalId,
+              reason: 'Content moderation block',
+              objective: goal.objective?.slice(0, 100)
             });
             continue;
           }
 
-          // Add to all tasks
-          allTasks.push(task);
+          // Check if this is a timeout error
+          const isTimeout = goalError.message?.toLowerCase().includes('timeout') ||
+            goalError.message?.toLowerCase().includes('timed out') ||
+            goalError.name === 'AbortError';
+
+          if (isTimeout) {
+            console.warn(`[TaskGen] Goal ${goalId} timed out, skipping`);
+            skippedGoals.push({
+              goalId,
+              reason: 'Request timeout',
+              objective: goal.objective?.slice(0, 100)
+            });
+            continue;
+          }
+
+          // For other errors, re-throw to fail the pipeline
+          throw goalError;
         }
+      }
 
-        // Update task start number for next goal
-        taskStartNumber = allTasks.length + 1;
-
-        console.log(`[TaskGen] Generated ${parsed.tasks.length} tasks for goal ${goalId}`);
+      // Log skipped goals summary
+      if (skippedGoals.length > 0) {
+        console.warn(`[TaskGen] ${skippedGoals.length} goal(s) skipped due to content moderation:`);
+        for (const skipped of skippedGoals) {
+          console.warn(`  - ${skipped.goalId}: ${skipped.objective}...`);
+        }
       }
 
       // Check for unbound tasks after all goals processed
@@ -906,6 +1045,12 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
           allUnboundTasks,
           toolManifest.tools.map(t => t.name)
         );
+      }
+
+      // Repair cross-goal dependencies (LLM sometimes references tasks by title)
+      const { repaired, unresolved } = repairTaskDependencies(allTasks);
+      if (repaired > 0 || unresolved > 0) {
+        console.log(`[TaskGen] Cross-goal dependency resolution: ${repaired} fixed, ${unresolved} dropped`);
       }
 
       // Build task list from accumulated tasks
@@ -932,12 +1077,22 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
           estimatedTotalMinutes: allTasks.reduce(
             (sum, t) => sum + (t.effort?.estimatedMinutes || 0), 0
           ),
-          goalsProcessed: executionOrder.length
+          goalsProcessed: executionOrder.length,
+          goalsSkipped: skippedGoals.length
         },
+        skippedGoals: skippedGoals.length > 0 ? skippedGoals : undefined,
         tokenUsage: totalTokenUsage
       };
 
-      console.log(`[TaskGen] Completed: ${allTasks.length} tasks from ${executionOrder.length} goals`);
+      console.log(`[TaskGen] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`[TaskGen] [*] Task Generation Complete`);
+      console.log(`[TaskGen]    Goals processed: ${executionOrder.length - skippedGoals.length}/${executionOrder.length}`);
+      console.log(`[TaskGen]    Tasks created: ${allTasks.length}`);
+      console.log(`[TaskGen]    Total tokens: ${totalTokenUsage.totalTokens.toLocaleString()}`);
+      if (skippedGoals.length > 0) {
+        console.log(`[TaskGen]    [!] Skipped goals: ${skippedGoals.length}`);
+      }
+      console.log(`[TaskGen] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
       // Update session
       const updatedSession = sessionManager.setTaskList(sessionId, taskList);
@@ -947,7 +1102,8 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
         data: {
           sessionId,
           state: updatedSession.state,
-          taskList
+          taskList,
+          skippedGoals: skippedGoals.length > 0 ? skippedGoals : undefined
         }
       });
     },
@@ -1018,7 +1174,7 @@ function createTasklistRoutes(sessionManager, toolRouter, llmClient) {
         taskList
       });
 
-      console.log(`[TaskList] Imported: ${taskList.tasks.length} tasks for session ${sessionId.slice(0, 8)} (state → GENERATED)`);
+      console.log(`[TaskList] Imported: ${taskList.tasks.length} tasks for session ${sessionId.slice(0, 8)} (state -> GENERATED)`);
 
       return jsonResponse({
         success: true,

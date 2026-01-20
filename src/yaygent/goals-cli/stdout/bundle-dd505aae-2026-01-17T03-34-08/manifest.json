@@ -1,0 +1,115 @@
+{
+  "bundleId": "bundle-dd505aae-2026-01-17T03-34-08",
+  "sessionId": "dd505aae-47f7-4034-bd0d-2ea891634ddb",
+  "createdAt": "2026-01-17T03:34:08.193Z",
+  "version": "1.0.0",
+  "contents": {
+    "sessionFiles": [
+      {
+        "path": "session/session.json",
+        "type": "session",
+        "size": 117031,
+        "checksum": "22919644bb46949cf2606024bbe2ce1f2744037b57b735072f877dda031f69df"
+      },
+      {
+        "path": "session/goals.json",
+        "type": "goals",
+        "size": 1962,
+        "checksum": "2475bb2a24fee460ae420432153f555498992d36aa225993736034f22a9468f1"
+      },
+      {
+        "path": "session/tasks.json",
+        "type": "tasks",
+        "size": 105567,
+        "checksum": "2953a378f8e720f563d56455aa1620a8d4a5c4aa8240f6233035f7201f2255f6"
+      },
+      {
+        "path": "session/context/cloud-provider-data.md",
+        "type": "context",
+        "size": 2083,
+        "checksum": "0a22cb244edba5905f619518b5b138ee5d889e2727904621908041ac3859826e"
+      },
+      {
+        "path": "session/context/requirements.md",
+        "type": "context",
+        "size": 981,
+        "checksum": "b5ac2271ea57af6ce42e2ef842779158686da11a59ebd9d022417261e9c9f29b"
+      },
+      {
+        "path": "session/context/notes.txt",
+        "type": "context",
+        "size": 210,
+        "checksum": "058e56ff614d5070ee4270989b745c06744d9043bfa05ebae5d2273b162f6e56"
+      }
+    ],
+    "executionFiles": [
+      {
+        "path": "execution/tasks/003-task-3.md",
+        "type": "task_output",
+        "size": 3437,
+        "checksum": "65b3767555fcb35f1cc48943ac4f7513ca162d8a1f3624a9fdbb5bfbdfa5377e"
+      },
+      {
+        "path": "execution/tasks/001-task-1.md",
+        "type": "task_output",
+        "size": 2367,
+        "checksum": "e7e9c7f219129e6794a3774f6d2d147c51b66804c4493a1a3693205becd031bd"
+      },
+      {
+        "path": "execution/tasks/002-task-2.md",
+        "type": "task_output",
+        "size": 1991,
+        "checksum": "e97f613b3591ae8bfb67d32f872d5fa01328aa0e4f186ff8f5be20abace7005b"
+      },
+      {
+        "path": "execution/evaluations/001-task-1-eval.json",
+        "type": "evaluation",
+        "size": 1268,
+        "checksum": "53b3c1a7e573445e19f7f7b9b8840c2993b80e2cb2bde2fb9785c4861bfe537e"
+      },
+      {
+        "path": "execution/evaluations/002-task-2-eval.json",
+        "type": "evaluation",
+        "size": 1347,
+        "checksum": "6f8960c975c37b62ac113decdda11a46699e769ec3f1e686997954f5f85b65c6"
+      },
+      {
+        "path": "execution/evaluations/003-task-3-eval.json",
+        "type": "evaluation",
+        "size": 1051,
+        "checksum": "9a3d7066b8a9481c351f212d93621da8a71957712e80bb0309381828045ff50f"
+      },
+      {
+        "path": "execution/execution-log.json",
+        "type": "log",
+        "size": 2307,
+        "checksum": "ba66d894d86bfef82e3cf44deb6e6b9018f2d3ca1aff66c306918027846f96c1"
+      },
+      {
+        "path": "execution/summary.md",
+        "type": "summary",
+        "size": 843,
+        "checksum": "31dadff554746e17a70602b09c69ce3ecab8823356a31ae49a286f82fee8c9b2"
+      }
+    ],
+    "artifactFiles": [],
+    "totalFiles": 14,
+    "totalSize": 242445
+  },
+  "metrics": {
+    "totalTasks": 3,
+    "completedCount": 3,
+    "failedCount": 0,
+    "remainingCount": 0,
+    "startedAt": "2026-01-17T03:33:31.455Z",
+    "completedAt": null,
+    "totalExecutionTimeMs": 36731,
+    "totalBufferTimeMs": 0,
+    "totalTokenUsage": {
+      "promptTokens": 52669,
+      "completionTokens": 795,
+      "totalTokens": 53464
+    }
+  },
+  "checksum": "2c8dd9270a591ea87c65557e980af67d93a8190aa4cad0a5dac33ef49e84f136"
+}

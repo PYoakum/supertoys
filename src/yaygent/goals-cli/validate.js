@@ -21,13 +21,13 @@ async function main() {
   try {
     const args = parseArguments(['-g', './goals.json', '-c', './context/']);
     if (args.goals === './goals.json' && args.context === './context/') {
-      console.log('  ✓ Argument parsing works correctly');
+      console.log('  [+] Argument parsing works correctly');
       passed++;
     } else {
       throw new Error('Unexpected argument values');
     }
   } catch (err) {
-    console.log('  ✗ Argument parsing failed:', err.message);
+    console.log('  [x] Argument parsing failed:', err.message);
     failed++;
   }
 
@@ -43,13 +43,13 @@ async function main() {
     };
     const result = manager.validate(validDef);
     if (result.valid) {
-      console.log('  ✓ Validation logic works correctly');
+      console.log('  [+] Validation logic works correctly');
       passed++;
     } else {
       throw new Error('Validation should have passed');
     }
   } catch (err) {
-    console.log('  ✗ Validation failed:', err.message);
+    console.log('  [x] Validation failed:', err.message);
     failed++;
   }
 
@@ -65,13 +65,13 @@ async function main() {
     };
     const result = manager.validate(invalidDef);
     if (!result.valid && result.errors.length > 0) {
-      console.log('  ✓ Invalid goals correctly detected');
+      console.log('  [+] Invalid goals correctly detected');
       passed++;
     } else {
       throw new Error('Should have detected invalid goals');
     }
   } catch (err) {
-    console.log('  ✗ Detection failed:', err.message);
+    console.log('  [x] Detection failed:', err.message);
     failed++;
   }
 
@@ -81,13 +81,13 @@ async function main() {
     const manager = new GoalManager('./tests/fixtures/valid-goals.json');
     const goals = await manager.load();
     if (goals.goals && goals.goals.length > 0) {
-      console.log(`  ✓ Loaded ${goals.goals.length} goals successfully`);
+      console.log(`  [+] Loaded ${goals.goals.length} goals successfully`);
       passed++;
     } else {
       throw new Error('No goals loaded');
     }
   } catch (err) {
-    console.log('  ✗ Goal loading failed:', err.message);
+    console.log('  [x] Goal loading failed:', err.message);
     failed++;
   }
 
@@ -97,13 +97,13 @@ async function main() {
     const loader = new ContextLoader('./tests/fixtures/context');
     const bundle = await loader.load();
     if (bundle.files && bundle.files.length > 0) {
-      console.log(`  ✓ Loaded ${bundle.files.length} context files successfully`);
+      console.log(`  [+] Loaded ${bundle.files.length} context files successfully`);
       passed++;
     } else {
       throw new Error('No context files loaded');
     }
   } catch (err) {
-    console.log('  ✗ Context loading failed:', err.message);
+    console.log('  [x] Context loading failed:', err.message);
     failed++;
   }
 
@@ -118,13 +118,13 @@ async function main() {
     const json = loader.getFormattedContext('json');
     
     if (xml.includes('<context>') && md.includes('#') && json.includes('{')) {
-      console.log('  ✓ All context formats work correctly');
+      console.log('  [+] All context formats work correctly');
       passed++;
     } else {
       throw new Error('Format output not as expected');
     }
   } catch (err) {
-    console.log('  ✗ Context formatting failed:', err.message);
+    console.log('  [x] Context formatting failed:', err.message);
     failed++;
   }
 
@@ -133,13 +133,13 @@ async function main() {
   console.log(`Results: ${passed} passed, ${failed} failed`);
   
   if (failed === 0) {
-    console.log('\n✓ All validation tests passed!');
+    console.log('\n[+] All validation tests passed!');
     console.log('\nThe Goals CLI component is ready for use.');
     console.log('Next: Run with your own goals and context:');
     console.log('  node goals-cli.js -g ./your-goals.json -c ./your-context/ --dry-run');
     process.exit(0);
   } else {
-    console.log('\n✗ Some tests failed. Please review the errors above.');
+    console.log('\n[x] Some tests failed. Please review the errors above.');
     process.exit(1);
   }
 }

@@ -1,0 +1,13 @@
+Happy Birthday Melody in Note Notation
+
+C4:q C4:e D4:h C4:h F4:h E4:w
+C4:q C4:e D4:h C4:h G4:h F4:w
+C4:q C4:e C5:h A4:h F4:h E4:h D4:w
+Bb4:q Bb4:e A4:h F4:h G4:h F4:w
+
+Notation Guide:
+- Note format: NOTE:DURATION
+- Notes: C4, D4, E4, F4, G4, A4, Bb4, C5 (octave 4 and 5)
+- Durations: q=quarter, e=eighth, h=half, w=whole
+
+This represents the classic "Happy Birthday to You" melody with proper timing and pitch.

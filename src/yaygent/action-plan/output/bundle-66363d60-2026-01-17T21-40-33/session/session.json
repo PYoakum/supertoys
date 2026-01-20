@@ -1,0 +1,527 @@
+{
+  "id": "66363d60-d1d0-43da-ad23-d2b731de7586",
+  "state": "GENERATED",
+  "goals": {
+    "version": "1.0",
+    "metadata": {
+      "loadedAt": "2026-01-17T21:38:43.329Z"
+    },
+    "items": [
+      {
+        "id": "svelte-hello",
+        "objective": "Create a simple Svelte hello world application using Vite that displays Hello World on the page",
+        "priority": 1,
+        "criteria": {
+          "success": [],
+          "acceptance": [],
+          "validation": "manual"
+        },
+        "constraints": [],
+        "context": {},
+        "status": {
+          "state": "pending",
+          "progress": 0,
+          "completedCriteria": [],
+          "blockers": []
+        },
+        "dependencies": {
+          "declaredDependencies": [],
+          "inferredDependencies": [],
+          "allDependencies": [],
+          "dependencyStatus": []
+        },
+        "executionIndex": 0,
+        "assignedAt": null,
+        "completedAt": null,
+        "notes": null
+      }
+    ],
+    "globalContext": {},
+    "dependencyGraph": {
+      "nodes": [
+        "svelte-hello"
+      ],
+      "edges": []
+    },
+    "executionOrder": [
+      "svelte-hello"
+    ]
+  },
+  "context": {
+    "files": [],
+    "metadata": {
+      "totalFiles": 0,
+      "totalSize": 0
+    },
+    "formattedContent": "<context>\n</context>",
+    "contentHash": "00000000"
+  },
+  "evaluation": {
+    "evaluatedAt": "2026-01-17T21:38:48.622Z",
+    "modelUsed": "claude-sonnet-4-20250514",
+    "executionOrder": [
+      "svelte-hello"
+    ],
+    "inferredDependencies": [],
+    "reasoning": "This is a single, self-contained goal with no dependencies. The goal is to create a simple Svelte hello world application using Vite, which can be executed independently without requiring any other goals to be completed first. Since there's only one goal, the execution order is straightforward.",
+    "warnings": [
+      {
+        "code": "MISSING_SUCCESS_CRITERIA",
+        "message": "Goal has empty success criteria array, making it difficult to determine completion",
+        "goalId": "svelte-hello"
+      },
+      {
+        "code": "MISSING_ACCEPTANCE_CRITERIA",
+        "message": "Goal has empty acceptance criteria array, making validation unclear",
+        "goalId": "svelte-hello"
+      },
+      {
+        "code": "MANUAL_VALIDATION_ONLY",
+        "message": "Goal relies solely on manual validation without automated checks",
+        "goalId": "svelte-hello"
+      }
+    ],
+    "tokenUsage": {
+      "inputTokens": 558,
+      "outputTokens": 260,
+      "totalTokens": 818
+    }
+  },
+  "taskList": {
+    "generatedAt": "2026-01-17T21:38:58.447Z",
+    "modelUsed": "claude-sonnet-4-20250514",
+    "sessionId": "66363d60-d1d0-43da-ad23-d2b731de7586",
+    "tasks": [
+      {
+        "id": "task-1",
+        "goalId": "svelte-hello",
+        "sequenceNumber": 1,
+        "title": "Create Svelte project scaffold",
+        "description": "Create a new Svelte project using SvelteKit template with Vite bundler",
+        "dependencies": [],
+        "tool": {
+          "toolName": "create_project_scaffold",
+          "toolDescription": "Create a new project from a template",
+          "command": {
+            "action": "create",
+            "parameters": {
+              "projectType": "svelte",
+              "name": "svelte-hello-world",
+              "installDependencies": true
+            },
+            "expectedOutput": "A new Svelte project directory structure with all necessary files and dependencies"
+          },
+          "fallbackTool": null
+        },
+        "effort": {
+          "estimatedMinutes": 3,
+          "complexity": "low"
+        },
+        "state": "completed",
+        "startedAt": "2026-01-17T21:39:58.597Z",
+        "completedAt": "2026-01-17T21:40:11.332Z",
+        "result": {
+          "taskId": "task-1",
+          "success": true,
+          "output": "<tool_use>\n<tool_name>create_project_scaffold</tool_name>\n<parameters>\n{\n  \"sessionId\": \"svelte-hello-session\",\n  \"projectType\": \"svelte\",\n  \"name\": \"svelte-hello-world\",\n  \"installDependencies\": true\n}\n</parameters>\n</tool_use>\n\nI'm creating a new Svelte project scaffold using the predefined parameters. I've added a sessionId to ensure proper sandbox isolation for this task. The scaffold will create a SvelteKit application with Vite bundler, which is perfect for a simple hello world application. The `installDependencies: true` option will automatically run the dependency installation after scaffolding, so the project will be ready to run immediately.",
+          "toolInvocations": [
+            {
+              "toolName": "create_project_scaffold",
+              "parameters": {
+                "sessionId": "svelte-hello-session",
+                "projectType": "svelte",
+                "name": "svelte-hello-world",
+                "installDependencies": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\n  \"success\": true,\n  \"projectType\": \"SvelteKit\",\n  \"projectPath\": \"svelte-hello-world\",\n  \"absolutePath\": \"/Users/devmachine/dev-projects/supertoys/src/yaygent/goals-session-server/sandbox/66363d60-d1d0-43da-ad23-d2b731de7586/svelte-hello-world\",\n  \"filesCreated\": 16,\n  \"files\": [\n    \".gitignore\",\n    \".npmrc\",\n    \".svelte-kit/\",\n    \"README.md\",\n    \"bun.lock\",\n    \"jsconfig.json\",\n    \"node_modules/\",\n    \"package.json\",\n    \"src/app.html\",\n    \"src/lib/assets/favicon.svg\",\n    \"src/lib/index.js\",\n    \"src/routes/+layout.svelte\",\n    \"src/routes/+page.svelte\",\n    \"static/robots.txt\",\n    \"svelte.config.js\",\n    \"vite.config.js\"\n  ],\n  \"duration\": 2023,\n  \"logs\": [\n    \"Created directory: svelte-hello-world\",\n    \"Running: bunx sv create svelte-hello-world --template minimal --no-types --no-add-ons --no-install\",\n    \"Create command completed (726ms)\",\n    \"stdout: ┌  Welcome to the Svelte CLI! (v0.11.2)\\n│\\n◆  Project created\\n│\\n│  npx sv create --template minimal --no-types --no-install svelte-hello-world\\n│\\n◇  What's next? ───────────────────────────────╮\\n│                                              │\\n│  📁 Project steps                            │\\n│                                              │\\n│    1: cd svelte-hello-world                  │\\n│    2: bun install                            │\\n│    3: bun run dev --open                     │\\n│            \",\n    \"Patched Vite scripts to use bun runtime\",\n    \"  dev: \\\"vite dev\\\" -> \\\"bunx --bun vite dev\\\"\",\n    \"  build: \\\"vite build\\\" -> \\\"bunx --bun vite build\\\"\",\n    \"  preview: \\\"vite preview\\\" -> \\\"bunx --bun vite preview\\\"\",\n    \"Running: bun install\",\n    \"bun install completed (1292ms)\"\n  ],\n  \"nextSteps\": [\n    \"cd svelte-hello-world\",\n    \"bun run dev\"\n  ]\n}"
+                  }
+                ]
+              },
+              "success": true,
+              "durationMs": 2026
+            }
+          ],
+          "artifacts": [
+            {
+              "type": "file",
+              "path": ".gitignore",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": ".npmrc",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": ".svelte-kit/",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "README.md",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "bun.lock",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "jsconfig.json",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "node_modules/",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "package.json",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "src/app.html",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "src/lib/assets/favicon.svg",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "src/lib/index.js",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "src/routes/+layout.svelte",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "src/routes/+page.svelte",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "static/robots.txt",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "svelte.config.js",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            },
+            {
+              "type": "file",
+              "path": "vite.config.js",
+              "size": 0,
+              "tool": "create_project_scaffold",
+              "createdAt": "2026-01-17T21:40:06.037Z"
+            }
+          ],
+          "reasoning": "I'm creating a new Svelte project scaffold using the predefined parameters. I've added a sessionId to ensure proper sandbox isolation for this task. The scaffold will create a SvelteKit application with Vite bundler, which is perfect for a simple hello world application. The `installDependencies: true` option will automatically run the dependency installation after scaffolding, so the project will be ready to run immediately.",
+          "tokenUsage": {
+            "promptTokens": 17399,
+            "completionTokens": 178,
+            "totalTokens": 17577
+          },
+          "metadata": {
+            "executedAt": "2026-01-17T21:40:06.037Z",
+            "modelUsed": "claude-sonnet-4-20250514"
+          },
+          "evaluation": {
+            "taskId": "task-1",
+            "success": true,
+            "reason": {
+              "summary": "Successfully created a Svelte project scaffold using SvelteKit template with Vite bundler",
+              "details": "The task execution successfully created a new Svelte project using the SvelteKit template with Vite bundler. The scaffold was created with 16 files including all necessary configuration files (vite.config.js, svelte.config.js), source files (src/routes/+page.svelte for the main page), and dependencies were automatically installed. The project is ready to run and display content."
+            },
+            "criteriaMatched": [
+              "Created new Svelte project using SvelteKit template",
+              "Used Vite bundler (confirmed by vite.config.js file)",
+              "Project scaffold is complete with all necessary files",
+              "Dependencies were installed automatically"
+            ],
+            "criteriaUnmatched": [],
+            "issues": [],
+            "tokenUsage": {
+              "promptTokens": 1304,
+              "completionTokens": 226,
+              "totalTokens": 1530
+            },
+            "metadata": {
+              "evaluatedAt": "2026-01-17T21:40:11.331Z",
+              "modelUsed": "claude-sonnet-4-20250514"
+            }
+          }
+        },
+        "executionTimeMs": 12735
+      },
+      {
+        "id": "task-2",
+        "goalId": "svelte-hello",
+        "sequenceNumber": 2,
+        "title": "Modify main page to display Hello World",
+        "description": "Edit the main Svelte page component to display 'Hello World' message",
+        "dependencies": [],
+        "tool": {
+          "toolName": "code_editor",
+          "toolDescription": "Edit code files in a sandboxed workspace",
+          "command": {
+            "action": "write",
+            "parameters": {
+              "operation": "write",
+              "path": "svelte-hello-world/src/routes/+page.svelte",
+              "content": "<script>\n\t// Simple Hello World Svelte component\n</script>\n<svelte:head>\n\t<title>Hello World - Svelte App</title>\n</svelte:head>\n<main>\n\t<h1>Hello World</h1>\n\t<p>Welcome to your Svelte application!</p>\n</main>\n<style>\n\tmain {\n\t\ttext-align: center;\n\t\tpadding: 2rem;\n\t\tfont-family: Arial, sans-serif;\n\t}\n\th1 {\n\t\tcolor: #ff3e00;\n\t\tfont-size: 3rem;\n\t\tmargin-bottom: 1rem;\n\t}\n\tp {\n\t\tcolor: #333;\n\t\tfont-size: 1.2rem;\n\t}\n</style>"
+            },
+            "expectedOutput": "Updated Svelte page component that displays Hello World"
+          },
+          "fallbackTool": null
+        },
+        "effort": {
+          "estimatedMinutes": 2,
+          "complexity": "low"
+        },
+        "state": "completed",
+        "startedAt": "2026-01-17T21:40:11.332Z",
+        "completedAt": "2026-01-17T21:40:24.160Z",
+        "result": {
+          "taskId": "task-2",
+          "success": true,
+          "output": "<tool_use>\n<tool_name>code_editor</tool_name>\n<parameters>\n{\n  \"operation\": \"write\",\n  \"path\": \"svelte-hello-world/src/routes/+page.svelte\",\n  \"content\": \"<script>\\n\\t// Simple Hello World Svelte component\\n</script>\\n<svelte:head>\\n\\t<title>Hello World - Svelte App</title>\\n</svelte:head>\\n<main>\\n\\t<h1>Hello World</h1>\\n\\t<p>Welcome to your Svelte application!</p>\\n</main>\\n<style>\\n\\tmain {\\n\\t\\ttext-align: center;\\n\\t\\tpadding: 2rem;\\n\\t\\tfont-family: Arial, sans-serif;\\n\\t}\\n\\th1 {\\n\\t\\tcolor: #ff3e00;\\n\\t\\tfont-size: 3rem;\\n\\t\\tmargin-bottom: 1rem;\\n\\t}\\n\\tp {\\n\\t\\tcolor: #333;\\n\\t\\tfont-size: 1.2rem;\\n\\t}\\n</style>\"\n}\n</parameters>\n</tool_use>\n\nI'm modifying the main page component of the Svelte application to display a \"Hello World\" message. The predefined parameters provide a complete Svelte component that:\n\n1. Sets the page title to \"Hello World - Svelte App\" using `<svelte:head>`\n2. Displays a prominent \"Hello World\" heading in Svelte's signature orange color (#ff3e00)\n3. Includes a welcoming subtitle\n4. Applies centered styling with appropriate fonts and spacing\n\nThis creates a clean, professional-looking hello world page that fulfills the task requirements and demonstrates basic Svelte component structure with script, markup, and style sections.",
+          "toolInvocations": [
+            {
+              "toolName": "code_editor",
+              "parameters": {
+                "sessionId": "66363d60-d1d0-43da-ad23-d2b731de7586",
+                "operation": "write",
+                "path": "svelte-hello-world/src/routes/+page.svelte",
+                "content": "<script>\n\t// Simple Hello World Svelte component\n</script>\n<svelte:head>\n\t<title>Hello World - Svelte App</title>\n</svelte:head>\n<main>\n\t<h1>Hello World</h1>\n\t<p>Welcome to your Svelte application!</p>\n</main>\n<style>\n\tmain {\n\t\ttext-align: center;\n\t\tpadding: 2rem;\n\t\tfont-family: Arial, sans-serif;\n\t}\n\th1 {\n\t\tcolor: #ff3e00;\n\t\tfont-size: 3rem;\n\t\tmargin-bottom: 1rem;\n\t}\n\tp {\n\t\tcolor: #333;\n\t\tfont-size: 1.2rem;\n\t}\n</style>"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\n  \"success\": true,\n  \"operation\": \"write\",\n  \"path\": \"svelte-hello-world/src/routes/+page.svelte\",\n  \"size\": 423,\n  \"modified\": \"2026-01-17T21:40:18.537Z\"\n}"
+                  }
+                ]
+              },
+              "success": true,
+              "durationMs": 2
+            }
+          ],
+          "artifacts": [
+            {
+              "type": "file",
+              "path": "svelte-hello-world/src/routes/+page.svelte",
+              "size": 423,
+              "tool": "code_editor",
+              "checksum": null,
+              "createdAt": "2026-01-17T21:40:18.538Z"
+            }
+          ],
+          "reasoning": "I'm modifying the main page component of the Svelte application to display a \"Hello World\" message. The predefined parameters provide a complete Svelte component that:\n\n1. Sets the page title to \"Hello World - Svelte App\" using `<svelte:head>`\n2. Displays a prominent \"Hello World\" heading in Svelte's signature orange color (#ff3e00)\n3. Includes a welcoming subtitle\n4. Applies centered styling with appropriate fonts and spacing\n\nThis creates a clean, professional-looking hello world page that fulfills the task requirements and demonstrates basic Svelte component structure with script, markup, and style sections.",
+          "tokenUsage": {
+            "promptTokens": 17673,
+            "completionTokens": 447,
+            "totalTokens": 18120
+          },
+          "metadata": {
+            "executedAt": "2026-01-17T21:40:18.538Z",
+            "modelUsed": "claude-sonnet-4-20250514"
+          },
+          "evaluation": {
+            "taskId": "task-2",
+            "success": true,
+            "reason": {
+              "summary": "Task successfully completed - main Svelte page component modified to display Hello World",
+              "details": "The execution successfully created a Svelte component file at the correct path (svelte-hello-world/src/routes/+page.svelte) that displays 'Hello World' as the main heading. The component includes proper Svelte structure with script, markup, and style sections, displays the required 'Hello World' message prominently, and includes additional styling and content that enhances the user experience."
+            },
+            "criteriaMatched": [
+              "Modified the main Svelte page component",
+              "Displays 'Hello World' message on the page",
+              "Created proper Svelte component structure",
+              "File written to correct location for SvelteKit routing"
+            ],
+            "criteriaUnmatched": [],
+            "issues": [],
+            "tokenUsage": {
+              "promptTokens": 914,
+              "completionTokens": 217,
+              "totalTokens": 1131
+            },
+            "metadata": {
+              "evaluatedAt": "2026-01-17T21:40:24.159Z",
+              "modelUsed": "claude-sonnet-4-20250514"
+            }
+          }
+        },
+        "executionTimeMs": 12828
+      },
+      {
+        "id": "task-3",
+        "goalId": "svelte-hello",
+        "sequenceNumber": 3,
+        "title": "Start development server",
+        "description": "Start the Vite development server to serve the Svelte application",
+        "dependencies": [],
+        "tool": {
+          "toolName": "framework_exec",
+          "toolDescription": "Execute framework commands using Bun runtime",
+          "command": {
+            "action": "dev",
+            "parameters": {
+              "action": "dev",
+              "framework": "svelte",
+              "projectDir": "svelte-hello-world"
+            },
+            "expectedOutput": "Development server running and serving the Hello World Svelte application"
+          },
+          "fallbackTool": null
+        },
+        "effort": {
+          "estimatedMinutes": 2,
+          "complexity": "low"
+        },
+        "state": "completed",
+        "startedAt": "2026-01-17T21:40:24.160Z",
+        "completedAt": "2026-01-17T21:40:33.582Z",
+        "result": {
+          "taskId": "task-3",
+          "success": true,
+          "output": "<tool_use>\n<tool_name>framework_exec</tool_name>\n<parameters>\n{\n  \"sessionId\": \"svelte-hello\",\n  \"action\": \"dev\",\n  \"framework\": \"svelte\",\n  \"projectDir\": \"svelte-hello-world\"\n}\n</parameters>\n</tool_use>\n\nI'm starting the Vite development server for the Svelte application. This will:\n\n1. Launch the development server with hot module replacement (HMR)\n2. Make the application accessible via a local URL (typically http://localhost:5173)\n3. Enable live reloading when files are modified\n4. Serve the \"Hello World\" application that was created and modified in the previous tasks\n\nThe `dev` action will run in the background since development servers are long-running processes, allowing you to view the Svelte Hello World application in a browser.",
+          "toolInvocations": [
+            {
+              "toolName": "framework_exec",
+              "parameters": {
+                "sessionId": "svelte-hello",
+                "action": "dev",
+                "framework": "svelte",
+                "projectDir": "svelte-hello-world"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\n  \"success\": true,\n  \"action\": \"dev\",\n  \"framework\": \"svelte\",\n  \"command\": \"bun run dev\",\n  \"exitCode\": 0,\n  \"stdout\": \"Process started in background (PID: 10641)\",\n  \"stderr\": \"\",\n  \"duration\": 4,\n  \"timedOut\": false,\n  \"background\": true,\n  \"backgroundAutoEnabled\": true,\n  \"pid\": 10641,\n  \"sandboxPath\": \"/Users/devmachine/dev-projects/supertoys/src/yaygent/goals-session-server/sandbox/66363d60-d1d0-43da-ad23-d2b731de7586\",\n  \"projectDir\": \"/Users/devmachine/dev-projects/supertoys/src/yaygent/goals-session-server/sandbox/66363d60-d1d0-43da-ad23-d2b731de7586/svelte-hello-world\"\n}"
+                  }
+                ]
+              },
+              "success": true,
+              "durationMs": 6
+            }
+          ],
+          "artifacts": [],
+          "reasoning": "I'm starting the Vite development server for the Svelte application. This will:\n\n1. Launch the development server with hot module replacement (HMR)\n2. Make the application accessible via a local URL (typically http://localhost:5173)\n3. Enable live reloading when files are modified\n4. Serve the \"Hello World\" application that was created and modified in the previous tasks\n\nThe `dev` action will run in the background since development servers are long-running processes, allowing you to view the Svelte Hello World application in a browser.",
+          "tokenUsage": {
+            "promptTokens": 17469,
+            "completionTokens": 206,
+            "totalTokens": 17675
+          },
+          "metadata": {
+            "executedAt": "2026-01-17T21:40:29.612Z",
+            "modelUsed": "claude-sonnet-4-20250514"
+          },
+          "evaluation": {
+            "taskId": "task-3",
+            "success": true,
+            "reason": {
+              "summary": "Development server successfully started",
+              "details": "The Vite development server was successfully launched using 'bun run dev' command. The server started in the background with PID 10641, which is the expected behavior for development servers. The command executed without errors (exit code 0) and the server is now running to serve the Svelte application."
+            },
+            "criteriaMatched": [
+              "Development server started successfully",
+              "Command executed without errors",
+              "Server running in background as expected"
+            ],
+            "criteriaUnmatched": [],
+            "issues": [],
+            "tokenUsage": {
+              "promptTokens": 859,
+              "completionTokens": 159,
+              "totalTokens": 1018
+            },
+            "metadata": {
+              "evaluatedAt": "2026-01-17T21:40:33.582Z",
+              "modelUsed": "claude-sonnet-4-20250514"
+            }
+          }
+        },
+        "executionTimeMs": 9422
+      }
+    ],
+    "summary": {
+      "totalTasks": 3,
+      "tasksByState": {
+        "pending": 3
+      },
+      "tasksByTool": {
+        "create_project_scaffold": 1,
+        "code_editor": 1,
+        "framework_exec": 1
+      },
+      "toolsRequired": [
+        "create_project_scaffold",
+        "code_editor",
+        "framework_exec"
+      ],
+      "estimatedTotalMinutes": 7,
+      "goalsProcessed": 1,
+      "goalsSkipped": 0
+    },
+    "tokenUsage": {
+      "inputTokens": 2865,
+      "outputTokens": 665,
+      "totalTokens": 3530
+    }
+  },
+  "metadata": {
+    "sourceIp": "unknown",
+    "userAgent": "curl/8.7.1",
+    "createdAt": "2026-01-17T21:38:43.330Z",
+    "updatedAt": "2026-01-17T21:38:58.450Z",
+    "lastAccessedAt": "2026-01-17T21:39:58.595Z",
+    "version": 3
+  },
+  "error": null
+}

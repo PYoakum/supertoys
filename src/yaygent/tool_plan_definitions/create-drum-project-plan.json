@@ -1,0 +1,467 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Create Drum Tool",
+    "description": "Tool registry integration for TR-808 style drum pattern sequencing and audio generation using ffmpeg to stitch samples into finished tracks",
+    "author": "automated-developer",
+    "created": "2026-01-17T00:00:00Z",
+    "tags": ["drum-machine", "808", "audio", "ffmpeg", "sequencer", "beat-maker", "tool-registry"]
+  },
+  "globalContext": {
+    "sampleSource": "https://github.com/emanuelefavero/drum-machine-808/tree/master/sounds",
+    "sampleFormat": "MP3 audio files",
+    "audioEngine": "ffmpeg for concatenation, mixing, and export",
+    "patternFormat": "Grid-based step sequencer (16 steps per bar typical)",
+    "outputFormats": "WAV, MP3, OGG, FLAC",
+    "tr808Sounds": "kick, snare, clap, hihat-closed, hihat-open, tom-low, tom-mid, tom-high, cymbal, cowbell, rimshot, conga-low, conga-mid, conga-high, maracas, claves"
+  },
+  "goals": [
+    {
+      "id": "setup-project",
+      "objective": "Initialize project with ffmpeg bindings and audio processing dependencies",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Project structure with sample management",
+          "ffmpeg-python or subprocess wrapper configured",
+          "Sample files downloaded and cached locally",
+          "Audio format detection and validation"
+        ],
+        "acceptance": [
+          "ffmpeg accessible via subprocess or binding",
+          "All 808 samples load successfully",
+          "Sample metadata (duration, sample rate) extractable"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "ffmpeg must be installed on system",
+        "Support both Python and Rust implementations",
+        "Cache samples in platform-appropriate directory"
+      ],
+      "context": {
+        "pythonDeps": "ffmpeg-python, pydub (optional), numpy",
+        "rustDeps": "ffmpeg-next or Command::new for subprocess",
+        "sampleCache": "~/.cache/create-drum/samples/"
+      }
+    },
+    {
+      "id": "define-sample-mapping",
+      "objective": "Define mapping between input identifiers and TR-808 drum sample files",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Sample map: short code -> sample file path",
+          "Support multiple aliases per sound (kick, bd, bass_drum)",
+          "Velocity/variation support if multiple samples exist",
+          "Sample metadata: name, category, default_velocity, duration_ms"
+        ],
+        "acceptance": [
+          "All 16 TR-808 sounds mapped",
+          "Case-insensitive lookup",
+          "Unknown sample returns clear error"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Use standard TR-808 abbreviations as primary keys",
+        "Support human-readable aliases"
+      ],
+      "dependencies": ["setup-project"],
+      "context": {
+        "sampleMap": "BD/kick: kick.mp3, SD/snare: snare.mp3, CH/hihat: hihat-closed.mp3, OH: hihat-open.mp3, CP/clap: clap.mp3, CB/cowbell: cowbell.mp3, CY/cymbal: cymbal.mp3, RS/rim: rimshot.mp3, LT: tom-low.mp3, MT: tom-mid.mp3, HT: tom-high.mp3, LC: conga-low.mp3, MC: conga-mid.mp3, HC: conga-high.mp3, MA/maracas: maracas.mp3, CL/claves: claves.mp3",
+        "categories": "kicks, snares, hihats, toms, congas, percussion, cymbals"
+      }
+    },
+    {
+      "id": "implement-pattern-parser",
+      "objective": "Implement parser for drum pattern notation converting string input to sequenced events",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Parse grid notation: 'BD x---x---|x---x---'",
+          "Parse JSON pattern format with timing info",
+          "Support multiple tracks/instruments per pattern",
+          "Velocity notation: x (normal), X (accent), o (soft)"
+        ],
+        "acceptance": [
+          "16-step and 32-step patterns supported",
+          "Bar separators (|) parsed correctly",
+          "Multiple instruments in single pattern string"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "x = hit, - = rest, | = bar separator",
+        "Support velocity levels: x=80, X=127, o=50",
+        "Configurable steps per beat (default 4)"
+      ],
+      "dependencies": ["define-sample-mapping"],
+      "context": {
+        "gridFormat": "INSTRUMENT PATTERN where pattern is x/-/X/o characters",
+        "multiTrack": "BD x---x---|x---x---\\nSD ----|x---|----|x---\\nCH x-x-|x-x-|x-x-|x-x-",
+        "jsonFormat": "{\"bpm\": 120, \"tracks\": [{\"sample\": \"kick\", \"pattern\": \"x---x---\"}]}"
+      }
+    },
+    {
+      "id": "implement-timing-engine",
+      "objective": "Implement timing calculation for converting pattern steps to audio timestamps",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Calculate step duration from BPM and time signature",
+          "Generate precise timestamps for each hit",
+          "Support swing/shuffle timing",
+          "Handle tempo changes mid-pattern"
+        ],
+        "acceptance": [
+          "Timestamps accurate to 1ms",
+          "Swing percentage configurable (0-100%)",
+          "Common time signatures: 4/4, 3/4, 6/8"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Default: 4/4 time, 4 steps per beat (16th notes)",
+        "BPM range: 20-300",
+        "Swing affects even-numbered steps"
+      ],
+      "dependencies": ["implement-pattern-parser"],
+      "context": {
+        "stepDuration": "60000 / bpm / steps_per_beat ms",
+        "swingFormula": "even_step_offset = step_duration * (swing_percent / 100)",
+        "example": "120 BPM, 4 steps/beat = 125ms per step"
+      }
+    },
+    {
+      "id": "implement-ffmpeg-mixer",
+      "objective": "Implement ffmpeg-based audio mixing engine to combine samples at specified timestamps",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Mix multiple samples at precise timestamps",
+          "Apply per-sample volume/velocity scaling",
+          "Handle overlapping samples correctly",
+          "Generate intermediate silence for timing gaps"
+        ],
+        "acceptance": [
+          "Output audio matches pattern timing",
+          "No clicks/pops at sample boundaries",
+          "Supports 100+ simultaneous sample placements"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Use ffmpeg amix or amerge filters",
+        "Normalize output to prevent clipping",
+        "Support sample rate conversion if needed"
+      ],
+      "dependencies": ["implement-timing-engine"],
+      "context": {
+        "ffmpegApproach": "Generate filter_complex with adelay for each sample, then amix all streams",
+        "adelayFormat": "adelay=delays_ms|delays_ms for stereo offset",
+        "volumeFilter": "volume=velocity/127 per sample",
+        "mixFilter": "amix=inputs=N:duration=longest:normalize=0"
+      }
+    },
+    {
+      "id": "implement-pattern-renderer",
+      "objective": "Implement pattern rendering pipeline from parsed pattern to mixed audio file",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "render_pattern(pattern, config) -> audio_path",
+          "Pipeline: parse -> timing -> ffmpeg mix -> output",
+          "Support loop count for pattern repetition",
+          "Progress reporting for long renders"
+        ],
+        "acceptance": [
+          "Single pattern renders in <5 seconds",
+          "Loop stitching seamless",
+          "Output duration matches expected"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Temp files cleaned up after render",
+        "Memory efficient for long patterns",
+        "Configurable output format"
+      ],
+      "dependencies": ["implement-ffmpeg-mixer"],
+      "context": {
+        "renderSteps": "1. Parse pattern -> 2. Calculate timestamps -> 3. Build ffmpeg filter graph -> 4. Execute ffmpeg -> 5. Return output path",
+        "loopMethod": "Render one iteration, then ffmpeg concat for loops"
+      }
+    },
+    {
+      "id": "implement-song-builder",
+      "objective": "Implement song builder for chaining multiple patterns into complete arrangements",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "build_song(patterns, arrangement) chains patterns",
+          "Arrangement format: [A, A, B, A, B, B] pattern sequence",
+          "Crossfade/transition options between patterns",
+          "Per-pattern volume adjustment"
+        ],
+        "acceptance": [
+          "Patterns stitch without gaps or clicks",
+          "Arrangement of 100+ patterns supported",
+          "Output as single continuous file"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "All patterns must have same BPM for seamless join",
+        "Support pattern labels (intro, verse, chorus, etc.)"
+      ],
+      "dependencies": ["implement-pattern-renderer"],
+      "context": {
+        "arrangementFormat": "{\"patterns\": {\"A\": pattern1, \"B\": pattern2}, \"sequence\": [\"A\", \"A\", \"B\", \"A\"]}",
+        "concatMethod": "ffmpeg -f concat -i filelist.txt -c copy output.wav"
+      }
+    },
+    {
+      "id": "implement-preset-patterns",
+      "objective": "Implement library of preset drum patterns for common genres and styles",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "Preset patterns: basic_rock, four_on_floor, boom_bap, trap, dnb, etc.",
+          "get_preset(name) returns pattern object",
+          "list_presets() returns available presets with descriptions",
+          "Presets customizable (tempo, swing)"
+        ],
+        "acceptance": [
+          "10+ genre presets included",
+          "Presets sound musically appropriate",
+          "Easy to extend with custom presets"
+        ],
+        "validation": "hybrid"
+      },
+      "constraints": [
+        "Store presets as JSON or embedded data",
+        "Document each preset's musical context"
+      ],
+      "dependencies": ["implement-pattern-parser"],
+      "context": {
+        "presetExamples": "basic_rock: BD x---x---|x---x---, SD ----|x---|----|x---, CH x-x-|x-x-|x-x-|x-x- | four_on_floor: BD x---|x---|x---|x---, CH x-x-|x-x-|x-x-|x-x-, OH ----|---x|----|---x | boom_bap: BD x--x|----|x--x|----, SD ----|x---|----|x---, CH x-x-|x-x-|x-x-|x-x-",
+        "genres": "rock, pop, hip-hop, trap, house, techno, drum-and-bass, reggae, funk, disco"
+      }
+    },
+    {
+      "id": "implement-humanize",
+      "objective": "Implement humanization to add timing and velocity variation for natural feel",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "Timing jitter: random offset within configurable range",
+          "Velocity variation: random adjustment to hit volumes",
+          "Per-instrument humanize settings",
+          "Reproducible with seed parameter"
+        ],
+        "acceptance": [
+          "Humanized output sounds less mechanical",
+          "Timing stays within musical tolerance",
+          "Seed produces identical results"
+        ],
+        "validation": "hybrid"
+      },
+      "constraints": [
+        "Timing variation: ±10ms typical",
+        "Velocity variation: ±10% typical",
+        "Optional, disabled by default"
+      ],
+      "dependencies": ["implement-timing-engine"],
+      "context": {
+        "timingJitter": "random.gauss(0, timing_variance_ms)",
+        "velocityJitter": "velocity * random.uniform(1-variance, 1+variance)",
+        "perInstrument": "Snare often has more variation than kick"
+      }
+    },
+    {
+      "id": "define-tool-schema",
+      "objective": "Define JSON schema for create_drum tool interface",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "Input schema: action, pattern, bpm, loops, output_format, output_path",
+          "Output schema: audio_path, duration_ms, bpm, pattern_bars",
+          "Action types: render, build_song, list_samples, list_presets, get_preset"
+        ],
+        "acceptance": [
+          "Schema validates with JSON Schema Draft-07",
+          "All parameters documented",
+          "Sensible defaults"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "pattern accepts string (grid) or object (JSON)",
+        "bpm defaults to 120",
+        "loops defaults to 1"
+      ],
+      "dependencies": ["setup-project"],
+      "context": {
+        "actions": "render | build_song | list_samples | list_presets | get_preset",
+        "renderRequired": "pattern (string or object)",
+        "renderOptional": "bpm (default 120), loops (default 1), swing (default 0), output_format (default wav), output_path, humanize (default false)",
+        "buildSongRequired": "patterns (object), sequence (array)"
+      }
+    },
+    {
+      "id": "implement-tool-handler",
+      "objective": "Implement tool registry handler for JSON request processing",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "handle(input: dict) -> dict dispatches actions",
+          "render action generates audio from pattern",
+          "build_song action chains patterns into arrangement",
+          "list_samples returns available drum sounds"
+        ],
+        "acceptance": [
+          "All actions return valid JSON per schema",
+          "Errors include descriptive messages",
+          "Temp files cleaned up"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Validate pattern syntax before rendering",
+        "Timeout for long renders",
+        "Return audio path, not audio data"
+      ],
+      "dependencies": [
+        "implement-pattern-renderer",
+        "implement-song-builder",
+        "define-tool-schema"
+      ],
+      "context": {
+        "entryPoint": "async def handle(input: dict) -> dict",
+        "errorCodes": "INVALID_PATTERN, UNKNOWN_SAMPLE, RENDER_ERROR, INVALID_BPM, FFMPEG_ERROR"
+      }
+    },
+    {
+      "id": "implement-cli",
+      "objective": "Create CLI for standalone drum pattern rendering",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "create-drum render 'BD x---x---|...' -o beat.wav",
+          "create-drum preset boom_bap --bpm 90 -o hiphop.wav",
+          "create-drum samples --list shows available sounds",
+          "create-drum presets --list shows available presets"
+        ],
+        "acceptance": [
+          "Help text documents pattern format",
+          "Supports --bpm, --loops, --swing flags",
+          "Progress bar for rendering"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Use argparse or click",
+        "Support stdin for pattern input",
+        "Exit codes: 0 success, 1 error"
+      ],
+      "dependencies": ["implement-tool-handler"],
+      "context": {
+        "cliCommands": "render, build, preset, samples, presets",
+        "exampleUsage": "create-drum render 'BD x---x---|x---x---\\nSD ----|x---|----|x---' --bpm 120 --loops 4 -o beat.wav"
+      }
+    },
+    {
+      "id": "write-tests",
+      "objective": "Write tests for pattern parsing, timing, and audio generation",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "Pattern parser tests for all notation formats",
+          "Timing calculation tests",
+          "Integration tests with actual ffmpeg rendering",
+          "Preset pattern validation"
+        ],
+        "acceptance": [
+          "Tests pass with ffmpeg installed",
+          "Coverage >70%",
+          "Fast unit tests (<10s)"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Mock ffmpeg for unit tests where possible",
+        "Verify output audio duration matches expected"
+      ],
+      "dependencies": ["implement-tool-handler"],
+      "context": {
+        "testPatterns": "Simple 4-beat, complex 16-step, multi-instrument",
+        "timingTests": "Verify step durations at various BPMs"
+      }
+    },
+    {
+      "id": "write-documentation",
+      "objective": "Write documentation for pattern format, samples, and usage",
+      "priority": 4,
+      "criteria": {
+        "success": [
+          "README with pattern format reference",
+          "Sample catalog with sound descriptions",
+          "Preset patterns documented",
+          "API reference"
+        ],
+        "acceptance": [
+          "Pattern format clearly explained with examples",
+          "All samples listed with categories",
+          "Troubleshooting section"
+        ],
+        "validation": "manual"
+      },
+      "constraints": [
+        "Include visual pattern grid examples",
+        "Document ffmpeg requirements"
+      ],
+      "dependencies": ["implement-cli"],
+      "context": {
+        "sections": "Overview, Installation, Quick Start, Pattern Format, Samples, Presets, CLI Reference, API, Troubleshooting"
+      }
+    },
+    {
+      "id": "integrate-tool-registry",
+      "objective": "Package create_drum tool for registration with tool registry",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "tool-manifest.json defines metadata, schema, capabilities",
+          "Tool exposes standard entry point",
+          "Health check verifies ffmpeg and samples available"
+        ],
+        "acceptance": [
+          "Tool registers successfully",
+          "render action returns audio file path",
+          "Samples bundled or auto-downloaded"
+        ],
+        "validation": "hybrid"
+      },
+      "constraints": [
+        "ffmpeg must be available in environment",
+        "Bundle samples or download on first use",
+        "Document sample licensing"
+      ],
+      "dependencies": [
+        "implement-tool-handler",
+        "define-tool-schema"
+      ],
+      "context": {
+        "manifestName": "create-drum",
+        "manifestVersion": "1.0.0",
+        "manifestDescription": "TR-808 style drum pattern sequencer with ffmpeg audio rendering",
+        "capabilities": "drum-patterns, audio-generation, beat-sequencing, preset-patterns",
+        "resourceCpu": "1+ cores",
+        "resourceMemory": "256MB minimum",
+        "resourceDisk": "50MB for samples",
+        "externalDeps": "ffmpeg"
+      }
+    }
+  ]
+}

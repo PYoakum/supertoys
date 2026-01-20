@@ -46,7 +46,7 @@ function markdownToText(markdown) {
   text = text.replace(/!\[(.+?)\]\((.+?)\)/g, '[Image: $1]');
 
   // Convert unordered lists
-  text = text.replace(/^[-*+]\s+/gm, '  • ');
+  text = text.replace(/^[-*+]\s+/gm, '  - ');
 
   // Convert ordered lists
   text = text.replace(/^(\d+)\.\s+/gm, '  $1. ');

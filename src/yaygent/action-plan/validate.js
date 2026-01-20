@@ -36,10 +36,10 @@ async function main() {
       throw new Error(`Expected grade B, got ${result.grade}`);
     }
     
-    console.log('  ✓ Score calculation works correctly');
+    console.log('  [+] Score calculation works correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Score calculation failed:', err.message);
+    console.log('  [x] Score calculation failed:', err.message);
     failed++;
   }
 
@@ -54,10 +54,10 @@ async function main() {
     if (calc.scoreToGrade(65) !== 'D') throw new Error('65 should be D');
     if (calc.scoreToGrade(50) !== 'F') throw new Error('50 should be F');
     
-    console.log('  ✓ Grade mapping works correctly');
+    console.log('  [+] Grade mapping works correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Grade mapping failed:', err.message);
+    console.log('  [x] Grade mapping failed:', err.message);
     failed++;
   }
 
@@ -72,10 +72,10 @@ async function main() {
     const score2 = calc.calculateTaskCompletionScore({ totalTasks: 10, completedCount: 5, failedCount: 5 });
     if (score2 < 30 || score2 > 50) throw new Error(`50% completion with failures should be 30-50, got ${score2}`);
     
-    console.log('  ✓ Task completion scoring works correctly');
+    console.log('  [+] Task completion scoring works correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Task completion scoring failed:', err.message);
+    console.log('  [x] Task completion scoring failed:', err.message);
     failed++;
   }
 
@@ -90,10 +90,10 @@ async function main() {
     const parsed2 = parseJsonResponse(json2);
     if (parsed2.qualityScore.overall !== 90) throw new Error('Markdown JSON failed');
     
-    console.log('  ✓ JSON response parsing works correctly');
+    console.log('  [+] JSON response parsing works correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ JSON response parsing failed:', err.message);
+    console.log('  [x] JSON response parsing failed:', err.message);
     failed++;
   }
 
@@ -125,10 +125,10 @@ async function main() {
     const v2 = validateEvaluationResponse(invalid);
     if (v2.valid) throw new Error('Invalid response marked valid');
     
-    console.log('  ✓ Evaluation response validation works correctly');
+    console.log('  [+] Evaluation response validation works correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Evaluation response validation failed:', err.message);
+    console.log('  [x] Evaluation response validation failed:', err.message);
     failed++;
   }
 
@@ -167,13 +167,13 @@ async function main() {
     if (!files.reportMd) throw new Error('Report MD not generated');
     if (!files.reportJson) throw new Error('Report JSON not generated');
     
-    console.log('  ✓ Report generator works correctly');
+    console.log('  [+] Report generator works correctly');
     passed++;
     
     // Cleanup
     await rm('./test-eval-output', { recursive: true, force: true });
   } catch (err) {
-    console.log('  ✗ Report generator failed:', err.message);
+    console.log('  [x] Report generator failed:', err.message);
     failed++;
     try { await rm('./test-eval-output', { recursive: true, force: true }); } catch (e) {}
   }
@@ -183,12 +183,12 @@ async function main() {
   console.log(`Results: ${passed} passed, ${failed} failed`);
   
   if (failed === 0) {
-    console.log('\n✓ All validation tests passed!');
+    console.log('\n[+] All validation tests passed!');
     console.log('\nUsage: node output-eval.js --bundle <path>');
     console.log('Note: Requires a session bundle and LLM API key.');
     process.exit(0);
   } else {
-    console.log('\n✗ Some tests failed.');
+    console.log('\n[x] Some tests failed.');
     process.exit(1);
   }
 }

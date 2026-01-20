@@ -1,0 +1,37 @@
+POSITION: Software Developer
+CLASSIFICATION: Full-time employment
+LOCATION: Remote work arrangement
+REPORTING STRUCTURE: Reports to Engineering Manager
+
+FUNCTIONAL REQUIREMENTS:
+- Execute coding tasks using JavaScript, Python, React programming languages
+- Implement software solutions according to provided specifications
+- Participate in code review processes
+- Attend scheduled team meetings
+- Document code according to established protocols
+- Perform debugging and testing procedures
+- Maintain existing software systems
+
+QUALIFICATION PARAMETERS:
+- Bachelor's degree in Computer Science or equivalent field
+- Minimum 3 years professional software development experience
+- Demonstrated proficiency in JavaScript, Python, React technologies
+- Experience with Git version control system
+- Familiarity with Agile development methodologies
+
+COMPENSATION PACKAGE:
+- Base salary: $80,000 - $120,000 annually
+- Health insurance coverage provided
+- 401(k) retirement plan available
+- 15 days paid time off allocated per year
+- Standard federal holidays observed
+
+APPLICATION PROCESS:
+Submit resume and cover letter through company portal. Applications processed in order received. Response time: 2-3 business days.
+
+EMPLOYMENT TERMS:
+At-will employment. Background check required. Drug screening mandatory. Equal opportunity employer.
+
+CONTACT INFORMATION:
+hr@company.com
+Reference ID: DEV-2024-001

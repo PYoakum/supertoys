@@ -1,0 +1,48 @@
+POSITION ANNOUNCEMENT
+SOFTWARE ENGINEER - FULL STACK DEVELOPMENT
+
+COMPANY OVERVIEW
+We are a dynamic technology organization committed to delivering innovative software solutions that drive business excellence. Our company culture emphasizes professional growth, collaborative teamwork, and technical excellence in all endeavors.
+
+POSITION SUMMARY
+We are seeking a highly qualified Full Stack Software Engineer to join our development team. The successful candidate will be responsible for designing, developing, and maintaining both front-end and back-end applications using modern web technologies and industry best practices.
+
+KEY RESPONSIBILITIES
+• Design and implement scalable web applications using React.js and Node.js frameworks
+• Develop and maintain RESTful APIs and database architectures
+• Collaborate with cross-functional teams including product management, design, and quality assurance
+• Participate in code reviews and maintain high standards of code quality
+• Troubleshoot, debug, and optimize application performance
+• Stay current with emerging technologies and industry trends
+• Contribute to technical documentation and knowledge sharing initiatives
+
+REQUIRED QUALIFICATIONS
+• Bachelor's degree in Computer Science, Software Engineering, or related technical field
+• Minimum 3 years of professional experience in full stack development
+• Proficiency in JavaScript, HTML5, CSS3, and modern web development frameworks
+• Experience with React.js, Node.js, and database technologies (SQL/NoSQL)
+• Strong understanding of version control systems (Git)
+• Excellent problem-solving and analytical capabilities
+• Strong written and verbal communication skills
+• Ability to work effectively in collaborative team environments
+
+PREFERRED QUALIFICATIONS
+• Experience with cloud platforms (AWS, Azure, or Google Cloud)
+• Knowledge of containerization technologies (Docker, Kubernetes)
+• Familiarity with CI/CD pipelines and DevOps practices
+• Experience with testing frameworks and methodologies
+
+COMPENSATION AND BENEFITS
+We offer a competitive compensation package commensurate with experience, including:
+• Comprehensive health, dental, and vision insurance coverage
+• Retirement savings plan with company matching
+• Professional development opportunities and continuing education support
+• Flexible work arrangements and work-life balance initiatives
+• Performance-based bonuses and career advancement opportunities
+
+APPLICATION PROCESS
+Qualified candidates are invited to submit their resume, cover letter, and portfolio of relevant work samples. We are an equal opportunity employer committed to diversity and inclusion in the workplace.
+
+To apply, please submit your application materials through our online portal or contact our Human Resources department directly.
+
+We thank all applicants for their interest; however, only candidates selected for interviews will be contacted.

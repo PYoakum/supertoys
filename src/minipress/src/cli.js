@@ -37,7 +37,7 @@ const runtime = {
 };
 
 const HELP_TEXT = `
-HTML Blocks CLI v${VERSION}
+Minipress CLI v${VERSION}
 Convert JSON/JS configurations into HTML content blocks
 
 USAGE:

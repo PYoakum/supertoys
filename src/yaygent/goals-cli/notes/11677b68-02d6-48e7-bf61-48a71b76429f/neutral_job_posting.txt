@@ -1,0 +1,38 @@
+POSITION: Software Developer
+LOCATION: Remote
+EMPLOYMENT TYPE: Full-time
+POSITION SUMMARY:
+Individual will perform software development tasks. Responsibilities include code creation, system maintenance, and technical documentation preparation.
+REQUIRED QUALIFICATIONS:
+- Bachelor's degree in Computer Science or equivalent field
+- Minimum 3 years software development experience
+- Proficiency in JavaScript, Python, or Java programming languages
+- Database management system knowledge
+- Version control system experience
+PREFERRED QUALIFICATIONS:
+- Advanced degree in Computer Science
+- Cloud platform experience
+- Agile methodology familiarity
+- Additional programming language proficiency
+RESPONSIBILITIES:
+- Write code according to specifications
+- Debug and resolve software defects
+- Participate in code review processes
+- Update technical documentation
+- Attend scheduled meetings
+- Complete assigned tasks within specified timeframes
+COMPENSATION:
+Salary range: $70,000 - $90,000 annually
+Benefits package included
+APPLICATION PROCESS:
+Submit resume and cover letter through company portal
+Applications processed in order received
+Response time: 2-3 business days
+COMPANY INFORMATION:
+Technology company
+Established 2015
+Employee count: 50-100
+Industry: Software development
+CONTACT:
+hr@company.com
+Application deadline: 30 days from posting date

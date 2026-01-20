@@ -132,19 +132,19 @@ Bundle: ${args.bundle}
   const bundleData = await bundleLoader.load();
   const sessionId = bundleLoader.getSessionId();
 
-  console.log('  ✅ Manifest loaded');
-  console.log('  ✅ Session data loaded');
-  console.log(`  ✅ Goals loaded (${bundleData.goals?.items?.length || 0} goals)`);
-  console.log(`  ✅ Tasks loaded (${bundleData.tasks?.tasks?.length || 0} tasks)`);
-  console.log(`  ✅ Task outputs loaded (${bundleData.taskOutputs?.length || 0} files)`);
-  console.log('  ✅ Execution log loaded');
+  console.log('  [+] Manifest loaded');
+  console.log('  [+] Session data loaded');
+  console.log(`  [+] Goals loaded (${bundleData.goals?.items?.length || 0} goals)`);
+  console.log(`  [+] Tasks loaded (${bundleData.tasks?.tasks?.length || 0} tasks)`);
+  console.log(`  [+] Task outputs loaded (${bundleData.taskOutputs?.length || 0} files)`);
+  console.log('  [+] Execution log loaded');
 
   console.log(`\nSession: ${sessionId}`);
 
   // Phase 2: Analyzing Session
   console.log('\n──────────────────────────────────────────────────────────────────────');
   console.log('Phase 2: Analyzing Session');
-  console.log('  ⏳ Sending to evaluation LLM...');
+  console.log('  [...] Sending to evaluation LLM...');
 
   const startTime = Date.now();
 
@@ -157,11 +157,11 @@ Bundle: ${args.bundle}
   // Validate response
   const validation = validateEvaluationResponse(evaluationResult);
   if (!validation.valid) {
-    console.error('  ⚠️  Warning: LLM response validation issues:', validation.errors.join(', '));
+    console.error('  [!]  Warning: LLM response validation issues:', validation.errors.join(', '));
   }
 
   const durationSec = (Date.now() - startTime) / 1000;
-  console.log(`  ✅ Analysis complete (${durationSec.toFixed(1)}s)`);
+  console.log(`  [+] Analysis complete (${durationSec.toFixed(1)}s)`);
 
   // Phase 3: Generating Reports
   console.log('\n──────────────────────────────────────────────────────────────────────');
@@ -178,17 +178,17 @@ Bundle: ${args.bundle}
 
   const files = await reportGenerator.generateAll(sessionId, evaluationResult, metadata);
 
-  console.log('  ✅ evaluation-report.md generated');
-  console.log('  ✅ evaluation-report.json generated');
+  console.log('  [+] evaluation-report.md generated');
+  console.log('  [+] evaluation-report.json generated');
   
   if (!args['no-learnings']) {
-    console.log('  ✅ learnings.md generated');
+    console.log('  [+] learnings.md generated');
   }
   
   if (!args['no-recommendations']) {
-    console.log('  ✅ recommendations/tool-router.md generated');
-    console.log('  ✅ recommendations/requirements.md generated');
-    console.log('  ✅ recommendations/language.md generated');
+    console.log('  [+] recommendations/tool-router.md generated');
+    console.log('  [+] recommendations/requirements.md generated');
+    console.log('  [+] recommendations/language.md generated');
   }
 
   // Display Results
@@ -214,10 +214,10 @@ Evaluation Complete!
 └─────────────────────────────────────────────────────────────────────┘
 
 Key Findings:
-  📋 ${evaluationResult.toolRouterRecommendations?.featureRequests?.length || 0} feature requests for tool router
-  ⚠️  ${evaluationResult.requirementsAnalysis?.unclearRequirements?.length || 0} unclear requirements identified
-  💡 ${evaluationResult.learningsSummary?.keyLearnings?.length || 0} key learnings extracted
-  📌 ${evaluationResult.learningsSummary?.actionItems?.length || 0} action items generated
+  [#] ${evaluationResult.toolRouterRecommendations?.featureRequests?.length || 0} feature requests for tool router
+  [!]  ${evaluationResult.requirementsAnalysis?.unclearRequirements?.length || 0} unclear requirements identified
+  [*] ${evaluationResult.learningsSummary?.keyLearnings?.length || 0} key learnings extracted
+  [>] ${evaluationResult.learningsSummary?.actionItems?.length || 0} action items generated
 
 Reports saved to: ${outputDir}/${sessionId}/
 

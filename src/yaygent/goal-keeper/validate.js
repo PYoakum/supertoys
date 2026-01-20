@@ -42,10 +42,10 @@ async function main() {
     if (status.watchPath !== TEST_DIR) throw new Error('Wrong watch path');
     if (status.running !== false) throw new Error('Should not be running yet');
     
-    console.log('  ✓ Directory watcher initializes correctly');
+    console.log('  [+] Directory watcher initializes correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Directory watcher init failed:', err.message);
+    console.log('  [x] Directory watcher init failed:', err.message);
     failed++;
   }
 
@@ -78,10 +78,10 @@ async function main() {
     if (!detected) throw new Error('File not detected');
     if (!stable) throw new Error('File not marked stable');
 
-    console.log('  ✓ Directory watcher detects files correctly');
+    console.log('  [+] Directory watcher detects files correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ File detection failed:', err.message);
+    console.log('  [x] File detection failed:', err.message);
     failed++;
   }
 
@@ -105,10 +105,10 @@ async function main() {
     if (result.goals.goals.length !== 1) throw new Error('Wrong goals count');
     if (result.goals.goals[0].id !== 'goal-1') throw new Error('Wrong goal ID');
 
-    console.log('  ✓ File processor validates goals correctly');
+    console.log('  [+] File processor validates goals correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ File processor failed:', err.message);
+    console.log('  [x] File processor failed:', err.message);
     failed++;
   }
 
@@ -135,10 +135,10 @@ async function main() {
 
     if (!errorThrown) throw new Error('Should have thrown validation error');
 
-    console.log('  ✓ File processor rejects invalid goals');
+    console.log('  [+] File processor rejects invalid goals');
     passed++;
   } catch (err) {
-    console.log('  ✗ Invalid goals test failed:', err.message);
+    console.log('  [x] Invalid goals test failed:', err.message);
     failed++;
   }
 
@@ -165,10 +165,10 @@ async function main() {
     if (result.context.files.length === 0) throw new Error('Context not loaded');
     if (result.context.files[0].path !== 'readme.md') throw new Error('Wrong context file');
 
-    console.log('  ✓ File processor loads context correctly');
+    console.log('  [+] File processor loads context correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Context loading failed:', err.message);
+    console.log('  [x] Context loading failed:', err.message);
     failed++;
   }
 
@@ -182,10 +182,10 @@ async function main() {
 
     if (!client.baseUrl) throw new Error('Base URL not set');
     
-    console.log('  ✓ Session client initializes correctly');
+    console.log('  [+] Session client initializes correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Session client init failed:', err.message);
+    console.log('  [x] Session client init failed:', err.message);
     failed++;
   }
 
@@ -204,10 +204,10 @@ async function main() {
       throw new Error('Should not match plain .json');
     }
 
-    console.log('  ✓ Pattern matching works correctly');
+    console.log('  [+] Pattern matching works correctly');
     passed++;
   } catch (err) {
-    console.log('  ✗ Pattern matching failed:', err.message);
+    console.log('  [x] Pattern matching failed:', err.message);
     failed++;
   }
 
@@ -219,12 +219,12 @@ async function main() {
   console.log(`Results: ${passed} passed, ${failed} failed`);
   
   if (failed === 0) {
-    console.log('\n✓ All validation tests passed!');
+    console.log('\n[+] All validation tests passed!');
     console.log('\nUsage: node goals-watcher.js --watch ./inbox');
     console.log('Note: Requires a running Goals Session Server.');
     process.exit(0);
   } else {
-    console.log('\n✗ Some tests failed.');
+    console.log('\n[x] Some tests failed.');
     process.exit(1);
   }
 }

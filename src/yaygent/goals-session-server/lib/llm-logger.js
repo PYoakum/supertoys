@@ -95,7 +95,7 @@ export class LLMLogger {
 
     try {
       writeFileSync(filepath, JSON.stringify(logEntry, null, 2));
-      console.log(`[LLMLogger] Logged request to ${filepath}`);
+      // Verbose file logging disabled - use debug mode if needed
     } catch (err) {
       console.error(`[LLMLogger] Failed to log request: ${err.message}`);
     }
@@ -125,7 +125,7 @@ export class LLMLogger {
 
     try {
       writeFileSync(rawFilepath, response.content || '');
-      console.log(`[LLMLogger] Logged raw response to ${rawFilepath}`);
+      // Verbose file logging disabled - use debug mode if needed
     } catch (err) {
       console.error(`[LLMLogger] Failed to log raw response: ${err.message}`);
     }

@@ -86,6 +86,7 @@ export function parseTaskToml(content) {
         currentTask.dependencies = [];
       }
       currentTask.dependencies.push({});
+      currentSection = 'dependencies';
       continue;
     }
 
@@ -205,18 +206,28 @@ function setNestedValue(obj, path, value) {
  * @returns {Object} - Formatted task
  */
 function finalizeTask(raw) {
-  // Filter out dependencies without a valid taskId - these are malformed
-  const validDeps = (raw.dependencies || [])
-    .filter(d => d.taskId && typeof d.taskId === 'string' && d.taskId.trim() !== '')
-    .map(d => ({
-      taskId: d.taskId.trim(),
-      type: d.type || 'completion'
-    }));
+  // Process dependencies - try to extract any usable reference
+  // Priority: taskId > title > id > goalId (as hint)
+  const processedDeps = [];
+  let droppedCount = 0;
+
+  for (const d of (raw.dependencies || [])) {
+    // Try to get a valid reference
+    const taskId = d.taskId?.trim?.() || d.title?.trim?.() || d.id?.trim?.();
+
+    if (taskId && taskId !== '') {
+      processedDeps.push({
+        taskId: taskId,
+        type: d.type || 'completion'
+      });
+    } else {
+      droppedCount++;
+    }
+  }
 
   // Warn about dropped dependencies
-  const droppedCount = (raw.dependencies || []).length - validDeps.length;
   if (droppedCount > 0) {
-    console.warn(`[WARN] Task ${raw.id}: Dropped ${droppedCount} dependency(s) without valid taskId`);
+    console.warn(`[WARN] Task ${raw.id}: Dropped ${droppedCount} dependency(s) without valid reference`);
   }
 
   return {
@@ -225,7 +236,7 @@ function finalizeTask(raw) {
     sequenceNumber: raw.sequenceNumber || 0,
     title: raw.title || '',
     description: raw.description || '',
-    dependencies: validDeps,
+    dependencies: processedDeps,
     tool: {
       toolName: raw.toolName,
       toolDescription: raw.toolDescription || '',

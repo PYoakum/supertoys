@@ -1176,7 +1176,7 @@ If all steps complete, the pipeline is working correctly.
         title: 'Pipeline Test Document'
       });
       expect(step1.isError).toBeFalsy();
-      console.log('  Step 1: MD -> DOCX ✓');
+      console.log('  Step 1: MD -> DOCX [+]');
 
       // Step 3: DOCX -> MD
       const step2 = await docxMdTool.execute({
@@ -1185,7 +1185,7 @@ If all steps complete, the pipeline is working correctly.
         outputPath: 'pipeline-step2.md'
       });
       expect(step2.isError).toBeFalsy();
-      console.log('  Step 2: DOCX -> MD ✓');
+      console.log('  Step 2: DOCX -> MD [+]');
 
       // Step 4: MD -> PDF
       const step3 = await pdfExportTool.execute({
@@ -1195,14 +1195,14 @@ If all steps complete, the pipeline is working correctly.
         title: 'Pipeline Final Output'
       });
       expect(step3.isError).toBeFalsy();
-      console.log('  Step 3: MD -> PDF ✓');
+      console.log('  Step 3: MD -> PDF [+]');
 
       // Verify all outputs exist
       expect(existsSync(join(sandboxPath, 'pipeline-step1.docx'))).toBe(true);
       expect(existsSync(join(sandboxPath, 'pipeline-step2.md'))).toBe(true);
       expect(existsSync(join(sandboxPath, 'pipeline-final.pdf'))).toBe(true);
 
-      console.log('  Pipeline complete ✓');
+      console.log('  Pipeline complete [+]');
     });
 
     test('should complete template processing pipeline: tokens + export', async () => {
@@ -1242,7 +1242,7 @@ TOTAL=$250.00
         outputPath: 'invoice-filled.md'
       });
       expect(step1.isError).toBeFalsy();
-      console.log('  Step 1: Token replacement ✓');
+      console.log('  Step 1: Token replacement [+]');
 
       // Verify token replacement
       const filledContent = await readFile(join(sandboxPath, 'invoice-filled.md'), 'utf-8');
@@ -1258,12 +1258,12 @@ TOTAL=$250.00
         title: 'Invoice INV-2025-001'
       });
       expect(step2.isError).toBeFalsy();
-      console.log('  Step 2: PDF export ✓');
+      console.log('  Step 2: PDF export [+]');
 
       // Verify PDF exists
       expect(existsSync(join(sandboxPath, 'invoice-final.pdf'))).toBe(true);
 
-      console.log('  Template pipeline complete ✓');
+      console.log('  Template pipeline complete [+]');
     });
   });
 });

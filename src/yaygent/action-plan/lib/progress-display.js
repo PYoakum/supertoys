@@ -59,7 +59,7 @@ Status: Running
       ? (task.tool?.toolName || task.tool?.name || '(none)')
       : (task.tool || '(none)');
     console.log(`      Tool: ${toolName}`);
-    console.log(`      Status: ⏳ In Progress...`);
+    console.log(`      Status: In Progress...`);
   }
 
   /**
@@ -67,7 +67,7 @@ Status: Running
    * @param {number} durationSec
    */
   printExecutionComplete(durationSec) {
-    console.log(`\n      ✅ Execution complete (${durationSec.toFixed(1)}s)`);
+    console.log(`\n      Execution complete (${durationSec.toFixed(1)}s)`);
   }
 
   /**
@@ -77,9 +77,9 @@ Status: Running
    */
   printEvaluationResult(success, evaluation = null) {
     if (success) {
-      console.log(`      ✅ Evaluation passed`);
+      console.log(`      Evaluation passed`);
     } else {
-      console.log(`      ❌ Evaluation failed`);
+      console.log(`      Evaluation failed`);
       // Always show reason summary for failures
       if (evaluation?.reason?.summary) {
         console.log(`      Reason: ${evaluation.reason.summary}`);
@@ -145,7 +145,7 @@ Status: Running
    * @param {Error} error
    */
   printTaskError(error) {
-    console.log(`\n      ❌ Error: ${error.message}`);
+    console.log(`\n      Error: ${error.message}`);
     if (this.verbose && error.details) {
       console.log(`      Details: ${JSON.stringify(error.details)}`);
     }
@@ -163,11 +163,11 @@ Status: Running
     let evalStatus = '';
     if (evalResult) {
       if (evalResult.background) {
-        evalStatus = `\n  📊 Evaluation: Running in background (PID: ${evalResult.pid})`;
+        evalStatus = `\n  [#] Evaluation: Running in background (PID: ${evalResult.pid})`;
       } else if (evalResult.success) {
-        evalStatus = `\n  📊 Evaluation: Complete (${(evalResult.durationMs / 1000).toFixed(1)}s)`;
+        evalStatus = `\n  [#] Evaluation: Complete (${(evalResult.durationMs / 1000).toFixed(1)}s)`;
       } else {
-        evalStatus = `\n  ⚠️  Evaluation: Failed - ${evalResult.error || 'Unknown error'}`;
+        evalStatus = `\n  [!]  Evaluation: Failed - ${evalResult.error || 'Unknown error'}`;
       }
     }
 
@@ -175,7 +175,7 @@ Status: Running
     let bufferInfo = '';
     if (metrics.totalBufferTimeMs && metrics.totalBufferTimeMs > 0) {
       const bufferSec = (metrics.totalBufferTimeMs / 1000).toFixed(1);
-      bufferInfo = `\n  ⏳ Buffer Time: ${bufferSec}s`;
+      bufferInfo = `\n  [...] Buffer Time: ${bufferSec}s`;
     }
 
     console.log(`
@@ -183,7 +183,7 @@ Status: Running
 Execution Complete!
 
 Summary:
-  ${metrics.failedCount === 0 ? '✅' : '❌'} Tasks Completed: ${metrics.completedCount}/${metrics.totalTasks}
+  ${metrics.failedCount === 0 ? '[+]' : '[x]'} Tasks Completed: ${metrics.completedCount}/${metrics.totalTasks}
   ⏱️  Total Duration: ${duration}s${bufferInfo}
   ${bundlePath ? `📁 Bundle Created: ${bundlePath}` : ''}${evalStatus}
 
@@ -204,8 +204,8 @@ Execution Failed!
 Reason: ${reason}
 
 Summary:
-  ✅ Tasks Completed: ${metrics.completedCount}/${metrics.totalTasks}
-  ❌ Tasks Failed: ${metrics.failedCount}
+  [+] Tasks Completed: ${metrics.completedCount}/${metrics.totalTasks}
+  [x] Tasks Failed: ${metrics.failedCount}
   ⏱️  Total Duration: ${((Date.now() - this.startTime) / 1000).toFixed(1)}s
 
 ══════════════════════════════════════════════════════════════════════

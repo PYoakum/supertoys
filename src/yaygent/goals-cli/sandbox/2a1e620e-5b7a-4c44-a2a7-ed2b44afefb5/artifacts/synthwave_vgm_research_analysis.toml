@@ -1,0 +1,28 @@
+# Research Analysis Output
+title = "Electronic Synthwave Video Game Music Research"
+summary = "Research document referencing a Bandcamp article about synthwave video game music, but the actual content is unavailable due to a 404 error or missing page."
+tags = ["synthwave", "video-game-music", "electronic-music", "bandcamp", "missing-content", "404-error"]
+key_concepts = ["synthwave", "video game music", "electronic music"]
+confidence_score = 0.3
+needs_refinement = true
+
+[source]
+path = "context/synthwave_vgm_research"
+url = "https://daily.bandcamp.com/features/synthwave-video-game-music-list"
+fetched_at = "2026-01-20T07:55:55.443Z"
+analyzed_at = "2026-01-20T07:59:01.389Z"
+iterations = 3
+
+[[relevant_information]]
+heading = "Content Status"
+content = "The referenced Bandcamp article about synthwave video game music is not accessible - returns 404 error message"
+relevance_score = 0.9
+
+[[relevant_information]]
+heading = "Source Reference"
+content = "Originally intended to analyze content from daily.bandcamp.com/features/synthwave-video-game-music-list"
+relevance_score = 0.7
+
+[[clarity_improvements]]
+original = "Sorry, that something isn't here."
+improved = "The requested content is not available at this URL."

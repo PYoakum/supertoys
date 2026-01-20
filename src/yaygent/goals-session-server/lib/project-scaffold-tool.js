@@ -711,7 +711,7 @@ export class ProjectScaffoldTool {
             const newValue = scriptValue.replace(pattern.match, pattern.replace);
             if (newValue !== scriptValue) {
               pkg.scripts[scriptName] = newValue;
-              changes.push(`${scriptName}: "${scriptValue}" → "${newValue}"`);
+              changes.push(`${scriptName}: "${scriptValue}" -> "${newValue}"`);
               modified = true;
             }
             break;

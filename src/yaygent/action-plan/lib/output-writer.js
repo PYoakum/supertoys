@@ -212,12 +212,19 @@ ${result.reasoning || 'No reasoning provided'}
    */
   formatSummary(data) {
     const taskRows = data.tasks?.map(t => {
-      const status = t.state === 'completed' ? '✅ Success' : '❌ Failed';
+      const status = t.state === 'completed' ? '[+] Success' : '[x] Failed';
       return `| ${t.sequenceNumber} | ${t.title} | ${t.goalId} | ${status} | ${t.executionTimeMs || 'N/A'}ms |`;
     }).join('\n') || 'No tasks';
 
     const issues = data.issues?.map(i => `- ${i}`).join('\n') || 'None';
-    const artifacts = data.artifacts?.map(a => `- ${a}`).join('\n') || 'None';
+    const artifacts = data.artifacts?.length > 0
+      ? data.artifacts.map(a => {
+          if (typeof a === 'string') return `- ${a}`;
+          const size = a.size ? ` (${a.size} bytes)` : '';
+          const tool = a.tool ? ` [${a.tool}]` : '';
+          return `- \`${a.path}\`${size}${tool}`;
+        }).join('\n')
+      : 'None';
 
     return `# Execution Summary
 

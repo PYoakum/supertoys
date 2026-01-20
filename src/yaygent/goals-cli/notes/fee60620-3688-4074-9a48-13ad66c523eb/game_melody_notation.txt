@@ -1,0 +1,28 @@
+# Video Game Style Melody - "Heroic Quest"
+# Tempo: 120 BPM, Key: C Major
+# Pattern: AABA structure with memorable hooks
+
+# Section A - Main Theme (catchy, ascending)
+C4:q E4:q G4:q E4:q | C4:q G3:q C4:h |
+E4:q G4:q A4:q G4:q | F4:q E4:q D4:h |
+
+# Section A Repeat
+C4:q E4:q G4:q E4:q | C4:q G3:q C4:h |
+E4:q G4:q A4:q G4:q | C5:q G4:q C4:h |
+
+# Section B - Bridge (higher register, more movement)
+F4:q A4:q C5:q A4:q | F4:q D4:q F4:h |
+G4:q B4:q D5:q B4:q | G4:q E4:q G4:h |
+
+# Section A - Return (with slight variation)
+C4:q E4:q G4:q E4:q | C4:q G3:q C4:h |
+E4:q G4:q A4:q F4:q | E4:q D4:q C4:w |
+
+# Characteristics Applied:
+# - Simple, memorable phrases
+# - Pentatonic-influenced (C-D-E-G-A focus)
+# - Repetitive rhythmic patterns (mostly quarters)
+# - Clear melodic contour with peaks
+# - AABA song structure
+# - Octave jumps for excitement (C4 to C5)
+# - Strong tonic resolution

@@ -1,0 +1,39 @@
+Subject: Job Opportunity - Software Developer Position
+From: HR Team <hr@company.com>
+To: Potential Candidate <candidate@example.com>
+
+Dear Potential Candidate,
+
+We have a job opening for a Software Developer position at our company.
+
+Position: Software Developer
+Location: Office or remote work options available
+Employment Type: Full-time
+
+Responsibilities:
+- Write code
+- Fix bugs
+- Attend meetings
+- Complete assigned tasks
+- Work with team members
+
+Requirements:
+- Programming experience
+- Computer science degree or equivalent experience
+- Ability to work independently
+- Communication skills
+- Problem-solving abilities
+
+Compensation:
+- Salary range: $70,000 - $120,000 annually
+- Health insurance
+- Retirement plan
+- Paid time off
+
+Application Process:
+Send resume and cover letter to this email address. We will review applications and contact qualified candidates for interviews.
+
+Thank you for your interest.
+
+HR Team
+Company Name

@@ -1,5 +1,5 @@
 {
-  "name": "html-blocks-cli",
+  "name": "minipress-cli",
   "version": "1.0.0",
   "description": "CLI tool to convert JSON/JS configurations into HTML content blocks",
   "type": "module",

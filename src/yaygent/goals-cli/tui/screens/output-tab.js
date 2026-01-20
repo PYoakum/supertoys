@@ -154,7 +154,7 @@ export class OutputTabScreen {
     const items = this.bundles.map(b => {
       const date = new Date(b.createdAt).toLocaleDateString();
       const tasks = `${b.completedCount}/${b.taskCount}`;
-      const status = b.status === 'success' ? '✓' : b.status === 'failed' ? '✗' : '?';
+      const status = b.status === 'success' ? '+' : b.status === 'failed' ? 'x' : '?';
       return `${status} ${b.sessionId.slice(0, 8)}... ${tasks} tasks (${date})`;
     });
 

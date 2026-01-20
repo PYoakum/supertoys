@@ -1,0 +1,586 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Text-to-Speech Tool",
+    "description": "Tool registry integration for text-to-speech synthesis using Coqui TTS with multiple models, voices, and 1100+ language support",
+    "author": "automated-developer",
+    "created": "2026-01-17T00:00:00Z",
+    "tags": ["tts", "text-to-speech", "speech-synthesis", "coqui", "deep-learning", "multi-lingual", "tool-registry"]
+  },
+  "globalContext": {
+    "sourceRepository": "https://github.com/coqui-ai/TTS",
+    "license": "MPL-2.0",
+    "pythonVersion": ">=3.9, <3.12",
+    "modelCategories": "tts_models (text-to-speech), vocoder_models (waveform generation)",
+    "architectures": "Tacotron2, Glow-TTS, FastPitch, VITS, XTTS v2, Bark, Tortoise",
+    "fairseqLanguages": "1100+ languages via Facebook MMS/Fairseq VITS models",
+    "presetVoices": "Multi-speaker models include preset speaker voices",
+    "outputFormat": "WAV audio at model-specific sample rates (22050Hz-24000Hz typical)"
+  },
+  "goals": [
+    {
+      "id": "setup-python-project",
+      "objective": "Initialize Python project with Coqui TTS dependencies for text-to-speech synthesis",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "Project structure with pyproject.toml and requirements.txt",
+          "TTS package installed via pip install TTS",
+          "PyTorch installed with optional CUDA support",
+          "Audio dependencies: scipy, soundfile installed"
+        ],
+        "acceptance": [
+          "from TTS.api import TTS succeeds",
+          "TTS().list_models() returns available models",
+          "Basic synthesis works on CPU"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Python 3.9-3.11 required",
+        "espeak-ng required for phonemization on Linux",
+        "Optional CUDA for GPU acceleration"
+      ],
+      "context": {
+        "pipInstall": "pip install TTS torch torchaudio scipy soundfile",
+        "systemDepsLinux": "apt-get install espeak-ng libsndfile1",
+        "systemDepsMac": "brew install espeak",
+        "dockerImage": "ghcr.io/coqui-ai/tts-cpu"
+      }
+    },
+    {
+      "id": "implement-model-registry",
+      "objective": "Implement model discovery, download, and management for all available TTS and vocoder models",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "list_models() returns categorized model list",
+          "get_model_info(name) returns model metadata",
+          "download_model(name) fetches and caches model",
+          "Model categorization: by language, architecture, quality tier"
+        ],
+        "acceptance": [
+          "All models from TTS().list_models() accessible",
+          "Model info includes language, dataset, description",
+          "Download progress reporting"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Models cached in ~/.local/share/tts/",
+        "Model sizes range from 50MB to 2GB+",
+        "Support offline mode with pre-downloaded models"
+      ],
+      "dependencies": ["setup-python-project"],
+      "context": {
+        "modelFormat": "tts_models/<language>/<dataset>/<model_name>",
+        "vocoderFormat": "vocoder_models/<language>/<dataset>/<vocoder_name>",
+        "defaultModel": "tts_models/en/ljspeech/tacotron2-DDC",
+        "highQualityModel": "tts_models/en/vctk/vits",
+        "multiLingualModel": "tts_models/multilingual/multi-dataset/xtts_v2"
+      }
+    },
+    {
+      "id": "implement-tts-engine",
+      "objective": "Implement core TTS engine wrapper providing unified interface across all model architectures",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "synthesize(text, model, speaker, language) generates audio",
+          "Automatic vocoder selection for spectrogram models",
+          "Device management (CPU/GPU) with memory optimization",
+          "Supports all TTS architectures: Tacotron2, VITS, Glow-TTS, etc."
+        ],
+        "acceptance": [
+          "Consistent API across model types",
+          "Graceful fallback if vocoder not specified",
+          "Memory released after synthesis"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Some models require specific vocoders",
+        "End-to-end models (VITS) don't need separate vocoder",
+        "Model loading latency on first request"
+      ],
+      "dependencies": ["implement-model-registry"],
+      "context": {
+        "spectrogramModels": "Tacotron, Tacotron2, Glow-TTS, FastPitch, FastSpeech2 (need vocoder)",
+        "endToEndModels": "VITS, XTTS v2, YourTTS, Bark, Tortoise (integrated vocoder)",
+        "vocoders": "HiFiGAN, UnivNet, MelGAN, MultiBand-MelGAN, WaveGrad",
+        "apiUsage": "tts.tts_to_file(text=text, file_path=output_path)"
+      }
+    },
+    {
+      "id": "implement-speaker-manager",
+      "objective": "Implement speaker selection and management for multi-speaker TTS models",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "list_speakers(model) returns available speakers for model",
+          "get_speaker_info(model, speaker_id) returns speaker metadata",
+          "Validate speaker exists before synthesis",
+          "Default speaker selection when not specified"
+        ],
+        "acceptance": [
+          "VCTK models expose 100+ speakers",
+          "XTTS v2 preset speakers accessible",
+          "Speaker IDs consistent across sessions"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Single-speaker models don't support speaker selection",
+        "Speaker format varies: index, name, or ID depending on model"
+      ],
+      "dependencies": ["implement-model-registry"],
+      "context": {
+        "vctkSpeakers": "100+ speakers in VCTK dataset models",
+        "xttsPresets": "Ana Florence, Craig Gutsy, etc. built into XTTS v2",
+        "listCommand": "tts --model_name <model> --list_speaker_idxs",
+        "speakerArg": "speaker or speaker_idx parameter depending on model"
+      }
+    },
+    {
+      "id": "implement-language-manager",
+      "objective": "Implement language detection, validation, and Fairseq multi-lingual model support",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "list_languages() returns all supported languages",
+          "get_models_for_language(lang) finds compatible models",
+          "Fairseq model name generation from ISO language codes",
+          "Language auto-detection from input text (optional)"
+        ],
+        "acceptance": [
+          "1100+ Fairseq languages accessible",
+          "BCP-47 language tags supported",
+          "Clear error for unsupported languages"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Fairseq models: tts_models/<lang-iso>/fairseq/vits format",
+        "Quality varies by language data availability",
+        "Some languages require uroman for romanization"
+      ],
+      "dependencies": ["implement-model-registry"],
+      "context": {
+        "fairseqFormat": "tts_models/<lang-iso_code>/fairseq/vits",
+        "languageListUrl": "https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html",
+        "commonLanguages": "en, es, fr, de, it, pt, zh, ja, ko, ru, ar, hi",
+        "romanizationExtra": "pip install TTS[languages] for uroman support"
+      }
+    },
+    {
+      "id": "implement-text-preprocessor",
+      "objective": "Implement text preprocessing including normalization, phonemization, and SSML parsing",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "normalize_text(text) handles numbers, abbreviations, symbols",
+          "phonemize(text, language) converts to phonemes if needed",
+          "parse_ssml(ssml) extracts text and prosody hints",
+          "Sentence segmentation for long texts"
+        ],
+        "acceptance": [
+          "Numbers converted to words",
+          "Common abbreviations expanded",
+          "Handles Unicode and special characters"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Phonemization requires espeak-ng",
+        "SSML support is partial (basic tags only)",
+        "Language-specific normalization rules"
+      ],
+      "dependencies": ["setup-python-project"],
+      "context": {
+        "normalization": "Numbers, dates, currencies, abbreviations, URLs",
+        "phonemizer": "espeak-ng backend via phonemizer package",
+        "ssmlTags": "speak, prosody (rate, pitch, volume), break, say-as",
+        "maxLength": "Model-specific max input length, typically 500-1000 chars"
+      }
+    },
+    {
+      "id": "implement-audio-postprocessor",
+      "objective": "Implement audio post-processing for output format conversion and enhancement",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "convert_format(audio, target_format) handles WAV, MP3, OGG",
+          "resample(audio, target_rate) changes sample rate",
+          "normalize_volume(audio) applies loudness normalization",
+          "trim_silence(audio) removes leading/trailing silence"
+        ],
+        "acceptance": [
+          "MP3 encoding with configurable bitrate",
+          "Resampling preserves audio quality",
+          "LUFS-based loudness normalization"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "MP3 encoding requires lame or ffmpeg",
+        "OGG requires libvorbis",
+        "Preserve original if no post-processing requested"
+      ],
+      "dependencies": ["setup-python-project"],
+      "context": {
+        "outputFormats": "wav, mp3, ogg, flac",
+        "defaultFormat": "wav",
+        "mp3Bitrate": "192kbps default",
+        "loudnessTarget": "-16 LUFS for speech"
+      }
+    },
+    {
+      "id": "implement-synthesis-pipeline",
+      "objective": "Implement end-to-end synthesis pipeline from text input to audio file output",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "synthesize(text, config) -> SynthesisResult with audio path",
+          "Pipeline: preprocess -> model inference -> postprocess -> save",
+          "Batch synthesis for multiple texts",
+          "Progress callbacks for long texts"
+        ],
+        "acceptance": [
+          "Handles texts of any length via chunking",
+          "Consistent audio quality across chunks",
+          "Temp file cleanup"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Long text split at sentence boundaries",
+        "Chunk concatenation with crossfade",
+        "Memory management for batch processing"
+      ],
+      "dependencies": [
+        "implement-tts-engine",
+        "implement-text-preprocessor",
+        "implement-audio-postprocessor"
+      ],
+      "context": {
+        "pipelineSteps": "1. Text normalization -> 2. Chunking -> 3. Model inference -> 4. Concatenation -> 5. Post-processing -> 6. Save",
+        "resultFields": "audio_path, duration_ms, sample_rate, model_used, speaker_used"
+      }
+    },
+    {
+      "id": "implement-model-recommender",
+      "objective": "Implement intelligent model selection based on language, quality, and performance requirements",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "recommend_model(language, quality, speed) suggests best model",
+          "Quality tiers: fast, balanced, high_quality",
+          "Fallback chain if preferred model unavailable",
+          "Consider GPU availability in recommendations"
+        ],
+        "acceptance": [
+          "Recommendations match documented model characteristics",
+          "Fast tier uses lightweight models",
+          "High quality tier uses VITS/XTTS when available"
+        ],
+        "validation": "hybrid"
+      },
+      "constraints": [
+        "Not all languages have high-quality models",
+        "Trade-off between quality and speed",
+        "GPU availability affects viable options"
+      ],
+      "dependencies": ["implement-model-registry", "implement-language-manager"],
+      "context": {
+        "fastModels": "Glow-TTS, SpeedySpeech (real-time on CPU)",
+        "balancedModels": "Tacotron2 + HiFiGAN, FastPitch + HiFiGAN",
+        "highQualityModels": "VITS, XTTS v2 (slower but better quality)",
+        "fairseqFallback": "Use Fairseq VITS for uncommon languages"
+      }
+    },
+    {
+      "id": "define-tool-schema",
+      "objective": "Define JSON schema for tts tool interface with comprehensive synthesis options",
+      "priority": 2,
+      "criteria": {
+        "success": [
+          "Input schema: action, text, model, speaker, language, output_format, output_path",
+          "Output schema: audio_path, duration_ms, sample_rate, characters_processed",
+          "Action types: synthesize, list_models, list_speakers, list_languages, get_model_info"
+        ],
+        "acceptance": [
+          "Schema validates with JSON Schema Draft-07",
+          "All parameters documented",
+          "Sensible defaults for optional parameters"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "text required for synthesize action",
+        "model defaults to fast English model if not specified",
+        "output_path auto-generated if not provided"
+      ],
+      "dependencies": ["setup-python-project"],
+      "context": {
+        "actions": "synthesize | list_models | list_speakers | list_languages | get_model_info | recommend_model",
+        "synthesizeRequired": "text",
+        "synthesizeOptional": "model, speaker, language, output_format, output_path, speed, pitch",
+        "outputFormats": "wav | mp3 | ogg | flac",
+        "prosodyParams": "speed (0.5-2.0), pitch (0.5-2.0)"
+      }
+    },
+    {
+      "id": "implement-tool-handler",
+      "objective": "Implement tool registry handler for JSON request processing and TTS dispatch",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "handle(input: dict) -> dict dispatches actions",
+          "synthesize action generates speech from text",
+          "list_models returns available models with metadata",
+          "Proper error handling with descriptive messages"
+        ],
+        "acceptance": [
+          "All actions return valid JSON per schema",
+          "Concurrent requests handled safely",
+          "Model caching between requests"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Model loading cached for repeat requests",
+        "Memory limits for concurrent synthesis",
+        "Request timeout handling"
+      ],
+      "dependencies": [
+        "implement-synthesis-pipeline",
+        "implement-speaker-manager",
+        "implement-language-manager",
+        "define-tool-schema"
+      ],
+      "context": {
+        "entryPoint": "async def handle(input: dict) -> dict",
+        "errorCodes": "INVALID_INPUT, MODEL_NOT_FOUND, SPEAKER_NOT_FOUND, LANGUAGE_NOT_SUPPORTED, SYNTHESIS_ERROR",
+        "caching": "LRU cache for loaded models, configurable max models in memory"
+      }
+    },
+    {
+      "id": "implement-cli",
+      "objective": "Create CLI for standalone TTS tool invocation and model management",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "tts-tool synthesize 'Hello world' -o output.wav generates speech",
+          "tts-tool models --list shows available models",
+          "tts-tool speakers --model <n> lists speakers",
+          "tts-tool languages --list shows supported languages"
+        ],
+        "acceptance": [
+          "Help text documents all commands and options",
+          "Supports --model, --speaker, --language flags",
+          "Progress indicator for synthesis"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Use argparse or click",
+        "Support stdin for text input",
+        "Exit codes: 0 success, 1 error"
+      ],
+      "dependencies": ["implement-tool-handler"],
+      "context": {
+        "cliCommands": "synthesize, models, speakers, languages, info, download",
+        "synthesizeFlags": "--model, --speaker, --language, --output, --format, --speed, --pitch",
+        "batchMode": "tts-tool synthesize --input texts.txt --output-dir ./audio/"
+      }
+    },
+    {
+      "id": "implement-http-server",
+      "objective": "Implement HTTP API server for TTS service deployment",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "POST /synthesize accepts text and returns audio",
+          "GET /models lists available models",
+          "GET /speakers/{model} lists speakers for model",
+          "GET /health returns service status"
+        ],
+        "acceptance": [
+          "FastAPI-based with OpenAPI docs",
+          "Audio returned as file or base64",
+          "Streaming response option"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Async request handling",
+        "Rate limiting for resource protection",
+        "Model preloading configuration"
+      ],
+      "dependencies": ["implement-tool-handler"],
+      "context": {
+        "framework": "FastAPI with uvicorn",
+        "endpoints": "/synthesize, /models, /models/{name}, /speakers/{model}, /languages, /health",
+        "responseFormats": "audio/wav, audio/mpeg, application/json (base64)",
+        "coquiServerRef": "TTS/server/server.py provides reference implementation"
+      }
+    },
+    {
+      "id": "implement-caching-layer",
+      "objective": "Implement caching for synthesized audio to avoid redundant computation",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "Cache lookup by text hash + model + speaker + params",
+          "Configurable cache size and TTL",
+          "Cache invalidation on model update",
+          "Disk-based cache for persistence"
+        ],
+        "acceptance": [
+          "Cache hit returns audio in <10ms",
+          "LRU eviction when cache full",
+          "Cache stats endpoint"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Hash must include all synthesis parameters",
+        "Disk space limits for cache",
+        "Thread-safe cache access"
+      ],
+      "dependencies": ["implement-synthesis-pipeline"],
+      "context": {
+        "cacheKey": "sha256(text + model + speaker + language + speed + pitch)",
+        "cacheDir": "~/.cache/tts-tool/audio/",
+        "defaultSize": "1GB max cache size",
+        "defaultTTL": "7 days"
+      }
+    },
+    {
+      "id": "implement-batch-synthesis",
+      "objective": "Implement batch processing for synthesizing multiple texts efficiently",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "batch_synthesize(texts, config) processes list of texts",
+          "Parallel processing with configurable workers",
+          "Progress reporting per item",
+          "Partial failure handling"
+        ],
+        "acceptance": [
+          "Efficient model reuse across batch",
+          "Results maintain input order",
+          "Failed items don't block others"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Memory limits batch size",
+        "GPU memory shared across batch",
+        "Error isolation per item"
+      ],
+      "dependencies": ["implement-synthesis-pipeline"],
+      "context": {
+        "inputFormats": "List of texts, CSV file, JSON array",
+        "outputFormats": "Individual files, ZIP archive, JSON with base64",
+        "parallelism": "CPU: multiprocessing, GPU: sequential with batched inference where supported"
+      }
+    },
+    {
+      "id": "write-tests",
+      "objective": "Write comprehensive tests for TTS synthesis, model management, and API endpoints",
+      "priority": 3,
+      "criteria": {
+        "success": [
+          "Unit tests for text preprocessing",
+          "Integration tests for synthesis pipeline",
+          "API endpoint tests",
+          "Model loading/unloading tests"
+        ],
+        "acceptance": [
+          "Tests pass on CPU",
+          "Coverage >70%",
+          "Fast test suite (<2 min excluding model downloads)"
+        ],
+        "validation": "automated"
+      },
+      "constraints": [
+        "Use small/fast models for tests",
+        "Mock model inference where appropriate",
+        "Fixture audio for comparison"
+      ],
+      "dependencies": ["implement-tool-handler", "implement-http-server"],
+      "context": {
+        "framework": "pytest with pytest-asyncio",
+        "testModel": "tts_models/en/ljspeech/glow-tts (fast, small)",
+        "mockStrategy": "Mock TTS class for unit tests"
+      }
+    },
+    {
+      "id": "write-documentation",
+      "objective": "Write comprehensive documentation for TTS tool usage, models, and deployment",
+      "priority": 4,
+      "criteria": {
+        "success": [
+          "README with installation and quick start",
+          "Model catalog with quality/speed characteristics",
+          "API reference for all endpoints",
+          "Deployment guide for production"
+        ],
+        "acceptance": [
+          "All examples tested",
+          "Model recommendations documented",
+          "Troubleshooting section"
+        ],
+        "validation": "manual"
+      },
+      "constraints": [
+        "Keep model list updated",
+        "Include hardware requirements per model",
+        "Note language coverage limitations"
+      ],
+      "dependencies": ["implement-cli", "implement-http-server"],
+      "context": {
+        "sections": "Overview, Installation, Quick Start, CLI Reference, HTTP API, Models, Languages, Speakers, Configuration, Deployment, Troubleshooting"
+      }
+    },
+    {
+      "id": "integrate-tool-registry",
+      "objective": "Package tts tool for registration with tool registry",
+      "priority": 1,
+      "criteria": {
+        "success": [
+          "tool-manifest.json defines metadata, schema, capabilities",
+          "Tool exposes standard entry point",
+          "Health check verifies default model availability"
+        ],
+        "acceptance": [
+          "Tool registers successfully",
+          "synthesize action returns audio path",
+          "Model download on first use works"
+        ],
+        "validation": "hybrid"
+      },
+      "constraints": [
+        "Default model auto-downloaded on first use",
+        "Document which models are bundled vs downloaded",
+        "Resource requirements vary by model"
+      ],
+      "dependencies": [
+        "implement-tool-handler",
+        "define-tool-schema"
+      ],
+      "context": {
+        "manifestName": "tts",
+        "manifestVersion": "1.0.0",
+        "manifestDescription": "Text-to-speech synthesis using Coqui TTS with 1100+ languages and multiple voice models",
+        "capabilities": "text-to-speech, multi-lingual, multi-speaker, multi-model",
+        "defaultModel": "tts_models/en/ljspeech/tacotron2-DDC (~200MB)",
+        "resourceCpu": "2+ cores minimum",
+        "resourceMemory": "4GB RAM minimum, 8GB for large models",
+        "resourceGpu": "Optional, 2GB+ VRAM accelerates inference",
+        "resourceDisk": "500MB-2GB per model"
+      }
+    }
+  ]
+}

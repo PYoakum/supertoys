@@ -1,0 +1,47 @@
+POSITION: Senior Software Engineer - Full Stack Development
+
+COMPANY OVERVIEW:
+We are a dynamic technology organization committed to delivering innovative software solutions that drive business transformation. Our company culture emphasizes professional excellence, collaborative teamwork, and continuous learning opportunities.
+
+POSITION SUMMARY:
+We are seeking a highly qualified Senior Software Engineer to join our development team. The successful candidate will be responsible for designing, developing, and maintaining complex web applications using modern technologies and best practices.
+
+KEY RESPONSIBILITIES:
+• Design and implement scalable web applications using React.js, Node.js, and related technologies
+• Collaborate with cross-functional teams including product managers, designers, and quality assurance professionals
+• Participate in code reviews and maintain high standards of code quality and documentation
+• Contribute to architectural decisions and technical strategy discussions
+• Mentor junior developers and provide technical guidance
+• Ensure application performance, security, and scalability requirements are met
+• Participate in agile development processes and sprint planning activities
+
+REQUIRED QUALIFICATIONS:
+• Bachelor's degree in Computer Science, Software Engineering, or related technical field
+• Minimum 5 years of professional software development experience
+• Demonstrated expertise in JavaScript, React.js, and Node.js
+• Proficiency with database technologies (SQL and NoSQL)
+• Experience with version control systems (Git) and collaborative development workflows
+• Strong understanding of software development lifecycle and agile methodologies
+• Excellent problem-solving and analytical thinking capabilities
+• Outstanding written and verbal communication skills
+
+PREFERRED QUALIFICATIONS:
+• Master's degree in Computer Science or related field
+• Experience with cloud platforms (AWS, Azure, or Google Cloud)
+• Knowledge of containerization technologies (Docker, Kubernetes)
+• Familiarity with CI/CD pipelines and DevOps practices
+• Previous experience in a senior or lead developer role
+
+COMPENSATION AND BENEFITS:
+• Competitive salary commensurate with experience and qualifications
+• Comprehensive health, dental, and vision insurance coverage
+• Retirement savings plan with company matching contribution
+• Professional development opportunities and continuing education support
+• Flexible work arrangements and work-life balance initiatives
+• Performance-based bonus structure
+
+APPLICATION PROCESS:
+Qualified candidates are invited to submit their resume, cover letter, and portfolio of relevant work samples. We are an equal opportunity employer committed to diversity and inclusion in the workplace.
+
+CONTACT INFORMATION:
+Please submit applications through our corporate careers portal or contact our Human Resources department for additional information regarding this opportunity.

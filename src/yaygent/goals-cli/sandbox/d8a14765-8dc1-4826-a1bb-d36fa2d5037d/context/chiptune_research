@@ -1,0 +1,467 @@
+---
+title: "Chiptune and 8-bit Video Game Music Research"
+url: "https://en.wikipedia.org/wiki/Chiptune"
+fetched_at: "2026-01-19T00:21:39.107Z"
+source: context_research_browser
+---
+
+# Chiptune and 8-bit Video Game Music Research
+
+> Source: [https://en.wikipedia.org/wiki/Chiptune](https://en.wikipedia.org/wiki/Chiptune)
+
+[*](/wiki/File:Spoken_Wikipedia_-_English_-_chiptune.oga)From Wikipedia, the free encyclopedia
+Style of synthesized electronic music
+For the altering of car electronics, see [chip tuning](/wiki/Chip_tuning).| Chiptune |
+| --- |
+| [![](//upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Chiptune-Setup-Game-Boys.jpg/250px-Chiptune-Setup-Game-Boys.jpg)](/wiki/File:Chiptune-Setup-Game-Boys.jpg)A musician's chiptune setup, involving [Game Boy](/wiki/Game_Boy) consoles |
+| Other names | - Chip music[[1]](#cite_note-ABC-1)
+- 8-bit music[[1]](#cite_note-ABC-1)
+- chiptunes[[2]](#cite_note-2)[[3]](#cite_note-3)
+|
+| Stylistic origins | - [Electronic](/wiki/Electronic_music)
+- [video game music](/wiki/Video_game_music)
+- [computer music](/wiki/Computer_music)
+- [soundtrack](/wiki/Soundtrack)
+- [synthpop](/wiki/Synthpop) ([Yellow Magic Orchestra](/wiki/Yellow_Magic_Orchestra))[[4]](#cite_note-4)
+- [heavy metal](/wiki/Heavy_metal_music)[[5]](#cite_note-5) ([neoclassical metal](/wiki/Neoclassical_metal))
+- [jazz fusion](/wiki/Jazz_fusion)[[6]](#cite_note-viceguide-6)
+|
+| Cultural origins | Late 1970s to early 1980s, Japan |
+| Derivative forms | - [Wonky](/wiki/Wonky_(genre))
+- [hyperpop](/wiki/Hyperpop)[[7]](#cite_note-7)
+- [kawaii future bass](/wiki/Future_bass#Kawaii_future_bass)[[8]](#cite_note-8)
+- [synthwave](/wiki/Synthwave)
+|
+| Subgenres |
+| [Bitpop](/wiki/Bitpop) |
+| Fusion genres |
+| - [Bleep techno](/wiki/Bleep_techno)[[9]](#cite_note-sicko_brewster_76-9)
+- [complextro](/wiki/Complextro)
+- [electro](/wiki/Electro_(music))[[10]](#cite_note-wire_1996-10)
+- [electroclash](/wiki/Electroclash)
+- [future bass](/wiki/Future_bass)
+- [glitch](/wiki/Glitch_(music))
+- [grime](/wiki/Grime_music)[[11]](#cite_note-Jong-11)
+- [house](/wiki/House_music)[[12]](#cite_note-12)
+- [Nintendocore](/wiki/Nintendocore)
+- [plugg](/wiki/Plugg_music)[[13]](#cite_note-SC-13)
+- [skweee](/wiki/Skweee)
+|
+| Regional scenes |
+|
+- [Japan](/wiki/Music_of_Japan)[[14]](#cite_note-14)|
+| Local scenes |
+|
+- [New York City](/wiki/Music_of_New_York_City)[[15]](#cite_note-15)- [Los Angeles](/wiki/Music_of_Los_Angeles)[[16]](#cite_note-16)[[17]](#cite_note-17)|
+| Other topics |
+|
+- [Artists](/wiki/List_of_chiptune_artists)- [Demoscene](/wiki/Demoscene)|**Chiptune**, also called **8-bit music** (although not all chiptune is 8-bit), is a style of [electronic music](/wiki/Electronic_music), and its associated subculture,[[18]](#cite_note-18)[[19]](#cite_note-19) made using the [programmable sound generator](/wiki/Programmable_sound_generator) (PSG) [sound chips](/wiki/Sound_chip) or [synthesizers](/wiki/Synthesizer) in vintage [arcade machines](/wiki/Arcade_game), [computers](/wiki/Computer) and [video game consoles](/wiki/Video_game_console).[[20]](#cite_note-20) The term is commonly used to refer to [tracker format music](/wiki/Tracker_music) using extremely basic and small [samples](/wiki/Sample_(music)) that an old computer or console could produce (this is the original meaning of the term), as well as music that combines PSG sounds with modern musical styles.[[21]](#cite_note-21)[[22]](#cite_note-22)[[23]](#cite_note-23) It has been described as "an interpretation of many genres". Any existing song can be arranged in a chiptune style. It can be defined by choice of instrument, by [timbre](/wiki/Timbre) more than specific style elements.[[24]](#cite_note-24)## Technology[[edit](/w/index.php?title=Chiptune&action=edit&section=1)]A [waveform generator](/wiki/Waveform_generator) is a fundamental module in a sound synthesis system. A waveform generator usually produces a basic geometrical waveform with a fixed or variable [timbre](/wiki/Timbre) and variable pitch. Common waveform generator configurations usually included two or three simple waveforms and often a single [pseudo-random-noise](/wiki/Pseudo-random-noise) generator (PRNG). Available [waveforms](/wiki/Waveform) often included [pulse wave](/wiki/Pulse_wave) (whose [timbre](/wiki/Timbre) can be varied by modifying the [duty cycle](/wiki/Duty_cycle)), [square wave](/wiki/Square_wave_(waveform)) (a symmetrical pulse wave producing only odd overtones), [triangle wave](/wiki/Triangle_wave) (which has a fixed timbre containing only odd [harmonics](/wiki/Harmonic) but is softer than a square wave), and [sawtooth wave](/wiki/Sawtooth_wave) (which has a bright raspy timbre and contains odd and even harmonics). Two notable examples of systems employing this technology were the [Game Boy](/wiki/Game_Boy) portable game console and the [Commodore 64](/wiki/Commodore_64) personal computer. The Game Boy uses two pulse channels (switchable between 12.5%, 25%, 50% and 75% wave duty cycle), a channel for a 4-bit waveform generator, and a pseudo-random-noise generator. The Commodore 64 however used the [MOS Technology SID](/wiki/MOS_Technology_SID) chip which offered 3 channels, each switchable between pulse, saw-tooth, triangle, and noise. Unlike the Game Boy, the pulse channels on the Commodore 64 allowed full control over wave duty cycles. The SID was a very technically advanced chip, offering many other features including ring modulation and adjustable resonance filters.[[25]](#cite_note-25)Due to the limited number of voices in early sound chips, one of the main challenges is to produce rich [polyphonic](/wiki/Polyphonic) music with them. The usual method to emulate it is via quick [arpeggios](/wiki/Arpeggio), which is one of the most relevant features of chiptune music (along with its electronic timbres).[[26]](#cite_note-26)Some older systems featured a simple [beeper](/wiki/Beep_(sound)) as their only sound output, as the original [ZX Spectrum](/wiki/ZX_Spectrum) and [IBM PC](/wiki/IBM_PC); despite this, many skilled programmers were able to produce unexpectedly rich music with this bare hardware, where the sound is fully generated by the system's [CPU](/wiki/CPU) by direct control of the beeper.## History[[edit](/w/index.php?title=Chiptune&action=edit&section=2)]### 1951–1979: Precursors[[edit](/w/index.php?title=Chiptune&action=edit&section=3)]| External videos |
+| --- |
+| [![video icon](//upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Nuvola_apps_kaboodle.svg/20px-Nuvola_apps_kaboodle.svg.png)](/wiki/File:Nuvola_apps_kaboodle.svg) [Science International*: *What Will They Think Of Next?*](https://youtube.com/watch?v=kPzA2jkN0vs&lc=CJKoHtM60L9wUdoAxfRE2dOhjSt8h2QdVNNECbuBPWk), YouTube video |The earliest precursors to chip music can be found in the early history of [computer music](/wiki/Computer_music). In 1951, the computers [CSIRAC](/wiki/CSIRAC) and [Ferranti Mark 1](/wiki/Ferranti_Mark_1) were used to perform real-time synthesized digital music in public.[[27]](#cite_note-27)One of the earliest commercial computer music albums came from the First Philadelphia Computer Music Festival, held August 25, 1978, as part of the Personal Computing '78 show. The First Philadelphia Computer Music Festival recordings were published by Creative Computing in 1979.[[28]](#cite_note-28) The [Global TV](/wiki/Global_TV) program *[Science International](/wiki/Science_International)* (1976–1979) credited a [PDP-11/10](/wiki/PDP-11) for the music.[[29]](#cite_note-29)### Mid-1970s–1980s: Video game origins[[edit](/w/index.php?title=Chiptune&action=edit&section=4)]Chiptune music began to appear with the [video game music](/wiki/Video_game_music) produced during the [golden age of video arcade games](/wiki/Golden_age_of_video_arcade_games). An early example was the opening tune in [Tomohiro Nishikado](/wiki/Tomohiro_Nishikado)'s [arcade game](/wiki/Arcade_game) *[Gun Fight](/wiki/Gun_Fight)* (1975). The first video game to use a continuous background soundtrack was Tomohiro Nishikado's 1978 release *[Space Invaders](/wiki/Space_Invaders)*, which had four simple [chromatic](/wiki/Diatonic_and_chromatic) descending [bass notes](/wiki/Bass_note) repeating in [a loop](/wiki/Music_loop), though it was dynamic and interacted with the player, increasing pace as the enemies descended on the player.[[30]](#cite_note-30)
+The first video game to feature continuous melodic [background music](/wiki/Background_music) was *[Rally-X](/wiki/Rally-X)*, an arcade game released by [Namco](/wiki/Namco) in 1980, featuring a simple tune that repeats continuously during [gameplay](/wiki/Gameplay).[[31]](#cite_note-gradar2-31)
+It was also one of the earliest games to use a [digital-to-analog converter](/wiki/Digital-to-analog_converter) to produce [sampled](/wiki/Sampling_(signal_processing)) sounds.[[32]](#cite_note-collins_12-32)
+That same year, the first video game to feature [speech synthesis](/wiki/Speech_synthesis) was also released, [Sunsoft](/wiki/Sunsoft)'s [shoot 'em up](/wiki/Shoot_%27em_up) arcade game *[Stratovox](/wiki/Stratovox)*.[[31]](#cite_note-gradar2-31)In the late 1970s, the pioneering [synth-pop](/wiki/Synth-pop)/[electronic dance music](/wiki/Electronic_dance_music) group [Yellow Magic Orchestra](/wiki/Yellow_Magic_Orchestra) (YMO) were using computers to produce synthesized music.[[33]](#cite_note-Sarasota-33)
+Some of their early music, including their 1978 self-titled [debut album](/wiki/Yellow_Magic_Orchestra_(album)), were [sampling](/wiki/Sampling_(music)) sounds from popular arcade games such as *Space Invaders*[[10]](#cite_note-wire_1996-10) and *Gun Fight*. In addition to incorporating sounds from contemporary video games into their music, the band would later have a major influence on much of the video game and chiptune music produced during the [8-bit](/wiki/History_of_video_game_consoles_(third_generation)) and [16-bit eras](/wiki/History_of_video_game_consoles_(fourth_generation)).[[34]](#cite_note-34)[[35]](#cite_note-35) [Sega](/wiki/Sega)'s 1982 arcade game *[Super Locomotive](/wiki/Super_Locomotive)* for example featured a chiptune [cover version](/wiki/Cover_version) of YMO's "[Rydeen](/wiki/Solid_State_Survivor)" (1979);[[36]](#cite_note-36) several later [computer games](/wiki/PC_game) also covered the song, such as *Trooper Truck* (1983) by [Rabbit Software](/wiki/Rabbit_Software) as well as *[Daley Thompson's Decathlon](/wiki/Daley_Thompson%27s_Decathlon)* (1984) and *[Stryker's Run](/wiki/Stryker%27s_Run)* (1986) arranged by [Martin Galway](/wiki/Martin_Galway).By 1983, [Konami](/wiki/Konami)'s arcade game *[Gyruss](/wiki/Gyruss)* utilized five sound chips along with a digital-to-analog converter, which were partly used to create an electronic rendition of [J. S. Bach's](/wiki/Johann_Sebastian_Bach) *[Toccata and Fugue in D minor](/wiki/Toccata_and_Fugue_in_D_minor,_BWV_565)*.[[37]](#cite_note-37)
+In 1984, former YMO member [Haruomi Hosono](/wiki/Haruomi_Hosono) released an album produced entirely from Namco arcade game samples entitled *Video Game Music*, an early example of a chiptune record[[38]](#cite_note-discogs_hosono-38)
+and the first video game music album.[[39]](#cite_note-39)
+The record featured the work of Namco's chiptune composers: Toshio Kai (*[Pac-Man](/wiki/Pac-Man)* in 1980), Nobuyuki Ohnogi (*[Galaga](/wiki/Galaga)*, *[New Rally-X](/wiki/New_Rally-X)* and *[Bosconian](/wiki/Bosconian)* in 1981, and *[Pole Position](/wiki/Pole_Position_(video_game))* in 1982), and Yuriko Keino (*[Dig Dug](/wiki/Dig_Dug)* and *[Xevious](/wiki/Xevious)* in 1982).[[40]](#cite_note-vgmdb_namco-40)### Early 1980s–1994: FM synthesis[[edit](/w/index.php?title=Chiptune&action=edit&section=5)]A major advance for chip music was the introduction of [frequency modulation synthesis](/wiki/Frequency_modulation_synthesis) (FM synthesis), first commercially released by [Yamaha](/wiki/Yamaha_Corporation) for their [digital synthesizers](/wiki/Digital_synthesizer) and FM [sound chips](/wiki/Sound_chip), which began appearing in arcade machines from the early 1980s.[[41]](#cite_note-karen_10-1-41)[[42]](#cite_note-42)
+Arcade game composers utilizing FM synthesis at the time included Konami's [Miki Higashino](/wiki/Miki_Higashino) (*[Gradius](/wiki/Gradius)*, *[Yie-Ar Kung Fu](/wiki/Yie-Ar_Kung_Fu)*, *[Teenage Mutant Ninja Turtles](/wiki/Teenage_Mutant_Ninja_Turtles_(arcade_game))*) and [Sega](/wiki/Sega)'s [Hiroshi Kawaguchi](/wiki/Hiroshi_Kawaguchi_(composer)) (*[Space Harrier](/wiki/Space_Harrier)*, *[Hang-On](/wiki/Hang-On)*, *[Out Run](/wiki/Out_Run)*).By the early 1980s, significant improvements to [personal computer game](/wiki/Personal_computer_game) music were made possible with the introduction of [digital](/wiki/Digital_synthesizer) FM synthesis sound. [Yamaha](/wiki/Yamaha_Corporation) began manufacturing FM [synth boards](/wiki/Sound_card) for Japanese computers such as the [NEC PC-8801](/wiki/NEC_PC-8801) and [PC-9801](/wiki/NEC_PC-9801) in the early 1980s, and by the mid-1980s, the PC-8801 and [FM-7](/wiki/FM-7) had built-in FM sound. This allowed computer game music to have greater complexity than the simplistic [beeps](/wiki/Beep_(sound)) from internal speakers. These FM synth boards produced a "warm and pleasant sound" that musicians such as [Yuzo Koshiro](/wiki/Yuzo_Koshiro) and [Takeshi Abo](/wiki/Takeshi_Abo) utilized to produce music that is still highly regarded within the chiptune community.[[43]](#cite_note-hg101_retro-43)
+In the early 1980s, Japanese [personal computers](/wiki/Personal_computer) such as the NEC PC-88 and PC-98 featured [audio programming languages](/wiki/Audio_programming_language) such as [Music Macro Language](/wiki/Music_Macro_Language) (MML) and [MIDI](/wiki/MIDI) interfaces, which were most often used to produce video game music.[[44]](#cite_note-shimazu104-44)[Fujitsu](/wiki/Fujitsu) also released the *FM Sound Editor* software for the FM-7 in 1985, providing users with a user-friendly interface to create and edit synthesized music.[[45]](#cite_note-45)In 1987, FM synthesis became available for Western computers when Canadian company [Ad Lib](/wiki/Ad_Lib,_Inc.) released the AdLib Music Synthesizer Card for the [IBM Personal Computer](/wiki/IBM_Personal_Computer),[[46]](#cite_note-46) while Singapore-based [Creative Labs](/wiki/Creative_Labs) incorporated the AdLib card's sound chip into its [Sound Blaster](/wiki/Sound_Blaster) card in 1989.[[47]](#cite_note-47) Both cards were widely supported by [MS-DOS](/wiki/MS-DOS) game developers in the late 1980s and early 1990s.The widespread adoption of FM synthesis by consoles would later be one of the major advances of the [16-bit era](/wiki/History_of_video_game_consoles_(fourth_generation)), by which time 16-bit arcade machines were using multiple FM synthesis chips.[[41]](#cite_note-karen_10-1-41) A major chiptune composer during this period was [Yuzo Koshiro](/wiki/Yuzo_Koshiro).[[48]](#cite_note-santos_2006-48)
+Despite later advances in audio technology, he would continue to use older PC-8801 hardware to produce chiptune soundtracks for series such as *[Streets of Rage](/wiki/Streets_of_Rage_(series))* (1991–1994) and *[Etrian Odyssey](/wiki/Etrian_Odyssey)* (2007–present).[[43]](#cite_note-hg101_retro-43) His soundtrack to *[The Revenge of Shinobi](/wiki/The_Revenge_of_Shinobi_(1989_video_game))* (1989) featured [house](/wiki/House_music)[[49]](#cite_note-greening_kotowski-49)[[50]](#cite_note-50)
+and [progressive](/wiki/Progressive_electronic_dance_music) [techno](/wiki/Techno) compositions[[48]](#cite_note-santos_2006-48) that fused [electronic dance music](/wiki/Electronic_dance_music) with traditional [Japanese music](/wiki/Music_of_Japan).[[51]](#cite_note-51)
+[The soundtrack](/wiki/Discography_of_the_Streets_of_Rage_series) for *[Streets of Rage 2](/wiki/Streets_of_Rage_2)* (1992) is considered "revolutionary" and "ahead of its time" for its "[blend of](/wiki/Electro_house) swaggering house [synths](/wiki/Synthesizer), [dirty](/wiki/Electro_house) [electro-funk](/wiki/Electro_(music)) and [trancey](/wiki/Trance_music) electronic textures that would feel as comfortable in a [nightclub](/wiki/Nightclub) as a video game."[[52]](#cite_note-52)
+For the soundtrack to *[Streets of Rage 3](/wiki/Streets_of_Rage_3)* (1994), Koshiro created a new composition method called the "Automated Composing System" to produce "fast-beat techno like [jungle](/wiki/Drum_and_bass)",[[53]](#cite_note-jeff_davis-53)
+resulting in innovative and [experimental sounds](/wiki/Experimental_music) generated automatically.[[54]](#cite_note-sega_horowitz-54)
+Koshiro also composed chiptune soundtracks for series such as *[Dragon Slayer](/wiki/Dragon_Slayer_(series))*, *[Ys](/wiki/Ys_(video_game))*, *[Shinobi](/wiki/Shinobi_(series))*, and *[ActRaiser](/wiki/ActRaiser)*. Another important FM synth composer was the late [Ryu Umemoto](/wiki/Ryu_Umemoto), who composed chiptune soundtracks for various [visual novel](/wiki/Visual_novel) and [shoot 'em up](/wiki/Shoot_%27em_up) games.[[55]](#cite_note-55)### 1986–present: SID music culture[[edit](/w/index.php?title=Chiptune&action=edit&section=6)]
+See also: [MOS Technology SID](/wiki/MOS_Technology_SID) and [Demoscene](/wiki/Demoscene)
+[*](/wiki/File:MOS_Technologies_6581.jpg)MOS 6581 and 8580 Commodore 64 SID chipsLater on, several demo groups moved to using their own music instead of ripped game music. In 1986, Jeroen "Red" Kimmel studied [Rob Hubbard](/wiki/Rob_Hubbard)'s player routine and used it for original demo songs[[56]](#cite_note-56)
+before writing a routine of his own in 1987. Hobbyists were also writing their own dedicated music editor software, such as [Chris Hülsbeck](/wiki/Chris_H%C3%BClsbeck)'s Soundmonitor* which was released as a type-in listing in a 1986 issue of the German C-64 magazine *[64'er](/w/index.php?title=64%27er&action=edit&redlink=1)*.[[57]](#cite_note-57)The practice of SID music composition has continued seamlessly until this day in conjunction with the [Commodore 64](/wiki/Commodore_64) demoscene. [The High Voltage SID Collection](/wiki/The_High_Voltage_SID_Collection), a comprehensive archive of SID music, contains over 55,000 pieces of SID music.[[58]](#cite_note-58)## Mainstream popularity[[edit](/w/index.php?title=Chiptune&action=edit&section=7)]The heyday of chiptune music was the 1980s.[[59]](#cite_note-bbc_chiptune-59) The earliest commercial chiptune records produced entirely from [sampling](/wiki/Sampling_(music)) [arcade game](/wiki/Arcade_game) sounds have existed since the mid-1980s, an early example being [Haruomi Hosono](/wiki/Haruomi_Hosono)'s *Video Game Music* in 1984.[[38]](#cite_note-discogs_hosono-38) Though entirely chiptune records were uncommon at the time, many mainstream musicians in the [pop rock](/wiki/Pop_rock),[[60]](#cite_note-timemag-60) [hip hop](/wiki/Hip_hop_music)[[61]](#cite_note-61) and [electronic music](/wiki/Electronic_music)[[62]](#cite_note-allmusic_electro-62)
+genres were sampling arcade game sounds and [bleeps](/wiki/Beep_(sound)) during the [golden age of video arcade games](/wiki/Golden_age_of_video_arcade_games) (late 1970s to mid-1980s), as early as [Yellow Magic Orchestra](/wiki/Yellow_Magic_Orchestra)'s "[Computer Game](/wiki/Yellow_Magic_Orchestra_(album))" in 1978.[[10]](#cite_note-wire_1996-10) [Buckner & Garcia](/wiki/Buckner_%26_Garcia)'s "[Pac-Man Fever](/wiki/Pac-Man_Fever_(song))" and the [album of the same name](/wiki/Pac-Man_Fever_(album)) were major hits in 1982.[[60]](#cite_note-timemag-60) Arcade game sounds were one of the foundational elements of the [electro music](/wiki/Electro_music) genre, which in turn inspired many other [electronic dance music](/wiki/Electronic_dance_music) genres such as [techno](/wiki/Techno) and [house music](/wiki/House_music), which were sometimes referred to as "[bleep music](/wiki/Bleep_(music))".[[10]](#cite_note-wire_1996-10) *[Space Invaders](/wiki/Space_Invaders)* inspired [Player One's "Space Invaders" (1979)](/wiki/Space_Invaders_(Player_One_song)), which in turn provided the [bassline](/wiki/Bassline) for [Jesse Saunders](/wiki/Jesse_Saunders)' "On and On" (1984),[[63]](#cite_note-63)[[64]](#cite_note-bp-64)
+the first [Chicago house](/wiki/Chicago_house) track.[[65]](#cite_note-65) [Warp](/wiki/Warp_(record_label))'s record "[Testone](/w/index.php?title=WarpVision&action=edit&redlink=1)" (1990) by [Sweet Exorcist](/wiki/Sweet_Exorcist_(band)) sampled video game sounds from Yellow Magic Orchestra's "Computer Game" and defined Sheffield's [bleep techno](/wiki/Yorkshire_Bleeps_and_Bass) scene in the early 1990s.[[9]](#cite_note-sicko_brewster_76-9)After the 1980s, however, chiptune music began declining in popularity.[[59]](#cite_note-bbc_chiptune-59) Since then, up until the 2000s, chip music was rarely performed live and the songs were nearly exclusively spread as executable programs and other computer file formats. Some of the earliest examples of record label releases of pure chip music can be found in the late 1990s.[[66]](#cite_note-66)
+Chiptune music began gaining popularity again towards the end of the 1990s. The first [electroclash](/wiki/Electroclash) record, [I-F](/wiki/I-F)'s "Space Invaders Are Smoking Grass" (1997), has been described as "burbling electro in a vocodered homage to [Atari-era](/wiki/Golden_age_of_arcade_video_games) hi-jinks".[[67]](#cite_note-Lynskey2002-67)By the mid-2000s, 8-bit chip music began making a comeback in mainstream pop music, when it was used by acts such as [Beck](/wiki/Beck) (for example, the 2005 song "[Girl](/wiki/Girl_(Beck_song))"), [The Killers](/wiki/The_Killers) (for example, the 2004 song "[On Top](/wiki/Hot_Fuss)"), [No Doubt](/wiki/No_Doubt) with the song "[Running](/wiki/Running_(No_Doubt_song))", and particularly [The Postal Service](/wiki/The_Postal_Service) in many of their songs. The low-quality digital [PCM](/wiki/PCM) styling of early game music composers such as Hiroshi Kawaguchi also began gaining popularity.[[68]](#cite_note-68)
+In 2003, the [J-pop](/wiki/J-pop) girl group [Perfume](/wiki/Perfume_(Japanese_band)),[[69]](#cite_note-japantimes-69)[[70]](#cite_note-bounce_perfume-70)
+along with producer [Yasutaka Nakata](/wiki/Yasutaka_Nakata), began producing music combining chiptunes with [synth-pop](/wiki/Synth-pop) and [electro house](/wiki/Electro_house);[[70]](#cite_note-bounce_perfume-70) their breakthrough came in 2007 with *[Game](/wiki/Game_(Perfume_album))*, which led to other Japanese female artists using a similar electronic style, including [Aira Mitsuki](/wiki/Aira_Mitsuki), [immi](/wiki/Immi), [Mizca](/wiki/Masami_Mitsuoka), [SAWA](/wiki/Sawa_(singer)), [Saori@destiny](/wiki/Saori_at_Destiny), and [Sweet Vacation](/wiki/Sweet_Vacation).[[71]](#cite_note-allabout-71)
+Electro house producer [Deadmau5](/wiki/Deadmau5) started his career in the late 1990s, with a chiptune and demoscene movements-influenced sound. Three self-released compilations, [Project 56](/wiki/Project_56_(album)), [deadmau5 Circa 1998–2002](/wiki/Deadmau5_Circa_1998%E2%80%932002) and [A Little Oblique](/wiki/A_Little_Oblique), were finished in 2006.[[72]](#cite_note-72)In 2007, the entirely chiptune album *[8-Bit Operators: The Music of Kraftwerk](/wiki/8-Bit_Operators:_The_Music_of_Kraftwerk)* was released on major mainstream label [Astralwerks](/wiki/Astralwerks)/[EMI](/wiki/EMI) Records, which included several prominent and noted chipmusicians, including Nanoloop[[73]](#cite_note-73)
+creator Oliver Wittchow, and LittleSoundDJ[[74]](#cite_note-74)
+creator Johan Kotlinski who appears as the artist *Role Model*. [Kraftwerk](/wiki/Kraftwerk) founding member [Ralf Hütter](/wiki/Ralf_H%C3%BCtter) personally selected the tracks.[[75]](#cite_note-75)
+A vinyl 12-inch single version was released on February 24, 2007 as a precursor to the full-length CD, and reached as high as number 17[[76]](#cite_note-76)
+on the *Billboard* magazine Hot Dance Singles Sales Chart. In March 2007, the CD release reached as high as number 1 on the [CMJ](/wiki/CMJ) RPM (North American college Electronic) charts.[[77]](#cite_note-77)[[78]](#cite_note-78)
+Edinburgh-born electronic musician [Unicorn Kid](/wiki/Unicorn_Kid) has helped further popularize chiptune, especially with the song "True Love Fantasy" and other songs from the EP "Tidal Rave" being played on late night radio, including on [BBC Radio 1](/wiki/BBC_Radio_1), where he played live on the Festive Festival 2011. In Canada, [Eightcubed](/wiki/Eightcubed) and [Crystal Castles](/wiki/Crystal_Castles_(band)) helped the popularity further via the Toronto underground club scene and created a lasting impression with the music video "Heart Invaders" debuting on [MuchMusic](/wiki/MuchMusic) in 2008[[79]](#cite_note-79)
+and the single "[Alice Practice](/wiki/Alice_Practice)" hitting 29th on [NME](/wiki/NME) "150 Best Tracks of the Past 15 Years".[[80]](#cite_note-80)During the late 2000s, a new wave of chiptune culture took place, boosted by the release of software such as LittleSoundDJ for the [Game Boy](/wiki/Game_Boy_family). This new culture has much more emphasis on live performances and record releases than the demoscene and tracker culture, of which the new artists are often only distantly aware.[[81]](#cite_note-81)
+In recent years, 8-bit chiptune sounds, or "video game beats", have been used by a number of mainstream pop artists. Examples include artists such as [Kesha](/wiki/Kesha)[[82]](#cite_note-82)
+(most notably in "[Tik Tok](/wiki/Tik_Tok_(song))",[[83]](#cite_note-Puls-83) the [best-selling single](/wiki/List_of_best-selling_singles) of 2010[[84]](#cite_note-ifpi10-84)),
+[50 Cent](/wiki/50_Cent) with the hit single "Ayo Technology", [Robyn](/wiki/Robyn), [Snoop Dogg](/wiki/Snoop_Dogg),[[83]](#cite_note-Puls-83)
+[Eminem](/wiki/Eminem) (for example, "Hellbound"), [Nelly Furtado](/wiki/Nelly_Furtado), and [Timbaland](/wiki/Timbaland) (see [Timbaland plagiarism controversy](/wiki/Timbaland_plagiarism_controversy)). The influence of video game sounds can also be heard in contemporary British [electronica](/wiki/Electronica) music by artists such as [Dizzee Rascal](/wiki/Dizzee_Rascal) and [Kieran Hebden](/wiki/Kieran_Hebden),[[85]](#cite_note-guardian_ymo-85)
+as well as in [heavy metal](/wiki/Heavy_metal_music) bands such as [DragonForce](/wiki/DragonForce). [Grime](/wiki/Grime_music) music in particular samples sawtooth wave sounds from video games which were popular in [East London](/wiki/East_(London_sub_region)).[[11]](#cite_note-Jong-11)
+Some [dubstep](/wiki/Dubstep) producers have also been influenced by video game chiptunes, particularly the work of [Yuzo Koshiro](/wiki/Yuzo_Koshiro).[[86]](#cite_note-86)[[87]](#cite_note-self-titledmag-87)[[88]](#cite_note-timeout_20425-88)
+In 2010, a [BBC News](/wiki/BBC_News) article stated that the "sights and sounds of [old-school games](/wiki/Retrogaming)" (naming *[Frogger](/wiki/Frogger)* and *[Donkey Kong](/wiki/Donkey_Kong)* as examples) are "now becoming a part of mainstream music and culture."[[59]](#cite_note-bbc_chiptune-59)
+[Complextro](/wiki/Complextro) pioneer [Porter Robinson](/wiki/Porter_Robinson) has also cited video game sounds, or chiptunes, as an influence on his style of music along with 1980s [analog synth](/wiki/Analog_synthesizer) music.[[89]](#cite_note-nashville_complextro-89) In 2022, [trap music](/wiki/Trap_music) producer Popstar Benny cited video game sounds as one of the foundations for the [plugg music](/wiki/Plugg_music) genre.[[13]](#cite_note-SC-13)## Tracker chiptunes[[edit](/w/index.php?title=Chiptune&action=edit&section=8)]
+See also: [music tracker](/wiki/Music_tracker) and [module file](/wiki/Module_file)The [Commodore Amiga](/wiki/Amiga) (1985) with its sample-based sound generation distanced the concept of microcomputer music away from plain chip-synthesized sounds. Amiga [tracker music software](/wiki/Music_tracker), beginning from Karsten Obarski's [Ultimate Soundtracker](/wiki/Ultimate_Soundtracker) (1987), inspired great numbers of computer enthusiasts to create computer music. As an offshoot of the burgeoning tracker music culture, a type of tracker music reminiscent of Commodore 64 SID music was born, that utilized simple waveforms instead of digitized samples. This type of music with small samples came to be called "chiptunes" referring to Amiga's chip memory where such samples would easily fit.Earliest examples of tracker chiptunes date back to 1989 and are attributed to the [demoscene](/wiki/Demoscene) musicians [4mat](/wiki/4mat), Baroque, [TDK](/wiki/Mark_Knight_(sound_designer)), Turtle and Duz. Tracker chiptunes are based on very short looped waveforms which are modulated by tracker effects such as [arpeggio](/wiki/Arpeggio), [vibrato](/wiki/Vibrato), and [portamento](/wiki/Portamento). A very common loop length is 128 samples, which at an approximate sample rate of 17 kHz misses a C note by a few [cents](/wiki/Cent_(music)).There is at least one commercial game for the Amiga, Nebulus II, that used chiptune style music, although with some conventional sampled instrument sounds as well as speech. The game apparently was initially planned for release for the C64 but was canceled.The small amount of sample data made tracker chiptunes far more space-efficient than most other types of tracker music, which made them appealing to size-limited demoscene demos and [crack intros](/wiki/Crack_intro). Tracker chiptunes have also been commonly used in other [warez scene](/wiki/Warez_scene) executables such as [keygens](/wiki/Keygen).Nowadays the term "chiptune" is also used to cover chip music using actual chip-based synthesis, but some sources such as the Amiga Music Preservation project still define a chiptune specifically as a small [tracker module](/wiki/Module_file).[[90]](#cite_note-90) Modern trackers used today include OpenMPT, Famitracker, Furnace and Goattracker.## Contemporary chiptune music[[edit](/w/index.php?title=Chiptune&action=edit&section=9)]
+[*](/wiki/File:Gameboytracker.JPG)Little Sound DJ* loaded onto a [Game Boy Advance](/wiki/Game_Boy_Advance)*[Skip Cloud – "The Adventure Lights" (2011)](/wiki/File:The_Adventure_Lights.ogg)
+[](/wiki/File:The_Adventure_Lights.ogg)Duration: 3 minutes and 34 seconds.3:34---[Drozerix – "Computer Adventures" (2012)](/wiki/File:Drozerix_-_Computer_Adventures.wav)
+[](/wiki/File:Drozerix_-_Computer_Adventures.wav)Duration: 2 minutes and 50 seconds.2:50
+These are examples of modern-day chiptune tracks distributed as stand-alone music files without being a part of a video game soundtrack.---
+Problems playing these files? See [media help](/wiki/Help:Media).*The chip [scene](/wiki/Warez_scene) has become relevant thanks to "[compos](/wiki/Compo_(demoscene))" being held, groups releasing [music disks](/wiki/Music_disk) and with the [cracktro](/wiki/Crack_intro)/demo scene. New [tracker](/wiki/Tracker_(music_software)) tools are used for making chip sounds available to less tech-savvy musicians. The [NES](/wiki/Nintendo_Entertainment_System) platform has the MidiNES, a cartridge that turns the system into a full blown hardware MIDI controlled synthesizer. Around 2007, the Mssiah was released for the [Commodore 64](/wiki/Commodore_64), which is very similar to the MidiNES, but with greater parameter controls, sequencing, analog drum emulation, and limited sample playback. The [Commodore PET](/wiki/Commodore_PET) has the [open-source](/wiki/Open-source_software) [PetSynth](/wiki/PetSynth) software, which uses the PET's [6522](/wiki/6522) chip for sound, allows the computer to be played like a piano keyboard, and features many effects. For MS-DOS, [Fast Tracker](/wiki/FastTracker_2) is one of the most famous chiptune makers because of the ability to create hand-drawn samples with the mouse. Chiptune artist [Pixelh8](/wiki/Pixelh8) has also designed music software such as Music Tech[[91]](#cite_note-91)
+for the Game Boy and the Pro Performer[[92]](#cite_note-92)
+for the [Game Boy Advance](/wiki/Game_Boy_Advance) and [Nintendo DS](/wiki/Nintendo_DS) which turn both machines into real time synthesizers.There have been a number of television segments featuring chiptunes and chip music artists in the past few years. On April 11, 2005, [8 Bit Weapon](/wiki/8_Bit_Weapon) played their songs "Bombs Away" and "Gameboy Rocker" on [G4](/wiki/G4_(U.S._TV_channel))'s *[Attack of the Show](/wiki/Attack_of_the_Show)* live broadcast Episode #5058.[[93]](#cite_note-93)[[94]](#cite_note-94) In 2008, as a parody of *[Masterpiece Theatre](/wiki/Masterpiece_(TV_series))*, the first four episodes of *[Boing Boing Video](/wiki/Boing_Boing#Boing_Boing_Video)*'s *[SPAMasterpiece Theater](/wiki/SPAMasterpiece_Theater)* opened with a chiptune remix of [Jean-Joseph Mouret](/wiki/Jean-Joseph_Mouret)'s "[Rondeau: Fanfare](/wiki/Fanfare-Rondeau)" (1735) by Hamhocks Buttermilk Johnson.[[95]](#cite_note-Boing_Boing_tv_2008a-95)
+Another chipmusic feature included little-scale, Dot.AY, [Ten Thousand Free Men & Their Families](/wiki/Ten_Thousand_Free_Men_%26_Their_Families) and Jim Cuomo on the Australian television series *[Good Game](/wiki/Good_Game_(TV_program))* in 2009.[[96]](#cite_note-96)The [Electronic Frontier Foundation](/wiki/Electronic_Frontier_Foundation) in December 2010 used a faux 8-bit game with an 8-bit sound track by crashfaster to demonstrate its notable legal achievements for that year.[[97]](#cite_note-97)In March 2012, the [Smithsonian American Art Museum](/wiki/Smithsonian_American_Art_Museum)'s "The Art of Video Games" exhibit opened featuring a chipmusic soundtrack at the entrance by artists [8 Bit Weapon](/wiki/8_Bit_Weapon) and [ComputeHer](/wiki/ComputeHer). 8 Bit Weapon also created a track called "The art of Video Games Anthem" for the exhibit.[[98]](#cite_note-98) In September 2015, the first music compilation based on [Domo (NHK)](/wiki/Domo_(NHK)), Domo Loves Chiptune, was released on iTunes, Amazon, and all major music streaming services.[[99]](#cite_note-Domo_Loves_Chiptune_Promotional_Video-99)[[100]](#cite_note-Everybody_Loves_Chiptune_&_So_Do_We-100)
+The compilation features top artists in the Chiptune genre such as [Anamanaguchi](/wiki/Anamanaguchi) and [Disasterpeace](/wiki/Disasterpeace). Domo Loves Chiptune also features the first Chiptune remix of the Domo theme song by Mystery Mansion. The New York City chiptune scene was also the subject of a documentary called *Reformat the Planet* by [2 Player Productions](/wiki/2_Player_Productions). This film was an official selection at the 2008 [South by Southwest](/wiki/South_by_Southwest).[[101]](#cite_note-101)Chip music has returned to 21st-century gaming, either in full-chip music style or using chip samples in the music. Popular games that feature chiptune elements in their soundtracks include *[Shovel Knight](/wiki/Shovel_Knight)*[[102]](#cite_note-102) and *[Undertale](/wiki/Undertale)*.[[103]](#cite_note-103)## Events[[edit](/w/index.php?title=Chiptune&action=edit&section=10)]Events take place all around the world that focus around the celebration and recognition of chiptune music.### Blip Festival[[edit](/w/index.php?title=Chiptune&action=edit&section=11)]
+Main article: [Blip Festival](/wiki/Blip_Festival)### MAGFest's Chipspace[[edit](/w/index.php?title=Chiptune&action=edit&section=12)]
+Main article: [MAGFest](/wiki/MAGFest)In the United States, during [Super MAGFest](/wiki/MAGFest)—a yearly convention that hosts a variety of video game-related events—popular chiptune artists such as [goto80](/wiki/Goto80) and [Chipzel](/wiki/Chipzel) have previously performed on the Concert Hall mainstage. A chiptune-focused mainstage show (aptly named "Chip Rave") typically occurs on the third day of the convention within the concert hall and has featured countless prominent faces in the chiptune community.Super MAGFest also holds a continuous venue called Chipspace, a place where participants in the chiptune community go on-stage and perform their music through an open mic system.[[104]](#cite_note-104) Originally started by Chiptunes=WIN[[105]](#cite_note-105) founder Brandon L. Hood and maintained by geekbeatradio,[[106]](#cite_note-106)
+Chipspace has evolved over the course of MAGFest's lifespan to bring chiptune fans closer together.[[107]](#cite_note-107)
+Among these daily performances are showcases, which are curated by chiptune [netlabels](/wiki/Netlabel) such as Chiptunes = WIN, geekbeatradio, and more.[[108]](#cite_note-108)[*](/wiki/File:Chipspace_(MAGFest_2020).jpg)The crowd area and marketplace for Chipspace during MAGFest 2020## References[[edit](/w/index.php?title=Chiptune&action=edit&section=13)]1. $12. $13. $14. $15. $16. $17. $18. $19. $110. $111. $112. $113. $114. $115. $116. $117. $118. $119. $120. $121. $122. $123. $124. $125. $126. $127. $128. $129. $130. $131. $132. $133. $134. $135. $136. $137. $138. $139. $140. $141. $142. $143. $144. $145. $146. $147. $148. $149. $150. $151. $152. $153. $154. $155. $156. $157. $158. $159. $160. $161. $162. $163. $164. $165. $166. $167. $168. $169. $170. $171. $172. $173. $174. $175. $176. $177. $178. $179. $180. $181. $182. $183. $184. $185. $186. $187. $188. $189. $190. $191. $192. $193. $194. $195. $196. $197. $198. $199. $1100. $1101. $1102. $1103. $1104. $1105. $1106. $1107. $1108. $1## Further reading[[edit](/w/index.php?title=Chiptune&action=edit&section=14)]- McAlpine, Kenneth B. (2018). *Bits and Pieces: A History of Chiptunes*. New York: Oxford University Press. [ISBN](/wiki/ISBN_(identifier)) [**978-0-19-049609-8](/wiki/Special:BookSources/978-0-19-049609-8).## External links[[edit](/w/index.php?title=Chiptune&action=edit&section=15)][*](/wiki/File:Commons-logo.svg)
+Wikimedia Commons has media related to [Chiptune](https://commons.wikimedia.org/wiki/Category:Chiptune).Listen to this article (26 minutes)[](/wiki/File:Spoken_Wikipedia_-_English_-_chiptune.oga)Duration: 25 minutes and 41 seconds.25:41
+![Spoken Wikipedia icon](//upload.wikimedia.org/wikipedia/commons/thumb/8/87/Gnome-mime-sound-openclipart.svg/60px-Gnome-mime-sound-openclipart.svg.png)[This audio file](/wiki/File:Spoken_Wikipedia_-_English_-_chiptune.oga) was created from a revision of this article dated 19 June 2020 (2020-06-19), and does not reflect subsequent edits.([Audio help](/wiki/Wikipedia:Media_help) · [More spoken articles](/wiki/Wikipedia:Spoken_articles))
+- ["Bleep Bloop: The Charms of Chiptune"](http://www.newyorker.com/online/blogs/culture/2013/05/bleep-bloop-the-charms-of-chiptune.html) in [The New Yorker](/wiki/The_New_Yorker)*'s *Culture* blog- [Diggin' in the Carts: A Documentary Series About Japanese Video Game Music](https://web.archive.org/web/20141001081738/http://www.redbullmusicacademy.com/magazine/diggin-in-the-carts), [Red Bull Music Academy](/wiki/Red_Bull_Music_Academy)| show- [v](/wiki/Template:Chiptune-footer)
+- [t](/wiki/Template_talk:Chiptune-footer)
+- [e](/wiki/Special:EditPage/Template:Chiptune-footer)
+Chiptune |
+| --- |
+| Genres |
+- [Bitpop](/wiki/Bitpop)- [Tracker music](/wiki/Module_file)- [Nintendocore](/wiki/Nintendocore)- [Skweee](/wiki/Skweee)- [Video game music](/wiki/Video_game_music)|
+| Technology |
+- [Sound chip](/wiki/Sound_chip)- [Synthesizer](/wiki/Synthesizer)- [Tracker](/wiki/Music_tracker)- [Game Boy](/wiki/Game_Boy)- [Nintendo Entertainment System](/wiki/Nintendo_Entertainment_System)- [Commodore 64](/wiki/Commodore_64)|
+| Events |
+- [Blip Festival](/wiki/Blip_Festival)- [MAGFest](/wiki/MAGFest)|
+| Related |
+- [8bitpeoples](/wiki/8bitpeoples)- [Circuit bending](/wiki/Circuit_bending)- [Glitch](/wiki/Glitch_(music))- [Demoscene](/wiki/Demoscene)|
+| Other [electronic music](/wiki/Electronic_music) [genres](/wiki/Music_genre) |
+- [Ambient](/wiki/Ambient_music)- [Ambient techno](/wiki/Ambient_techno)- [Breakbeat](/wiki/Breakbeat)- [Drum and bass](/wiki/Drum_and_bass)- [Dubstep](/wiki/Dubstep)- [Electro](/wiki/Electro_(music))- [Eurobeat](/wiki/Eurobeat)- [Eurodance](/wiki/Eurodance)- [Hardcore](/wiki/Hardcore_techno)- [Hi-NRG](/wiki/Hi-NRG)- [House](/wiki/House_music)- [Industrial](/wiki/Industrial_music)- [J-pop](/wiki/J-pop)- [Synthpop](/wiki/Synthpop)- [Techno](/wiki/Techno)- [Trance](/wiki/Trance_music)- [Trip hop](/wiki/Trip_hop)- [UK garage](/wiki/UK_garage)|| show- [v](/wiki/Template:DIY_culture_in_electronic_music)
+- [t](/wiki/Template_talk:DIY_culture_in_electronic_music)
+- [e](/wiki/Special:EditPage/Template:DIY_culture_in_electronic_music)
+[DIY culture](/wiki/DIY_ethic) in [electronic music](/wiki/Electronic_music) |
+| --- |
+| General topics |
+- Chiptune- [Circuit bending](/wiki/Circuit_bending)- [Modular synthesizer](/wiki/Modular_synthesizer)- [Hackspace](/wiki/Hackspace)- [Glitch (music)](/wiki/Glitch_(music))- [Tape loop](/wiki/Tape_loop)|
+| Predecessors and early pioneers |
+- [Thaddeus Cahill](/wiki/Thaddeus_Cahill)- [Luigi Russolo](/wiki/Luigi_Russolo)- [Leon Theremin](/wiki/Leon_Theremin)- [Delia Derbyshire](/wiki/Delia_Derbyshire)- [Bob Moog](/wiki/Bob_Moog)- [David Tudor](/wiki/David_Tudor)- [Reed Ghazala](/wiki/Reed_Ghazala)- [Serge Tcherepnin](/wiki/Serge_Tcherepnin)|
+| Instruments |
+- [Atari Punk Console](/wiki/Atari_Punk_Console)- [Drum Buddy](/wiki/Drum_Buddy)- [Kraakdoos](/wiki/Kraakdoos)|
+| Circuits |
+- [Speak & Spell (toy)](/wiki/Speak_%26_Spell_(toy))- [Roland TB-303](/wiki/Roland_TB-303)|
+| Organisations |
+- [BBC Radiophonic Workshop](/wiki/BBC_Radiophonic_Workshop)- [STEIM](/wiki/STEIM)- Elektronmusikstudion- Casper Electronics- [Death By Audio](/wiki/Death_By_Audio)- [Musical Electronics Library](/wiki/Musical_Electronics_Library)|
+| Writers |
+- [Nicolas Collins](/wiki/Nicolas_Collins)- [Bart Hopkin](/wiki/Bart_Hopkin)|
+| Related topics |
+- [Experimental musical instrument](/wiki/Experimental_musical_instrument)- [Acousmonium](/wiki/Acousmonium)- [Glitch](/wiki/Glitch)- [Graphical sound](/wiki/Graphical_sound)|
+|
+- * [Category: Electronic music](/wiki/Category:Electronic_music)|| show- [v](/wiki/Template:Electronica)
+- [t](/wiki/Template_talk:Electronica)
+- [e](/wiki/Special:EditPage/Template:Electronica)
+[Electronic](/wiki/Electronic_music)-based music styles |
+| --- |
+| [Electronic dance music](/wiki/Electronic_dance_music)** · **[Electronica](/wiki/Electronica)** |
+| [Genres](/wiki/List_of_electronic_music_genres) by
+[decade of origin](/wiki/Timeline_of_electronic_music_genres) | Early |
+- [Amplified guitar](/wiki/Guitar_amplifier)
+[Electric blues](/wiki/Electric_blues)- [Hawaiian guitar](/wiki/Music_of_Hawaii#Guitar_innovations)- [Jùjú](/wiki/J%C3%B9j%C3%BA_music)- [Rock](/wiki/Rock_music)
+[List of rock genres](/wiki/List_of_rock_genres)[Western swing](/wiki/Western_swing)
+[Biomusic](/wiki/Biomusic)
+[Computer music](/wiki/Computer_music)
+[Electroacoustic music](/wiki/Electroacoustic_music)
+- [Acousmatic music](/wiki/Acousmatic_music)- [Musique concrète](/wiki/Musique_concr%C3%A8te)- [Tape music](/wiki/Tape_music)[Elektronische Musik](/wiki/Elektronische_Musik)
+[Live electronics](/wiki/Live_electronic_music)
+[Noise](/wiki/Noise_music)
+[Sound system (Jamaican)](/wiki/Sound_system_(Jamaican))
+[Space age pop](/wiki/Space_age_pop)
+|
+| 1960s |
+- [Ambient](/wiki/Ambient_music)- [Drone](/wiki/Drone_music)- [Dub](/wiki/Dub_music)- [Electronic rock](/wiki/Electronic_rock)- [Jazz-funk](/wiki/Jazz-funk)- [Kosmische musik](/wiki/Kosmische_musik)- [New-age music](/wiki/New-age_music)- [Progressive rock](/wiki/Progressive_rock)- [Psychedelic music](/wiki/Psychedelic_music)
+[Psychedelic funk](/wiki/Psychedelic_funk)- [Psychedelic rock](/wiki/Psychedelic_rock)- [Sampledelia](/wiki/Sampledelia)[Space music](/wiki/Space_music)
+- [Space rock](/wiki/Space_rock)|
+| 1970s |
+- [Afro/cosmic music](/wiki/Afro/cosmic_music)
+[Space disco](/wiki/Space_disco)[Boogie](/wiki/Boogie_(genre))
+Chiptune
+[Dancehall](/wiki/Dancehall)
+[Electropunk](/wiki/Electropunk)
+[Eurodisco](/wiki/Eurodisco)
+[Hi-NRG](/wiki/Hi-NRG)
+[Industrial](/wiki/Industrial_music)
+- [Industrial rock](/wiki/Industrial_rock)[Japanoise](/wiki/Japanoise)
+[New wave](/wiki/New_wave_music)
+[Post-punk](/wiki/Post-punk)
+- [New musick](/wiki/New_musick)- [Cold wave](/wiki/Cold_wave_(music))- [Dance-punk](/wiki/Dance-punk)- [Dark wave](/wiki/Dark_wave)- [Minimal wave](/wiki/Minimal_wave)[Post-disco](/wiki/Post-disco)
+- [Dance-rock](/wiki/Dance-rock)- [Italo disco](/wiki/Italo_disco)[Reggae fusion](/wiki/Reggae_fusion)
+[Synth-pop](/wiki/Synth-pop)
+|
+| 1980s |
+- [Alternative dance](/wiki/Alternative_dance)
+[Baggy](/wiki/Baggy)[Ambient pop](/wiki/Ambient_pop)
+[Breakbeat](/wiki/Breakbeat)
+- [Florida breaks](/wiki/Florida_breaks)[Contemporary R&B](/wiki/Contemporary_R%26B)
+- [New jack swing](/wiki/New_jack_swing)[Dark ambient](/wiki/Dark_ambient)
+[Dubtronica](/wiki/Dubtronica)
+[Electro](/wiki/Electro_(music))
+- [Freestyle](/wiki/Freestyle_music)[Electro-industrial](/wiki/Electro-industrial)
+- [Electronic body music](/wiki/Electronic_body_music)[Electropop](/wiki/Electropop)
+[Ethnic electronica](/wiki/Ethnic_electronica)
+- [Funk carioca](/wiki/Funk_carioca)- [Kuduro](/wiki/Kuduro)- [Kwaito](/wiki/Kwaito)- [Tecnocumbia](/wiki/Tecnocumbia)- [Turbo-folk](/wiki/Turbo-folk)[Eurobeat](/wiki/Eurobeat)
+[Eurodance](/wiki/Eurodance)
+[Grebo](/wiki/Grebo_(music))
+[House](/wiki/House_music)
+- [Acid](/wiki/Acid_house)- [Ambient](/wiki/Ambient_house)- [Balearic beat](/wiki/Balearic_beat)- [Chicago](/wiki/Chicago_house)- [Deep](/wiki/Deep_house)- [Garage](/wiki/Garage_house)- [Funky](/wiki/Funky_house)- [Italo](/wiki/Italo_house)- [Jersey sound](/wiki/New_Jersey_sound)- [Hip house](/wiki/Hip_house)- [Latin](/wiki/Latin_house)- [Tech](/wiki/Tech_house)- [Tribal](/wiki/Tribal_house)[Industrial hip-hop](/wiki/Industrial_hip-hop)
+[Industrial metal](/wiki/Industrial_metal)
+[Martial industrial](/wiki/Martial_industrial)
+[Miami bass](/wiki/Miami_bass)
+[New beat](/wiki/New_beat)
+[Power electronics](/wiki/Power_electronics_(music))
+[Ragga](/wiki/Ragga)
+[Sophisti-pop](/wiki/Sophisti-pop)
+[Synth-metal](/wiki/Synth-metal)
+[Techno](/wiki/Techno)
+- [Acid techno](/wiki/Acid_techno)- [Bleep techno](/wiki/Bleep_techno)- [Detroit techno](/wiki/Detroit_techno)[Tracker music](/wiki/Tracker_music)
+|
+| 1990s |
+- [Ambient dub](/wiki/Ambient_dub)- [Ambient techno](/wiki/Ambient_techno)- [Asian underground](/wiki/Asian_underground)- [Baltimore club](/wiki/Baltimore_club)- [Bhangragga](/wiki/Bhangragga)- [Big beat](/wiki/Big_beat)- [Bitpop](/wiki/Bitpop)- [Breakbeat hardcore](/wiki/Breakbeat_hardcore)
+[Darkcore](/wiki/Darkcore)- [Happy hardcore](/wiki/Happy_hardcore)- [Toytown techno](/wiki/Toytown_techno)[Broken beat](/wiki/Broken_beat)
+[Changa tuki](/wiki/Changa_tuki)
+[Dark electro](/wiki/Dark_electro)
+[Denpa song](/wiki/Denpa_song)
+[Digital hardcore](/wiki/Digital_hardcore)
+[Disco polo](/wiki/Disco_polo)
+[Diva house](/wiki/Diva_house)
+- [Hardbag](/wiki/Hardbag)[Downtempo](/wiki/Downtempo)
+- [Bristol sound](/wiki/Bristol_underground_scene)- [Psybient](/wiki/Psybient)- [Trip hop](/wiki/Trip_hop)[Drum and bass](/wiki/Drum_and_bass)
+- Heavy
+[Darkstep](/wiki/Darkstep)- [Hardstep](/wiki/Hardstep)- [Neurofunk](/wiki/Neurofunk)- [Techstep](/wiki/Techstep)[Jungle](/wiki/Jungle_music)
+- [Ragga jungle](/wiki/Ragga_jungle)Light
+- [Atmospheric](/wiki/Atmospheric_drum_and_bass)- [Intelligent](/wiki/Intelligent_drum_and_bass)- [Jazzstep](/wiki/Jazzstep)- [Liquid funk](/wiki/Liquid_funk)[Dub techno](/wiki/Dub_techno)
+[Dungeon synth](/wiki/Dungeon_synth)
+[Electroclash](/wiki/Electroclash)
+[Folktronica](/wiki/Folktronica)
+[French house](/wiki/French_house)
+- [Nu disco](/wiki/Nu_disco)[Funkot](/wiki/Funkot)
+[Futurepop](/wiki/Futurepop)
+[Ghetto house](/wiki/Ghetto_house)
+- [Footwork](/wiki/Footwork_(genre))- [Ghettotech](/wiki/Ghettotech)[Glitch](/wiki/Glitch_(music))
+[Hardcore](/wiki/Hardcore_(electronic_dance_music_genre))
+- [Belgian techno](/wiki/Belgian_hardcore_techno)- [Bouncy techno](/wiki/Bouncy_techno)- [Breakcore](/wiki/Breakcore)- [Free tekno](/wiki/Free_tekno_(music))- [Frenchcore](/wiki/Frenchcore)- [Gabber](/wiki/Gabber)- [Hardstyle](/wiki/Hardstyle)
+[Lento violento](/wiki/Lento_violento)[J-core](/wiki/J-core)
+[Mákina](/wiki/M%C3%A1kina)
+[Speedcore](/wiki/Speedcore)
+[Harsh noise wall](/wiki/Harsh_noise_wall)
+[Illbient](/wiki/Illbient)
+[Indietronica](/wiki/Indietronica)
+[Industrial techno](/wiki/Industrial_techno)
+[Intelligent dance music](/wiki/Intelligent_dance_music)
+- [Drill 'n' bass](/wiki/Drill_%27n%27_bass)[Kidandali](/wiki/Kidandali)
+[Livetronica](/wiki/Jam_band#1996–2008:_rise_of_Phish_and_music_festivals)
+[Merenhouse](/wiki/Merenhouse)
+[Microhouse](/wiki/Microhouse)
+[Minimal techno](/wiki/Minimal_techno)
+- [Schaffel](/wiki/Schaffel)[Nu jazz](/wiki/Nu_jazz)
+- [Electro swing](/wiki/Electro_swing)[Nu metal](/wiki/Nu_metal)
+[Nu skool breaks](/wiki/Nu_skool_breaks)
+[Post-rock](/wiki/Post-rock)
+[Power noise](/wiki/Power_noise)
+[Progressive house](/wiki/Progressive_house)
+[Psydub](/wiki/Psydub)
+[Reggaeton](/wiki/Reggaeton)
+- [Dembow](/wiki/Dembow)[Trance](/wiki/Trance_music)
+- [Acid](/wiki/Acid_trance)- [Balearic](/wiki/Balearic_trance)- [Dream](/wiki/Dream_trance)- [Goa](/wiki/Goa_trance)- [Hands Up](/wiki/Eurodance#Hands_Up)- [Hard](/wiki/Hard_trance)- [Progressive](/wiki/Progressive_trance)- [Psy](/wiki/Psychedelic_trance)- [Tech](/wiki/Tech_trance)- [Uplifting](/wiki/Uplifting_trance)- [Vocal](/wiki/Vocal_trance)[UK garage](/wiki/UK_garage)
+- [2-step](/wiki/2-step_garage)- [Breakstep](/wiki/Breakstep)- [Speed garage](/wiki/Speed_garage)[UK hard house](/wiki/UK_hard_house)
+- [Hardbass](/wiki/Hardbass)- [Hard NRG](/wiki/Hard_NRG)|
+| 2000s |
+- [Afrobeats](/wiki/Afrobeats)- [Bassline](/wiki/Bassline_(music_genre))- [Budots](/wiki/Budots)- [Bloghouse](/wiki/Bloghouse)- [Christian electronic dance music](/wiki/Christian_electronic_dance_music)- [Cloud rap](/wiki/Cloud_rap)- [Coupé-décalé](/wiki/Coup%C3%A9-d%C3%A9cal%C3%A9)- [Crunk](/wiki/Crunk)
+[Crunkcore](/wiki/Crunkcore)[Dancehall pop](/wiki/Dancehall_pop)
+[Dubstep](/wiki/Dubstep)
+- [Reggaestep](/wiki/Reggaestep)[Electro house](/wiki/Electro_house)
+- [Complextro](/wiki/Complextro)- [Dutch house](/wiki/Dutch_house)- [Fidget house](/wiki/Fidget_house)[Electronicore](/wiki/Electronicore)
+[Future garage](/wiki/Future_garage)
+[Grime](/wiki/Grime_(music_genre))
+- [Grindie](/wiki/Grindie)[Hauntology](/wiki/Hauntology_(music))
+[Hypnagogic pop](/wiki/Hypnagogic_pop)
+- [Chillwave](/wiki/Chillwave)- [Glo-fi](/wiki/Glo-fi)[Jersey club](/wiki/Jersey_club)
+[Juke house](/wiki/Juke_house)
+[Jumpstyle](/wiki/Jumpstyle)
+[Mainstream hardcore](/wiki/Mainstream_hardcore)
+[Nightcore](/wiki/Nightcore)
+[Nintendocore](/wiki/Nintendocore)
+[Nortec](/wiki/Nortec)
+[Phonk](/wiki/Phonk)
+[Post-punk revival](/wiki/Post-punk_revival)
+- [New rave](/wiki/New_rave)[Rabòday](/wiki/Rab%C3%B2day)
+[Reductionism](/wiki/Reductionism_(music))
+- [Lowercase](/wiki/Lowercase_(music))- [Onkyokei](/wiki/Onkyokei)[Russ music](/wiki/Russ_music)
+[Sambass](/wiki/Sambass)
+[Shangaan electro](/wiki/Shangaan_electro)
+[Skweee](/wiki/Skweee)
+[Synthwave](/wiki/Synthwave)
+- [Sovietwave](/wiki/Sovietwave)[Tecno brega](/wiki/Tecno_brega)
+[Trival](/wiki/Trival)
+[UK bass](/wiki/UK_bass)
+[UK funky](/wiki/UK_funky)
+- [Funkstep](/wiki/Funkstep)[Vocaloid music](/wiki/Vocaloid_music)
+[Witch house](/wiki/Witch_house_(genre))
+[Wonky](/wiki/Wonky_(genre))
+[Wonky pop](/wiki/Wonky_pop)
+|
+| 2010s |
+- [Afroswing](/wiki/Afroswing)- [Algorave](/wiki/Algorave)- [Amapiano](/wiki/Amapiano)- [Azonto](/wiki/Azonto)- [Big room house](/wiki/Big_room_house)- [Black MIDI](/wiki/Black_MIDI)- [Brazilian bass](/wiki/Brazilian_bass)- [Bro-country](/wiki/Bro-country)- [Deconstructed club](/wiki/Deconstructed_club)- [Dreampunk](/wiki/Dreampunk)- [Funktronica](/wiki/Funktronica)- [Future bass](/wiki/Future_bass)
+[Kawaii future bass](/wiki/Kawaii_future_bass)[Future house](/wiki/Future_house)
+[Future soul](/wiki/Future_soul)
+[Hyperpop](/wiki/Hyperpop)
+[Gqom](/wiki/Gqom)
+[Jungle terror](/wiki/Jungle_terror)
+[Lofi hip-hop](/wiki/Lofi_hip-hop)
+[Mahraganat](/wiki/Mahraganat)
+[Melbourne bounce](/wiki/Melbourne_bounce)
+[Moombahton](/wiki/Moombahton)
+- [Moombahcore](/wiki/Moombahcore)- [Moombahsoul](/wiki/Moombahsoul)[Mumble rap](/wiki/Mumble_rap)
+[Outsider house](/wiki/Outsider_house)
+[Plugg](/wiki/Plugg_(music))
+[Post-dubstep](/wiki/Post-dubstep)
+- [Brostep](/wiki/Brostep)- [Riddim](/wiki/Riddim_(genre))[Rara tech](/wiki/Rara_tech)
+[Seapunk](/wiki/Seapunk)
+[Shamstep](/wiki/Shamstep)
+[EDM trap](/wiki/EDM_trap_music)
+[Tropical house](/wiki/Tropical_house)
+[Vaporwave](/wiki/Vaporwave)
+- [Hardvapour](/wiki/Hardvapour)- [Mallsoft](/wiki/Mallsoft)- [Slowed and reverb](/wiki/Chopped_%26_screwed#Slowed_and_reverb)[Wave](/wiki/Wave_music)
+- [Hardwave](/wiki/Hardwave)[Weird SoundCloud](/wiki/Weird_SoundCloud)
+[HexD](/wiki/HexD)
+[Hyperpop microgenres](/wiki/Hyperpop#Related_genres)
+- [Digicore](/wiki/Digicore)- [Sigilkore](/wiki/Sigilkore)[Rage](/wiki/Rage_rap)
+[Lowend](/wiki/Lowend)
+|
+| 2020s |
+- [Drift phonk](/wiki/Drift_phonk)- [Plugg microgenres](/wiki/Plugg_(music)#Proliferation_of_micro-subgenres)
+[Diary plugg](/wiki/Diary_plugg)- [Hyperplugg](/wiki/Hyperplugg)- [Dark plugg](/wiki/Dark_plugg)- [Ambient plugg](/wiki/Ambient_plugg)- [Terror plugg](/wiki/Terror_plugg)[Jerk](/wiki/Jerk_(music_genre))
+|Other topics
+| Culture |
+- [Beat drop](/wiki/Drop_(music))- [Club drug](/wiki/Club_drug)- [Disc jockey](/wiki/Disc_jockey)
+[DJ mix](/wiki/DJ_mix)- [Sound system](/wiki/Sound_system_(DJ))- [Turntablism](/wiki/Turntablism)[Mashup](/wiki/Mashup_(music))
+[Microgenre](/wiki/Microgenre)
+[Nightclub](/wiki/Nightclub)
+[Rave](/wiki/Rave)
+- [Acid house party](/wiki/Acid_house_party)- [Circuit party](/wiki/Circuit_party)- [Doof](/wiki/Doof)- [EDM festival](/wiki/List_of_electronic_dance_music_festivals)- [Free party](/wiki/Free_party)
+[Teknival](/wiki/Teknival)[Remix](/wiki/Remix)
+[Sampling](/wiki/Sampling_(music))
+- [Plunderphonics](/wiki/Plunderphonics)- [Rare groove](/wiki/Rare_groove)- [Riddim](/wiki/Riddim)[Street dance](/wiki/Street_dance)
+- [House dance](/wiki/House_dance)- [Rave dance](/wiki/Rave_dance)|
+| --- | --- |
+| Genres |
+- [Bass music](/wiki/Bass_music)- [Celtic fusion](/wiki/Celtic_fusion)- [Chill-out music](/wiki/Chill-out_music)
+[Lounge music](/wiki/Lounge_music)[Disco](/wiki/Disco)
+[Doujin music](/wiki/Doujin_music)
+[Lo-fi music](/wiki/Lo-fi_music)
+[Madchester](/wiki/Madchester)
+[Progressive electronica](/wiki/Progressive_electronica)
+[Rave music](/wiki/Rave_music)
+[Reggae](/wiki/Reggae)
+[Sound collage](/wiki/Sound_collage)
+[Video game music](/wiki/Video_game_music)
+- [Adaptive music](/wiki/Adaptive_music)|
+| Tools |
+- [Bass](/wiki/Bass_(sound)#Music_shows_and_dances)- [Data sonification](/wiki/Data_sonification)- [Digital audio workstation](/wiki/Digital_audio_workstation)- [Drum break](/wiki/Drum_break)
+[List](/wiki/Category:Sampled_drum_breaks)[Electronic musical instrument](/wiki/Electronic_musical_instrument)
+- [Drum machine](/wiki/Drum_machine)- [Sampler](/wiki/Sampler_(musical_instrument))- [Synthesizer](/wiki/Synthesizer)[Electronics in rock music](/wiki/Electronics_in_rock_music)
+[MIDI](/wiki/MIDI)
+[Music technology (electronic and digital)](/wiki/Music_technology_(electronic_and_digital))
+[Recording studio as an instrument](/wiki/Recording_studio_as_an_instrument)
+|| show- [v](/wiki/Template:Music_of_Japan)
+- [t](/wiki/Template_talk:Music_of_Japan)
+- [e](/wiki/Special:EditPage/Template:Music_of_Japan)
+[Music of Japan](/wiki/Music_of_Japan) |
+| --- |
+| "[Kimigayo](/wiki/Kimigayo)" (National anthem) |
+| [Traditional](/wiki/Traditional_Japanese_music) | [Instruments](/wiki/Traditional_Japanese_musical_instruments)
+Genres and styles |
+- [Bugaku](/wiki/Bugaku)- [Bushi](/wiki/Bushi_(music))- [Dainichido Bugaku](/wiki/Dainichido_Bugaku)- [Danmono](/wiki/Danmono)- [Gagaku](/wiki/Gagaku)- [Gigaku](/wiki/Gigaku)- [Jōruri](/wiki/J%C5%8Druri_(music))- [Kouta](/wiki/Kouta_(music))- [Min'yō](/wiki/Min%27y%C5%8D)- [Nagauta](/wiki/Nagauta)- [Rōkyoku](/wiki/R%C5%8Dkyoku)- [Saimon Ondo](/w/index.php?title=Saimon_Ondo&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E7%A5%AD%E6%96%87%E9%9F%B3%E9%A0%AD)]- [Komori-uta (lullaby)](/wiki/Lullaby#Asia-Pacific)- [Warabe Uta](/w/index.php?title=Warabe_Uta&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E7%AB%A5%E6%AD%8C)]
+[Kazoe Uta](/w/index.php?title=Kazoe_Uta&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E6%95%B0%E3%81%88%E6%AD%8C)]- [Ekaki Uta](/w/index.php?title=Ekaki_Uta&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E7%B5%B5%E6%8F%8F%E3%81%8D%E6%AD%8C)]- [Temari Uta](/w/index.php?title=Temari_Uta&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E6%89%8B%E9%9E%A0%E6%AD%8C)]|Post [Meiji Restoration](/wiki/Meiji_Restoration) (1868–present)
+- [Commercial song](/w/index.php?title=Japanese_commercial_song&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%82%B3%E3%83%9E%E3%83%BC%E3%82%B7%E3%83%A3%E3%83%AB%E3%82%BD%E3%83%B3%E3%82%B0#日本における歴史)]- [Gakusēka (student song)](/w/index.php?title=Gakus%C4%93ka&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E5%AD%A6%E7%94%9F%E6%AD%8C)]
+[Kōka (school song)](/w/index.php?title=Japanese_school_song&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E6%A0%A1%E6%AD%8C)]- [Ryōka (dormitory song)](/w/index.php?title=Ry%C5%8Dka_(song)&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E5%AF%AE%E6%AD%8C)]- [Daigaku-Ōenka (cheering song of university)](/w/index.php?title=Daigaku-%C5%8Denka&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E5%BF%9C%E6%8F%B4%E6%AD%8C#大学)][Enzetsuka/Enka](/wiki/Enka)
+[Gunka (military song)](/wiki/Gunka)
+[Jazz](/wiki/Japanese_jazz)
+[Kayōkyoku](/wiki/Kay%C5%8Dkyoku)
+- [Senji-kayō](/w/index.php?title=Senji-kay%C5%8D&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E6%88%A6%E6%99%82%E6%AD%8C%E8%AC%A1)]- [Gunkoku-kayō](/w/index.php?title=Gunkoku-kay%C5%8D&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E8%BB%8D%E5%9B%BD%E6%AD%8C%E8%AC%A1)][Radio calisthenics song](/wiki/Radio_calisthenics)
+[Ryūkōka](/wiki/Ry%C5%ABk%C5%8Dka)
+[Shichōsonka (municipality song)](/w/index.php?title=Shich%C5%8Dsonka&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E5%B8%82%E7%94%BA%E6%9D%91%E6%AD%8C)]
+[Shōka](/w/index.php?title=Sh%C5%8Dka_(subject)&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E5%94%B1%E6%AD%8C_(%E6%95%99%E7%A7%91))]
+- [Manshū-Shōka](/w/index.php?title=Mansh%C5%AB-Sh%C5%8Dka&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E6%BA%80%E5%B7%9E%E5%94%B1%E6%AD%8C)][Shin-min'yō](/w/index.php?title=Shin-min%27y%C5%8D&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E6%96%B0%E6%B0%91%E8%AC%A1)]
+Post-War (1945–present)
+| 1945–present |
+- Kayōkyoku
+[Mood-kayō](/w/index.php?title=Mood-kay%C5%8D&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%83%A0%E3%83%BC%E3%83%89%E6%AD%8C%E8%AC%A1)]- [Idol-kayō](/w/index.php?title=Idol-kay%C5%8D&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB%E6%AD%8C%E8%AC%A1)][Group Sounds](/wiki/Group_Sounds)
+[Image song](/wiki/Image_song)
+[J-pop](/wiki/J-pop)
+[Rock](/wiki/Japanese_rock)
+|
+| --- | --- |
+| 1970–present |
+- [Anime song](/wiki/Anime_song)- Chiptune- [City pop](/wiki/City_pop)- [Denpa song](/wiki/Denpa_song)- [Disco](/w/index.php?title=Japanese_disco&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%83%87%E3%82%A3%E3%82%B9%E3%82%B3#日本のディスコ)]- [Electro](/wiki/Electro_(music))- [Electropop](/wiki/Electropop)- [Eurobeat](/wiki/Eurobeat)- [Disco](/w/index.php?title=Japanese_disco&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%83%87%E3%82%A3%E3%82%B9%E3%82%B3#日本のディスコ)]- [Hardcore punk](/wiki/Japanese_hardcore)- [Hip hop](/wiki/Japanese_hip_hop)- [Metal](/wiki/Japanese_metal)- [Noise](/wiki/Japanoise)- [Noise rock](/wiki/Noise_rock)- [Nu-music](/w/index.php?title=Nu-music_(Japan)&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%83%8B%E3%83%A5%E3%83%BC%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%83%83%E3%82%AF)]- [Ōenka (cheering song)](/wiki/Fight_song#Japan)- [Reggae](/wiki/Japanese_reggae)- [Synth-pop](/wiki/Synth-pop)- [Ska](/wiki/Japanese_ska)- [Visual kei](/wiki/Visual_kei)- [Italo Disco](/wiki/Italo_Disco)- [Italo House](/wiki/Italo_House)- [Juliana’s techno](/wiki/Hardcore_techno)|
+| 1990–present |
+- [Bitpop](/wiki/Bitpop)- [Grime](/wiki/Grime_(music_genre)#Japanese_grime)- [Being-kei](/w/index.php?title=Being_craze&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%83%93%E3%83%BC%E3%82%A4%E3%83%B3%E3%82%B0%E3%83%96%E3%83%BC%E3%83%A0)]- [J-core](/wiki/J-core)- [Japanese net label scene](/wiki/Netlabels_in_Japan)- [Kawaii metal](/wiki/Kawaii_metal)- [Komuro-kei](/w/index.php?title=Komuro_family&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E5%B0%8F%E5%AE%A4%E3%83%95%E3%82%A1%E3%83%9F%E3%83%AA%E3%83%BC)]- [Onkyokei](/wiki/Onkyokei)- [Shibuya-kei](/wiki/Shibuya-kei)
+[Akishibu-kei](/wiki/Akishibu-kei)[Utaite](/wiki/Utaite)
+[Visual kei](/wiki/Visual_kei)
+- [Eroguro kei](/wiki/Eroguro#In_music)- [Nagoya kei](/wiki/Nagoya_kei)[Vocaloid music](/wiki/Vocaloid#Music)
+|Ethnic and regional
+- [Ainu music](/wiki/Ainu_music)
+[Rekuhkara](/wiki/Rekuhkara)[Southern Islands](/wiki/Ryukyuan_music)
+Charts
+| [Oricon](/wiki/Oricon) |
+- [Singles Chart](/wiki/Oricon_Singles_Chart)- [Combined Singles Chart](/wiki/Oricon_Combined_Singles_Chart)- [Albums Chart](/wiki/Oricon_Albums_Chart)- [Combined Albums Chart](/wiki/Oricon_Combined_Albums_Chart)- [Digital Singles and Albums](/wiki/Billboard_Japan_and_Oricon_download_charts)- [Karaoke Chart](/wiki/Oricon_Karaoke_Chart)|
+| --- | --- |
+| [Billboard Japan](/wiki/Billboard_Japan)* |
+- [Hot 100](/wiki/Billboard_Japan_Hot_100)- [Hot Albums](/wiki/Billboard_Japan_Hot_Albums)- [Top Download Songs and Albums](/wiki/Billboard_Japan_and_Oricon_download_charts)|
+| Other |
+- [RIAJ Digital Track Chart](/wiki/RIAJ_Digital_Track_Chart) (discontinued)|Achievements
+- [List of best-selling music artists in Japan](/wiki/List_of_best-selling_music_artists_in_Japan)
+[List of best-selling Western artists in Japan](/wiki/List_of_best-selling_Western_artists_in_Japan)[List of best-selling albums in Japan](/wiki/List_of_best-selling_albums_in_Japan)
+[List of best-selling singles in Japan](/wiki/List_of_best-selling_singles_in_Japan)
+[Record companies](/wiki/Category:Japanese_record_labels)
+| "Big 10" (as of 2026[[update]](https://en.wikipedia.org/w/index.php?title=Chiptune&action=edit)) |
+- [Avex Group](/wiki/Avex_Group)- [Sony Music Entertainment Japan](/wiki/Sony_Music_Entertainment_Japan)- [Universal Music Japan](/wiki/Universal_Music_Japan)- [King Record Co.](/wiki/King_Records_(Japan))- [J Storm](/wiki/J_Storm)- [Victor Entertainment](/wiki/Victor_Entertainment)- [Being Inc.](/wiki/Being_Inc.)- [Warner Music Group](/wiki/Warner_Music_Group)- [Pony Canyon](/wiki/Pony_Canyon)- [Teichiku Entertainment](/wiki/Teichiku_Records)|
+| --- | --- |
+| Others |
+- [Major](/wiki/Category:Japanese_record_labels)- [Independent](/wiki/Category:Japanese_independent_record_labels)|Musicians
+- [List of musical artists from Japan](/wiki/List_of_musical_artists_from_Japan)- [List of Japanese musical groups](/wiki/List_of_Japanese_musical_groups)- [List of J-pop artists](/wiki/List_of_J-pop_artists)- [List of Japanese composers](/wiki/List_of_Japanese_composers)- [List of Japanese hip hop musicians](/wiki/List_of_Japanese_hip_hop_musicians)- [List of Japanese singers](/wiki/List_of_Japanese_singers)[Timeline and years](/wiki/Timeline_of_Japanese_music)
+- [1962](/wiki/1962_in_Japanese_music)- [1963](/wiki/1963_in_Japanese_music)- [1964](/wiki/1964_in_Japanese_music)- [1965](/wiki/1965_in_Japanese_music)- [1966](/wiki/1966_in_Japanese_music)- [1967](/wiki/1967_in_Japanese_music)- [1979](/wiki/1979_in_Japanese_music)- [1980](/wiki/1980_in_Japanese_music)- [1981](/wiki/1981_in_Japanese_music)- [1982](/wiki/1982_in_Japanese_music)- [1983](/wiki/1983_in_Japanese_music)- [1984](/wiki/1984_in_Japanese_music)- [1985](/wiki/1985_in_Japanese_music)- [1986](/wiki/1986_in_Japanese_music)- [2007](/wiki/2007_in_Japanese_music)- [2008](/wiki/2008_in_Japanese_music)- [2009](/wiki/2009_in_Japanese_music)- [2010](/wiki/2010_in_Japanese_music)- [2011](/wiki/2011_in_Japanese_music)- [2012](/wiki/2012_in_Japanese_music)- [2013](/wiki/2013_in_Japanese_music)- [2014](/wiki/2014_in_Japanese_music)- [2015](/wiki/2015_in_Japanese_music)- [2016](/wiki/2016_in_Japanese_music)- [2017](/wiki/2017_in_Japanese_music)- [2018](/wiki/2018_in_Japanese_music)- [2019](/wiki/2019_in_Japanese_music)- [2020](/wiki/2020_in_Japanese_music)- [2021](/wiki/2021_in_Japanese_music)- [2022](/wiki/2022_in_Japanese_music)- [2023](/wiki/2023_in_Japanese_music)- [2024](/wiki/2024_in_Japanese_music)- [2025](/wiki/2025_in_Japanese_music)Online distributors
+- [iTunes Store](/wiki/ITunes_Store)- [Apple Music](/wiki/Apple_Music)- [Google Play Music](/wiki/Google_Play_Music)- [Amazon Music](/wiki/Amazon_Music)- [Spotify](/wiki/Spotify)- [KKBox](/wiki/KKBox) (the successor of [LISMO](/wiki/LISMO) Unlimited)- [RecoChoku](/wiki/RecoChoku) [[ja](https://ja.wikipedia.org/wiki/%E3%83%AC%E3%82%B3%E3%83%81%E3%83%A7%E3%82%AF)]- [Music.jp](/w/index.php?title=Music.jp&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/music.jp)]- [Mora](/wiki/Mora_(music_store))- [Dwango.jp](/wiki/Dwango_(company))- [E-Onkyo music](/wiki/Onkyo)- [Oricon Music Store](/wiki/Oricon)- [Line Music](/wiki/Line_Music)- [MySound](/w/index.php?title=Yamaha_Music_Media&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/%E3%83%A4%E3%83%9E%E3%83%8F%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%83%83%E3%82%AF%E3%83%A1%E3%83%87%E3%82%A3%E3%82%A2)]- [OTOTOY](/w/index.php?title=OTOTOY&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/Ototoy)]- [AWA](/w/index.php?title=AWA_(streaming_service)&action=edit&redlink=1) [[ja](https://ja.wikipedia.org/wiki/AWA_(%E9%9F%B3%E6%A5%BD%E9%85%8D%E4%BF%A1))]Other topics
+- [Awards](/wiki/Template:Japanese_Music_Award_Shows)- [Shinto music](/wiki/Shinto_music)| show- [v](/wiki/Template:Nerd_music)
+- [t](/wiki/Template_talk:Nerd_music)
+- [e](/wiki/Special:EditPage/Template:Nerd_music)
+[Nerd music](/wiki/Nerd_music) |
+| --- |
+| Styles | Electronic |
+- Chiptune
+[Bitpop](/wiki/Bitpop)[Skweee](/wiki/Skweee)
+|
+| Folk |
+- [Filk music](/wiki/Filk_music)- [Nerd-folk](/wiki/Nerd-folk)|
+| Hip hop |
+- [Nerdcore](/wiki/Nerdcore)|
+| Rock |
+- [Geek rock](/wiki/Geek_rock)
+[Time Lord rock](/wiki/Time_Lord_rock)- [Wizard rock](/wiki/Wizard_rock)[Nintendocore](/wiki/Nintendocore)
+|Festivals
+- [FilKONtario](/wiki/FilKONtario)- [Nerdapalooza](/wiki/Nerdapalooza)- [Ohio Valley Filk Fest](/wiki/Pegasus_Award)- [Rock Comic Con](/wiki/Rock_Comic_Con)- [w00tstock](/wiki/W00tstock)- [Wrockstock](/wiki/Wrockstock)Retrieved from "[https://en.wikipedia.org/w/index.php?title=Chiptune&oldid=1332865765](https://en.wikipedia.org/w/index.php?title=Chiptune&oldid=1332865765)"
+[Categories](/wiki/Help:Category): - [Video game culture](/wiki/Category:Video_game_culture)
+- [Video game terminology](/wiki/Category:Video_game_terminology)
+- [Video game music technology](/wiki/Category:Video_game_music_technology)
+- [Chiptune](/wiki/Category:Chiptune)
+- [Demoscene](/wiki/Category:Demoscene)
+- [Electronica](/wiki/Category:Electronica)
+- [1970s in music](/wiki/Category:1970s_in_music)
+- [1980s in music](/wiki/Category:1980s_in_music)
+- [1990s in music](/wiki/Category:1990s_in_music)
+- [2000s in music](/wiki/Category:2000s_in_music)
+- [2010s in music](/wiki/Category:2010s_in_music)
+- [2020s in music](/wiki/Category:2020s_in_music)
+Hidden categories: - [KLOV game ID not in Wikidata](/wiki/Category:KLOV_game_ID_not_in_Wikidata)
+- [All articles lacking reliable references](/wiki/Category:All_articles_lacking_reliable_references)
+- [Articles lacking reliable references from September 2023](/wiki/Category:Articles_lacking_reliable_references_from_September_2023)
+- [All articles containing circular references](/wiki/Category:All_articles_containing_circular_references)
+- [Webarchive template wayback links](/wiki/Category:Webarchive_template_wayback_links)
+- [CS1 Japanese-language sources (ja)](/wiki/Category:CS1_Japanese-language_sources_(ja))
+- [CS1 maint: archived copy as title](/wiki/Category:CS1_maint:_archived_copy_as_title)
+- [Articles with short description](/wiki/Category:Articles_with_short_description)
+- [Short description matches Wikidata](/wiki/Category:Short_description_matches_Wikidata)
+- [Use mdy dates from May 2024](/wiki/Category:Use_mdy_dates_from_May_2024)
+- [Articles with hAudio microformats](/wiki/Category:Articles_with_hAudio_microformats)
+- [Commons category link is on Wikidata](/wiki/Category:Commons_category_link_is_on_Wikidata)
+- [Spoken articles](/wiki/Category:Spoken_articles)
+- [Articles containing potentially dated statements from 2026](/wiki/Category:Articles_containing_potentially_dated_statements_from_2026)
+- [All articles containing potentially dated statements](/wiki/Category:All_articles_containing_potentially_dated_statements)

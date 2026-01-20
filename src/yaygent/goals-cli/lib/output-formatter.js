@@ -379,23 +379,23 @@ export function formatValidationSummary(summary) {
   
   // Goals validation
   lines.push('║ Goals:                                                         ║');
-  lines.push(`║   ✓ File: ${summary.goals.path.padEnd(51)}║`);
-  lines.push(`║   ✓ Goals found: ${String(summary.goals.count).padEnd(44)}║`);
-  lines.push(`║   ✓ Version: ${summary.goals.version.padEnd(49)}║`);
+  lines.push(`║   + File: ${summary.goals.path.padEnd(51)}║`);
+  lines.push(`║   + Goals found: ${String(summary.goals.count).padEnd(44)}║`);
+  lines.push(`║   + Version: ${summary.goals.version.padEnd(49)}║`);
   
   // Context validation
   lines.push('║                                                                ║');
   lines.push('║ Context:                                                       ║');
-  lines.push(`║   ✓ Directory: ${summary.context.path.padEnd(47)}║`);
-  lines.push(`║   ✓ Files loaded: ${String(summary.context.fileCount).padEnd(43)}║`);
-  lines.push(`║   ✓ Total size: ${summary.context.totalSize.padEnd(45)}║`);
+  lines.push(`║   + Directory: ${summary.context.path.padEnd(47)}║`);
+  lines.push(`║   + Files loaded: ${String(summary.context.fileCount).padEnd(43)}║`);
+  lines.push(`║   + Total size: ${summary.context.totalSize.padEnd(45)}║`);
   
   // Config validation
   lines.push('║                                                                ║');
   lines.push('║ Configuration:                                                 ║');
-  lines.push(`║   ✓ Endpoint: ${summary.config.endpoint.padEnd(48)}║`);
-  lines.push(`║   ✓ Model: ${summary.config.model.padEnd(51)}║`);
-  lines.push(`║   ✓ Auth: ${summary.config.authType.padEnd(52)}║`);
+  lines.push(`║   + Endpoint: ${summary.config.endpoint.padEnd(48)}║`);
+  lines.push(`║   + Model: ${summary.config.model.padEnd(51)}║`);
+  lines.push(`║   + Auth: ${summary.config.authType.padEnd(52)}║`);
   
   lines.push('║                                                                ║');
   lines.push('╠════════════════════════════════════════════════════════════════╣');

@@ -1,0 +1,41 @@
+# Job Posting Analysis Template
+
+## Basic Job Information
+- Job Title: 
+- Company Name: 
+- Location: 
+- Employment Type: 
+- Salary Range: 
+- Posted Date: 
+
+## Content Structure Analysis
+
+### Headlines & Messaging
+- Primary headline: 
+- Subheadlines: 
+- Key selling points: 
+
+### Content Organization
+- Introduction paragraph: 
+- Main content sections: 
+- Call-to-action elements: 
+
+### Information Hierarchy
+- Important information to highlight: 
+- Sections for emphasis: 
+- Contact details prominence: 
+
+### Newspaper-Style Layout Planning
+- Column structure suggestions: 
+- Information hierarchy: 
+- Visual emphasis areas: 
+
+### Content Prioritization
+- Most important information (above fold): 
+- Secondary information: 
+- Supporting details: 
+
+## Notes
+- Additional observations:
+- Design considerations:
+- User experience factors:

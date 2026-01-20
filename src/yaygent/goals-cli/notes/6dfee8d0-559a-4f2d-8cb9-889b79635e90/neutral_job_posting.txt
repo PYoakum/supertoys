@@ -1,0 +1,34 @@
+POSITION: Software Engineer
+DEPARTMENT: Engineering
+LOCATION: Remote/On-site
+EMPLOYMENT TYPE: Full-time
+POSITION SUMMARY:
+Individual will perform software development tasks. Role involves coding, testing, and deployment activities.
+REQUIRED QUALIFICATIONS:
+- Bachelor's degree in Computer Science or related field
+- 3+ years software development experience
+- Proficiency in JavaScript, Python, or Java
+- Experience with version control systems
+- Database management knowledge
+RESPONSIBILITIES:
+- Write code according to specifications
+- Execute testing procedures
+- Participate in code review processes
+- Maintain existing software systems
+- Document technical procedures
+- Attend scheduled meetings
+- Report to Engineering Manager
+TECHNICAL REQUIREMENTS:
+- Familiarity with cloud platforms (AWS, Azure, GCP)
+- Understanding of API development
+- Knowledge of software development lifecycle
+- Experience with automated testing frameworks
+COMPENSATION:
+- Salary range: $80,000 - $120,000 annually
+- Health insurance coverage provided
+- 401(k) plan available
+- 15 days paid time off per year
+APPLICATION PROCESS:
+Submit resume and cover letter through company portal. Applications processed within 2-3 weeks. Selected candidates will complete technical assessment and interview process.
+COMPANY INFORMATION:
+Technology company established 2015. 200+ employees. Headquarters located in major metropolitan area.

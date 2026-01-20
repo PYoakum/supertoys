@@ -1,0 +1,106 @@
+// Job Posting Data for Svelte Application
+// This JSON structure is optimized for the newspaper-style job posting component
+export const jobPostingData = {
+  // Basic job information
+  jobTitle: "[EXTRACTED_JOB_TITLE]",
+  company: "[EXTRACTED_COMPANY]",
+  location: "[EXTRACTED_LOCATION]",
+  employmentType: "[EXTRACTED_TYPE]", // Full-time, Part-time, Contract, etc.
+  salaryRange: "[EXTRACTED_SALARY]",
+  postedDate: "[EXTRACTED_DATE]",
+  // Main content sections
+  summary: "[EXTRACTED_SUMMARY]",
+  responsibilities: [
+    "[RESPONSIBILITY_1]",
+    "[RESPONSIBILITY_2]",
+    "[RESPONSIBILITY_3]"
+    // Add more as needed
+  ],
+  requirements: {
+    required: [
+      "[REQUIRED_SKILL_1]",
+      "[REQUIRED_SKILL_2]",
+      "[REQUIRED_SKILL_3]"
+    ],
+    preferred: [
+      "[PREFERRED_SKILL_1]",
+      "[PREFERRED_SKILL_2]"
+    ]
+  },
+  benefits: [
+    "[BENEFIT_1]",
+    "[BENEFIT_2]",
+    "[BENEFIT_3]"
+  ],
+  // Company information
+  companyInfo: {
+    about: "[COMPANY_DESCRIPTION]",
+    culture: "[CULTURE_DESCRIPTION]",
+    teamSize: "[TEAM_SIZE]",
+    industry: "[INDUSTRY]"
+  },
+  // Application details
+  applicationInfo: {
+    process: "[APPLICATION_PROCESS]",
+    deadline: "[DEADLINE]",
+    contact: "[CONTACT_INFO]"
+  },
+  // Highlighted selling points for prominent display
+  highlights: [
+    "[KEY_SELLING_POINT_1]",
+    "[KEY_SELLING_POINT_2]",
+    "[KEY_SELLING_POINT_3]"
+  ],
+  // Metadata for display optimization
+  displayConfig: {
+    showSalary: true, // Set to false if salary should not be displayed
+    emphasizeRemote: false, // Set to true if remote work is a key selling point
+    urgentHiring: false, // Set to true if urgent hiring
+    featured: false // Set to true for premium job postings
+  }
+};
+// Additional helper data for the newspaper layout
+export const layoutConfig = {
+  headline: {
+    primary: "[JOB_TITLE] at [COMPANY]",
+    secondary: "[LOCATION] • [TYPE] • [SALARY_RANGE]"
+  },
+  sections: [
+    {
+      id: "overview",
+      title: "The Opportunity",
+      content: "summary",
+      layout: "full-width"
+    },
+    {
+      id: "responsibilities",
+      title: "What You'll Do",
+      content: "responsibilities",
+      layout: "two-column"
+    },
+    {
+      id: "requirements",
+      title: "What We're Looking For",
+      content: "requirements",
+      layout: "sidebar-right"
+    },
+    {
+      id: "benefits",
+      title: "Why Join Us",
+      content: "benefits",
+      layout: "highlight-box"
+    },
+    {
+      id: "company",
+      title: "About [COMPANY]",
+      content: "companyInfo",
+      layout: "full-width"
+    },
+    {
+      id: "apply",
+      title: "Ready to Apply?",
+      content: "applicationInfo",
+      layout: "call-to-action"
+    }
+  ]
+};

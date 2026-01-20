@@ -71,7 +71,7 @@ export class ActionPlanRunner {
       result.level = 'debug';
       return result;
     }
-    if (line.includes('✓') || line.includes('SUCCESS') || line.includes('Complete')) {
+    if (line.includes('[+]') || line.includes('SUCCESS') || line.includes('Complete')) {
       result.level = 'success';
       return result;
     }
@@ -94,7 +94,7 @@ export class ActionPlanRunner {
    * @param {boolean} [options.verbose=false] - Verbose logging
    * @param {string} [options.output] - Output directory
    * @param {boolean} [options.noBundle=false] - Skip bundle generation
-   * @param {boolean} [options.noEval=false] - Skip output-eval
+   * @param {boolean} [options.runEval=false] - Run output-eval (requires LLM_API_KEY)
    * @param {Function} [options.onLog] - Log callback (level, message)
    * @param {Function} [options.onProgress] - Progress callback (current, total)
    * @param {Function} [options.onComplete] - Completion callback (success, result)
@@ -122,8 +122,8 @@ export class ActionPlanRunner {
     if (options.noBundle) {
       args.push('--no-bundle');
     }
-    if (options.noEval) {
-      args.push('--no-eval');
+    if (options.runEval) {
+      args.push('--eval');
     }
 
     const env = {

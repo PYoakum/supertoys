@@ -178,6 +178,7 @@ export const ExitCodes = {
   CONFIGURATION_ERROR: 3,
   VALIDATION_ERROR: 4,
   API_ERROR: 5,
+  UNKNOWN_ERROR: 6,
   INTERRUPTED: 10
 };
 

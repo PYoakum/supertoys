@@ -1,0 +1,53 @@
+# Software Engineer - Full Stack Position
+
+**Company:** TechCorp Inc.
+**Location:** San Francisco, CA (Hybrid)
+**Department:** Engineering
+**Employment Type:** Full-time
+**Posted:** December 2024
+
+## About the Role
+
+We are seeking a talented Full Stack Software Engineer to join our growing engineering team. You will be responsible for developing and maintaining web applications using modern technologies and frameworks.
+
+## Key Responsibilities
+
+- Design, develop, and maintain scalable web applications
+- Collaborate with cross-functional teams including product managers and designers
+- Write clean, maintainable, and well-documented code
+- Participate in code reviews and technical discussions
+- Troubleshoot and debug applications
+- Stay up-to-date with emerging technologies and industry trends
+
+## Required Qualifications
+
+- Bachelor's degree in Computer Science or related field
+- 3+ years of experience in full-stack development
+- Proficiency in JavaScript, HTML, CSS
+- Experience with React.js and Node.js
+- Knowledge of database systems (SQL and NoSQL)
+- Familiarity with version control systems (Git)
+- Strong problem-solving and analytical skills
+
+## Preferred Qualifications
+
+- Experience with cloud platforms (AWS, Azure, or GCP)
+- Knowledge of containerization (Docker, Kubernetes)
+- Experience with CI/CD pipelines
+- Understanding of microservices architecture
+- Previous startup experience
+
+## Benefits & Compensation
+
+- Competitive salary range: $120,000 - $160,000
+- Health, dental, and vision insurance
+- 401(k) with company matching
+- Flexible PTO policy
+- Professional development budget
+- Remote work flexibility
+
+## How to Apply
+
+Please submit your resume and a cover letter explaining your interest in the position.
+
+Contact: hiring@techcorp.com

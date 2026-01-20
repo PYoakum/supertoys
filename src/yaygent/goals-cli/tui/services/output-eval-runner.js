@@ -34,16 +34,16 @@ export class OutputEvalRunner {
    * @private
    */
   _parseLogLine(line) {
-    if (line.includes('Error:') || line.includes('⚠️')) {
+    if (line.includes('Error:') || line.includes('[!]')) {
       return { level: 'error', message: line };
     }
     if (line.includes('Warning:')) {
       return { level: 'warn', message: line };
     }
-    if (line.includes('✅') || line.includes('Complete')) {
+    if (line.includes('[+]') || line.includes('Complete')) {
       return { level: 'success', message: line };
     }
-    if (line.includes('⏳')) {
+    if (line.includes('[...]')) {
       return { level: 'info', message: line };
     }
     return { level: 'info', message: line };

@@ -1,0 +1,111 @@
+# Svelte Component Structure Plan for Job Posting Display
+
+## Component Hierarchy
+
+### Main Components
+- **JobPostingPage.svelte**: Main page component
+- **NewspaperLayout.svelte**: Overall newspaper-style layout wrapper
+- **JobPostingCard.svelte**: Individual job posting container
+
+### Header Components
+- **JobHeader.svelte**: Job title, company name, location
+- **CompanyLogo.svelte**: Company branding element
+- **JobMeta.svelte**: Posted date, job type, salary range
+
+### Content Components
+- **JobDescription.svelte**: Main job description content
+- **RequirementsList.svelte**: Skills and qualifications
+- **ResponsibilitiesList.svelte**: Job duties and tasks
+- **BenefitsSection.svelte**: Compensation and benefits
+
+### Interactive Components
+- **ApplyButton.svelte**: Primary call-to-action
+- **SaveJobButton.svelte**: Bookmark functionality
+- **ShareButtons.svelte**: Social media sharing
+- **ContactForm.svelte**: Direct inquiry form
+
+### Layout Components
+- **NewspaperColumn.svelte**: Column-based layout
+- **SectionDivider.svelte**: Visual separators
+- **Sidebar.svelte**: Additional information panel
+- **Footer.svelte**: Application instructions
+
+## Data Structure
+
+```javascript
+{
+  id: string,
+  title: string,
+  company: {
+    name: string,
+    logo: string,
+    website: string
+  },
+  location: {
+    city: string,
+    state: string,
+    remote: boolean
+  },
+  employment: {
+    type: string, // full-time, part-time, contract
+    level: string, // entry, mid, senior
+    department: string
+  },
+  compensation: {
+    salary: {
+      min: number,
+      max: number,
+      currency: string
+    },
+    benefits: string[]
+  },
+  description: {
+    summary: string,
+    responsibilities: string[],
+    requirements: {
+      required: string[],
+      preferred: string[]
+    }
+  },
+  application: {
+    deadline: string,
+    process: string,
+    contact: {
+      email: string,
+      phone: string
+    }
+  },
+  metadata: {
+    postedDate: string,
+    updatedDate: string,
+    views: number
+  }
+}
+```
+
+## CSS Classes & Styling
+
+- `.newspaper-layout`: Main container styling
+- `.job-header`: Header section styling
+- `.job-content`: Main content area
+- `.job-sidebar`: Side information panel
+- `.apply-section`: Call-to-action area
+
+## Responsive Breakpoints
+
+- Mobile: < 768px (single column)
+- Tablet: 768px - 1024px (two columns)
+- Desktop: > 1024px (three columns with sidebar)
+
+## State Management
+
+- Job posting data store
+- User interaction state (saved jobs, application status)
+- UI state (expanded sections, modal visibility)
+
+## Performance Considerations
+
+- Lazy loading for job images
+- Virtual scrolling for job lists
+- Component code splitting
+- Optimized bundle size

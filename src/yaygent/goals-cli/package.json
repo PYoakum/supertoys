@@ -25,6 +25,7 @@
     "bun": ">=1.0.0"
   },
   "dependencies": {
-    "@toon-format/toon": "^2.1.0"
+    "@toon-format/toon": "^2.1.0",
+    "jsmidgen": "^0.1.8"
   }
 }

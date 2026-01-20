@@ -153,7 +153,8 @@ export default {
 
   // Output Evaluation integration
   outputEval: {
-    enabled: process.env.OUTPUT_EVAL_ENABLED !== 'false',
+    // Disabled by default - requires LLM_API_KEY. Enable with --eval flag or OUTPUT_EVAL_ENABLED=true
+    enabled: process.env.OUTPUT_EVAL_ENABLED === 'true',
     // Path to output-eval executable (relative to this config or absolute)
     executablePath: process.env.OUTPUT_EVAL_PATH || '../output-eval/output-eval.js',
     // Output directory for evaluation reports

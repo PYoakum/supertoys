@@ -141,7 +141,7 @@ class Logger {
   }
 
   success(message, data = null) {
-    console.log(`[${this.timestamp()}] [SUCCESS] ✅ ${message}`, data ? JSON.stringify(data) : '');
+    console.log(`[${this.timestamp()}] [SUCCESS] [+] ${message}`, data ? JSON.stringify(data) : '');
   }
 }
 

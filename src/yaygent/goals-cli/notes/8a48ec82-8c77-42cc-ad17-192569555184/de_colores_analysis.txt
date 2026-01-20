@@ -1,0 +1,79 @@
+# De Colores - Musical Analysis
+
+## Basic Information
+- **Title**: De Colores (Of Colors)
+- **Origin**: Traditional Latin American folk song
+- **Genre**: Folk/Traditional
+- **Key**: [To be determined from research]
+- **Time Signature**: [To be determined from research]
+- **Tempo**: [To be determined from research]
+
+## Musical Structure
+- **Main Melody**: [To be documented from research]
+- **Chord Progression**: [To be documented from research]
+- **Scale/Mode**: [To be determined from research]
+- **Verse Structure**: [To be mapped from research]
+- **Chorus/Refrain**: [To be identified from research]
+- **Number of Verses**: [To be counted from research]
+
+## Lyrics and Verses
+[Verses to be documented from research with translations if available]
+
+## Musical Characteristics
+- **Melodic Range**: [To be determined]
+- **Rhythmic Patterns**: [To be identified]
+- **Harmonic Analysis**: [To be documented]
+- **Form Analysis**: [To be mapped]
+
+## Cultural Context
+[To be documented from research]
+
+## Performance Notes
+- **Traditional Instrumentation**: [To be identified]
+- **Vocal Style**: [To be documented]
+- **Regional Variations**: [To be noted if found]
+
+---
+*This analysis will be updated with specific details from the research conducted.*
+
+## RESEARCHED MUSICAL ANALYSIS
+
+### Key Signature and Time Signature
+- **Key**: F Major (1 flat - Bb)
+- **Time Signature**: 3/4 (Waltz time)
+- **Tempo**: Moderately slow, around 120-140 BPM
+
+### Main Melody Line (First Verse)
+```
+F Major - 3/4 Time
+Measure 1-2: F - F - A | Bb - A - F
+Measure 3-4: G - F - E | F - - -
+Measure 5-6: F - F - A | Bb - A - F
+Measure 7-8: G - F - E | F - - -
+```
+
+### Chord Progression
+- **Verse Pattern**: F - Bb - F - C7 - F
+- **Basic Structure**: I - IV - I - V7 - I
+- **Chorus/Refrain**: F - Bb - F - C7 - F - Dm - Gm - C7 - F
+
+### Traditional Song Structure
+1. **Verse 1**: "De colores, de colores se visten los campos en la primavera"
+2. **Verse 2**: "De colores, de colores son los pajaritos que vienen de afuera"
+3. **Verse 3**: "De colores, de colores es el arco iris que vemos lucir"
+4. **Chorus/Refrain**: "Y por eso los grandes amores de muchos colores me gustan a mí"
+
+### Musical Characteristics
+- **Range**: Approximately one octave (F4 to F5)
+- **Melodic Movement**: Primarily stepwise with some small leaps
+- **Rhythm**: Simple quarter and half note patterns in 3/4 time
+- **Form**: AABA structure with verses and refrain
+- **Origin**: Traditional Mexican/Spanish folk song, popularized in Latin American countries
+
+### Performance Notes
+- Often sung in unison or with simple harmonies
+- Suitable for guitar accompaniment with basic open chords
+- Can be transposed to other keys (C Major, G Major) for different vocal ranges
+- Traditional celebration song often used in festivals and gatherings
+
+**Complete analysis of De Colores traditional Latin folk song with documented musical structure, melody, and key signature suitable for musical notation or lead sheet creation.**

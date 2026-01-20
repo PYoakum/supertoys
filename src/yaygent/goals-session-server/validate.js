@@ -26,14 +26,14 @@ async function main() {
       context: { files: [] }
     });
     if (session.id === 'test-session-1' && store.has('test-session-1')) {
-      console.log('  ✓ Session store works correctly');
+      console.log('  [+] Session store works correctly');
       passed++;
     } else {
       throw new Error('Session not created');
     }
     store.stopCleanup();
   } catch (err) {
-    console.log('  ✗ Session store failed:', err.message);
+    console.log('  [x] Session store failed:', err.message);
     failed++;
   }
 
@@ -54,14 +54,14 @@ async function main() {
       }
     });
     if (session.id && session.state === SessionState.LOADED && session.goals.items.length === 2) {
-      console.log(`  ✓ Session created: ${session.id}`);
+      console.log(`  [+] Session created: ${session.id}`);
       passed++;
     } else {
       throw new Error('Session not created correctly');
     }
     manager.shutdown();
   } catch (err) {
-    console.log('  ✗ Session creation failed:', err.message);
+    console.log('  [x] Session creation failed:', err.message);
     failed++;
   }
 
@@ -71,13 +71,13 @@ async function main() {
     const router = createToolRouter({ notepadDir: './test-notes' });
     const tools = router.getAllTools();
     if (tools.length >= 5 && router.hasTool('notepad_create')) {
-      console.log(`  ✓ Tool router initialized with ${tools.length} tools`);
+      console.log(`  [+] Tool router initialized with ${tools.length} tools`);
       passed++;
     } else {
       throw new Error('Tool router not initialized correctly');
     }
   } catch (err) {
-    console.log('  ✗ Tool router failed:', err.message);
+    console.log('  [x] Tool router failed:', err.message);
     failed++;
   }
 
@@ -90,14 +90,14 @@ async function main() {
       content: 'Test content'
     });
     if (result.content[0].text.includes('Successfully created')) {
-      console.log('  ✓ Tool execution works correctly');
+      console.log('  [+] Tool execution works correctly');
       passed++;
     } else {
       throw new Error('Unexpected result');
     }
     try { await router.executeTool('notepad_delete', { filename: 'test-note.txt' }); } catch (e) {}
   } catch (err) {
-    console.log('  ✗ Tool execution failed:', err.message);
+    console.log('  [x] Tool execution failed:', err.message);
     failed++;
   }
 
@@ -107,13 +107,13 @@ async function main() {
     const router = createToolRouter();
     const manifest = router.getManifest();
     if (manifest.serverName === 'goals-session-server' && manifest.tools.length > 0) {
-      console.log('  ✓ Tool manifest generated correctly');
+      console.log('  [+] Tool manifest generated correctly');
       passed++;
     } else {
       throw new Error('Manifest format incorrect');
     }
   } catch (err) {
-    console.log('  ✗ Tool manifest failed:', err.message);
+    console.log('  [x] Tool manifest failed:', err.message);
     failed++;
   }
 
@@ -130,14 +130,14 @@ async function main() {
     });
     const goal = updated.goals.items[0];
     if (goal.status.state === GoalState.IN_PROGRESS && goal.status.progress === 50) {
-      console.log('  ✓ Goal update works correctly');
+      console.log('  [+] Goal update works correctly');
       passed++;
     } else {
       throw new Error('Goal not updated correctly');
     }
     manager.shutdown();
   } catch (err) {
-    console.log('  ✗ Goal update failed:', err.message);
+    console.log('  [x] Goal update failed:', err.message);
     failed++;
   }
 
@@ -162,13 +162,13 @@ async function main() {
     });
     const readData = JSON.parse(readResult.content[0].text);
     if (readData.content === 'console.log("hello");') {
-      console.log('  ✓ Code editor create/read works correctly');
+      console.log('  [+] Code editor create/read works correctly');
       passed++;
     } else {
       throw new Error('Content mismatch');
     }
   } catch (err) {
-    console.log('  ✗ Code editor create/read failed:', err.message);
+    console.log('  [x] Code editor create/read failed:', err.message);
     failed++;
   }
 
@@ -204,13 +204,13 @@ async function main() {
     });
     const readData = JSON.parse(readResult.content[0].text);
     if (readData.content === 'line1\nreplaced\nline4') {
-      console.log('  ✓ Code editor write/patch works correctly');
+      console.log('  [+] Code editor write/patch works correctly');
       passed++;
     } else {
       throw new Error(`Content mismatch: ${readData.content}`);
     }
   } catch (err) {
-    console.log('  ✗ Code editor write/patch failed:', err.message);
+    console.log('  [x] Code editor write/patch failed:', err.message);
     failed++;
   }
 
@@ -237,7 +237,7 @@ async function main() {
     });
     const listData = JSON.parse(listResult.content[0].text);
     if (listData.files.length >= 2) {
-      console.log(`  ✓ Code editor list found ${listData.files.length} files`);
+      console.log(`  [+] Code editor list found ${listData.files.length} files`);
       passed++;
     } else {
       throw new Error(`Expected at least 2 files, got ${listData.files.length}`);
@@ -250,13 +250,13 @@ async function main() {
     });
     const statData = JSON.parse(statResult.content[0].text);
     if (statData.isFile && statData.size > 0) {
-      console.log('  ✓ Code editor stat works correctly');
+      console.log('  [+] Code editor stat works correctly');
       passed++;
     } else {
       throw new Error('Stat returned unexpected data');
     }
   } catch (err) {
-    console.log('  ✗ Code editor list/stat failed:', err.message);
+    console.log('  [x] Code editor list/stat failed:', err.message);
     failed++;
   }
 
@@ -279,13 +279,13 @@ async function main() {
     });
     const deleteData = JSON.parse(deleteResult.content[0].text);
     if (deleteData.deleted) {
-      console.log('  ✓ Code editor delete works correctly');
+      console.log('  [+] Code editor delete works correctly');
       passed++;
     } else {
       throw new Error('Delete failed');
     }
   } catch (err) {
-    console.log('  ✗ Code editor delete failed:', err.message);
+    console.log('  [x] Code editor delete failed:', err.message);
     failed++;
   }
 
@@ -300,18 +300,18 @@ async function main() {
         operation: 'read',
         path: '../../../etc/passwd'
       });
-      console.log('  ✗ Path traversal was NOT blocked (security issue!)');
+      console.log('  [x] Path traversal was NOT blocked (security issue!)');
       failed++;
     } catch (err) {
       if (err.code === 'PATH_TRAVERSAL' || err.message.includes('traversal')) {
-        console.log('  ✓ Path traversal correctly blocked');
+        console.log('  [+] Path traversal correctly blocked');
         passed++;
       } else {
         throw err;
       }
     }
   } catch (err) {
-    console.log('  ✗ Path traversal test failed:', err.message);
+    console.log('  [x] Path traversal test failed:', err.message);
     failed++;
   }
 
@@ -327,13 +327,13 @@ async function main() {
     });
     const resultData = JSON.parse(result.content[0].text);
     if (resultData.success && resultData.checksum.startsWith('sha256:')) {
-      console.log('  ✓ File create with string input works');
+      console.log('  [+] File create with string input works');
       passed++;
     } else {
       throw new Error('Unexpected result');
     }
   } catch (err) {
-    console.log('  ✗ File create string failed:', err.message);
+    console.log('  [x] File create string failed:', err.message);
     failed++;
   }
 
@@ -359,13 +359,13 @@ async function main() {
     const parsed = JSON.parse(readData.content);
 
     if (resultData.success && parsed.name === 'test' && parsed.values.length === 3) {
-      console.log('  ✓ File create with JSON input works');
+      console.log('  [+] File create with JSON input works');
       passed++;
     } else {
       throw new Error('JSON content mismatch');
     }
   } catch (err) {
-    console.log('  ✗ File create JSON failed:', err.message);
+    console.log('  [x] File create JSON failed:', err.message);
     failed++;
   }
 
@@ -391,13 +391,13 @@ async function main() {
     const readData = JSON.parse(readResult.content[0].text);
 
     if (resultData.success && readData.content === 'Hello') {
-      console.log('  ✓ File create with base64 input works');
+      console.log('  [+] File create with base64 input works');
       passed++;
     } else {
       throw new Error('Base64 content mismatch');
     }
   } catch (err) {
-    console.log('  ✗ File create base64 failed:', err.message);
+    console.log('  [x] File create base64 failed:', err.message);
     failed++;
   }
 
@@ -422,13 +422,13 @@ async function main() {
     const readData = JSON.parse(readResult.content[0].text);
 
     if (resultData.success && readData.content === 'Hi') {
-      console.log('  ✓ File create with buffer input works');
+      console.log('  [+] File create with buffer input works');
       passed++;
     } else {
       throw new Error('Buffer content mismatch');
     }
   } catch (err) {
-    console.log('  ✗ File create buffer failed:', err.message);
+    console.log('  [x] File create buffer failed:', err.message);
     failed++;
   }
 
@@ -451,18 +451,18 @@ async function main() {
         inputType: 'string',
         data: 'new content'
       });
-      console.log('  ✗ Overwrite protection failed (should have thrown)');
+      console.log('  [x] Overwrite protection failed (should have thrown)');
       failed++;
     } catch (err) {
       if (err.code === 'FILE_EXISTS') {
-        console.log('  ✓ Overwrite protection works correctly');
+        console.log('  [+] Overwrite protection works correctly');
         passed++;
       } else {
         throw err;
       }
     }
   } catch (err) {
-    console.log('  ✗ Overwrite protection test failed:', err.message);
+    console.log('  [x] Overwrite protection test failed:', err.message);
     failed++;
   }
 
@@ -485,13 +485,13 @@ async function main() {
     if (resultData.success &&
         resultData.output?.returnValue?.answer === 4 &&
         resultData.execution?.exitCode === 0) {
-      console.log('  ✓ JavaScript execute with Node.js works');
+      console.log('  [+] JavaScript execute with Node.js works');
       passed++;
     } else {
       throw new Error('Unexpected result: ' + JSON.stringify(resultData));
     }
   } catch (err) {
-    console.log('  ✗ JavaScript execute Node.js failed:', err.message);
+    console.log('  [x] JavaScript execute Node.js failed:', err.message);
     failed++;
   }
 
@@ -515,13 +515,13 @@ async function main() {
     if (resultData.success &&
         resultData.output?.returnValue?.sum === 15 &&
         resultData.execution?.exitCode === 0) {
-      console.log('  ✓ JavaScript execute with Bun works');
+      console.log('  [+] JavaScript execute with Bun works');
       passed++;
     } else {
       throw new Error('Unexpected result: ' + JSON.stringify(resultData));
     }
   } catch (err) {
-    console.log('  ✗ JavaScript execute Bun failed:', err.message);
+    console.log('  [x] JavaScript execute Bun failed:', err.message);
     failed++;
   }
 
@@ -546,13 +546,13 @@ async function main() {
         resultData.output.console[0].level === 'log' &&
         resultData.output.console[1].level === 'warn' &&
         resultData.output.console[2].level === 'error') {
-      console.log('  ✓ Console capture works correctly');
+      console.log('  [+] Console capture works correctly');
       passed++;
     } else {
       throw new Error('Console not captured correctly');
     }
   } catch (err) {
-    console.log('  ✗ Console capture failed:', err.message);
+    console.log('  [x] Console capture failed:', err.message);
     failed++;
   }
 
@@ -572,13 +572,13 @@ async function main() {
     const resultData = JSON.parse(result.content[0].text);
 
     if (resultData.success && resultData.execution?.timedOut === true) {
-      console.log('  ✓ Timeout works correctly');
+      console.log('  [+] Timeout works correctly');
       passed++;
     } else {
       throw new Error('Timeout not triggered');
     }
   } catch (err) {
-    console.log('  ✗ Timeout test failed:', err.message);
+    console.log('  [x] Timeout test failed:', err.message);
     failed++;
   }
 
@@ -596,13 +596,13 @@ async function main() {
     const resultData = JSON.parse(result.content[0].text);
 
     if (resultData.success && resultData.path === 'test.db') {
-      console.log('  ✓ SQLite create works correctly');
+      console.log('  [+] SQLite create works correctly');
       passed++;
     } else {
       throw new Error('Unexpected result');
     }
   } catch (err) {
-    console.log('  ✗ SQLite create failed:', err.message);
+    console.log('  [x] SQLite create failed:', err.message);
     failed++;
   }
 
@@ -636,13 +636,13 @@ async function main() {
         resultData.schema.tables.includes('users') &&
         resultData.schema.tables.includes('posts') &&
         resultData.schema.indexes.includes('idx_posts_user')) {
-      console.log('  ✓ Database execute creates tables and indexes');
+      console.log('  [+] Database execute creates tables and indexes');
       passed++;
     } else {
       throw new Error('Schema not created correctly');
     }
   } catch (err) {
-    console.log('  ✗ Database execute failed:', err.message);
+    console.log('  [x] Database execute failed:', err.message);
     failed++;
   }
 
@@ -662,13 +662,13 @@ async function main() {
         resultData.queryType === 'INSERT' &&
         resultData.changes === 1 &&
         resultData.lastInsertRowid === 1) {
-      console.log('  ✓ SQL Runner INSERT works correctly');
+      console.log('  [+] SQL Runner INSERT works correctly');
       passed++;
     } else {
       throw new Error('INSERT failed: ' + JSON.stringify(resultData));
     }
   } catch (err) {
-    console.log('  ✗ SQL Runner INSERT failed:', err.message);
+    console.log('  [x] SQL Runner INSERT failed:', err.message);
     failed++;
   }
 
@@ -695,13 +695,13 @@ async function main() {
         resultData.rowCount === 2 &&
         resultData.rows[0].name === 'Alice' &&
         resultData.rows[1].name === 'Bob') {
-      console.log('  ✓ SQL Runner SELECT works correctly');
+      console.log('  [+] SQL Runner SELECT works correctly');
       passed++;
     } else {
       throw new Error('SELECT failed: ' + JSON.stringify(resultData));
     }
   } catch (err) {
-    console.log('  ✗ SQL Runner SELECT failed:', err.message);
+    console.log('  [x] SQL Runner SELECT failed:', err.message);
     failed++;
   }
 
@@ -720,13 +720,13 @@ async function main() {
     if (resultData.success &&
         resultData.queryType === 'UPDATE' &&
         resultData.changes === 1) {
-      console.log('  ✓ SQL Runner UPDATE works correctly');
+      console.log('  [+] SQL Runner UPDATE works correctly');
       passed++;
     } else {
       throw new Error('UPDATE failed');
     }
   } catch (err) {
-    console.log('  ✗ SQL Runner UPDATE failed:', err.message);
+    console.log('  [x] SQL Runner UPDATE failed:', err.message);
     failed++;
   }
 
@@ -753,13 +753,13 @@ async function main() {
         resultData.queryType === 'DELETE' &&
         resultData.changes === 1 &&
         selectData.rows[0].count === 1) {
-      console.log('  ✓ SQL Runner DELETE works correctly');
+      console.log('  [+] SQL Runner DELETE works correctly');
       passed++;
     } else {
       throw new Error('DELETE failed');
     }
   } catch (err) {
-    console.log('  ✗ SQL Runner DELETE failed:', err.message);
+    console.log('  [x] SQL Runner DELETE failed:', err.message);
     failed++;
   }
 
@@ -768,14 +768,14 @@ async function main() {
   console.log(`Results: ${passed} passed, ${failed} failed`);
   
   if (failed === 0) {
-    console.log('\n✓ All validation tests passed!');
+    console.log('\n[+] All validation tests passed!');
     console.log('\nStart the server with: node server.js');
     const { rm } = await import('fs/promises');
     try { await rm('./test-notes', { recursive: true, force: true }); } catch (e) {}
     try { await rm('./test-sandbox', { recursive: true, force: true }); } catch (e) {}
     process.exit(0);
   } else {
-    console.log('\n✗ Some tests failed.');
+    console.log('\n[x] Some tests failed.');
     process.exit(1);
   }
 }
