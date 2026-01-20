@@ -1125,6 +1125,98 @@ Synthesize these findings into a cohesive response to the research intent.`;
   // ============================================================
 
   /**
+   * Save research findings to session storage (notepad)
+   * @param {string} sessionId
+   * @param {Object} findings - Research findings to save
+   * @param {string} [nameHint] - Hint for naming the note (from intent or URL)
+   * @returns {Promise<string|null>} - Note filename or null if failed
+   * @private
+   */
+  async _saveToSessionStorage(sessionId, findings, nameHint = '') {
+    if (!this.sessionManager) {
+      return null;
+    }
+
+    try {
+      // Generate a descriptive filename from the hint
+      const safeName = nameHint
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40) || 'research';
+
+      const filename = `${safeName}_findings.txt`;
+
+      // Format findings as readable text
+      let content = `# Research Findings\n`;
+      content += `Generated: ${new Date().toISOString()}\n\n`;
+
+      if (findings.summary) {
+        content += `## Summary\n${findings.summary}\n\n`;
+      }
+
+      if (findings.synthesis) {
+        content += `## Synthesis\n${findings.synthesis}\n\n`;
+      }
+
+      if (findings.key_concepts?.length > 0) {
+        content += `## Key Concepts\n${findings.key_concepts.map(c => `- ${c}`).join('\n')}\n\n`;
+      }
+
+      if (findings.tags?.length > 0) {
+        content += `## Tags\n${findings.tags.join(', ')}\n\n`;
+      }
+
+      if (findings.findings?.length > 0 || findings.key_findings?.length > 0) {
+        content += `## Key Findings\n`;
+        const items = findings.findings || findings.key_findings || [];
+        for (const finding of items) {
+          const topic = finding.topic || 'Finding';
+          const details = finding.details || finding.finding || '';
+          const importance = finding.importance || 'medium';
+          content += `\n### ${topic} [${importance}]\n${details}\n`;
+        }
+        content += '\n';
+      }
+
+      if (findings.actionable_insights?.length > 0) {
+        content += `## Actionable Insights\n`;
+        for (const insight of findings.actionable_insights) {
+          content += `- ${insight.insight}`;
+          if (insight.application) {
+            content += ` (Apply: ${insight.application})`;
+          }
+          content += '\n';
+        }
+        content += '\n';
+      }
+
+      if (findings.sources?.length > 0) {
+        content += `## Sources\n`;
+        for (const source of findings.sources) {
+          const title = source.title || source.url;
+          const relevance = source.relevance ? ` (${(source.relevance * 100).toFixed(0)}% relevant)` : '';
+          content += `- ${title}${relevance}\n  ${source.url}\n`;
+        }
+      }
+
+      // Save to session storage
+      const session = this.sessionManager.getSession(sessionId);
+      if (session) {
+        const notes = session.notes || {};
+        notes[filename] = content;
+        this.sessionManager.store.update(sessionId, { notes });
+        console.log(`[Research] Saved findings to session storage: ${filename}`);
+        return filename;
+      }
+    } catch (err) {
+      console.warn(`[Research] Could not save to session storage: ${err.message}`);
+    }
+
+    return null;
+  }
+
+  /**
    * Check if host is allowed
    * @param {string} hostname
    * @returns {boolean}
@@ -1250,6 +1342,12 @@ Synthesize these findings into a cohesive response to the research intent.`;
           result.report_path = 'artifacts/research_synthesis.md';
         } catch (err) {
           console.warn('Could not save synthesis report:', err.message);
+        }
+
+        // Also save to session storage for cross-task access
+        const noteFilename = await this._saveToSessionStorage(sessionId, result, intent);
+        if (noteFilename) {
+          result.session_note = noteFilename;
         }
       }
 
@@ -1449,8 +1547,15 @@ Synthesize these findings into a cohesive response to the research intent.`;
 
         // Analyze content if enabled
         let analysis = null;
+        let sessionNote = null;
         if (analyze) {
           analysis = await this._analyzeContent(markdown, { title: pageTitle, url: pageUrl }, intent);
+
+          // Save analysis to session storage for cross-task access
+          if (analysis && addToContext) {
+            const nameHint = intent || pageTitle || parsedUrl.hostname;
+            sessionNote = await this._saveToSessionStorage(sessionId, analysis, nameHint);
+          }
         }
 
         // Record successful completion for timeout learning
@@ -1475,6 +1580,7 @@ Synthesize these findings into a cohesive response to the research intent.`;
           sandboxPath,
           message: `Research content saved to context/${outputFilename}`,
           analysis,
+          session_note: sessionNote,
           duration
         });
 

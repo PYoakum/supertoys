@@ -122,6 +122,67 @@ function parseScheduledAt(value, readyTime = Date.now()) {
 }
 
 /**
+ * Extract artifacts from tool invocation results
+ * Looks for successful file creations, writes, and other artifact-generating operations
+ * @param {Object[]} toolInvocations - Array of tool invocation results
+ * @returns {Object[]} - Array of artifact objects
+ */
+function extractArtifacts(toolInvocations) {
+  const artifacts = [];
+
+  for (const invocation of toolInvocations) {
+    if (!invocation.success || !invocation.result?.content) continue;
+
+    try {
+      const content = invocation.result.content[0]?.text;
+      if (!content) continue;
+
+      const parsed = JSON.parse(content);
+
+      // Check for file creation artifacts (file_create, notepad_create, etc.)
+      if (parsed.success && parsed.path) {
+        artifacts.push({
+          type: 'file',
+          path: parsed.path,
+          size: parsed.size || 0,
+          tool: invocation.toolName,
+          checksum: parsed.checksum || null,
+          createdAt: parsed.created || new Date().toISOString()
+        });
+      }
+
+      // Check for project scaffold artifacts
+      if (parsed.success && parsed.files && Array.isArray(parsed.files)) {
+        for (const file of parsed.files) {
+          artifacts.push({
+            type: 'file',
+            path: file.path || file,
+            size: file.size || 0,
+            tool: invocation.toolName,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // Check for code_editor artifacts
+      if (parsed.success && parsed.filePath) {
+        artifacts.push({
+          type: 'file',
+          path: parsed.filePath,
+          size: parsed.size || 0,
+          tool: invocation.toolName,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
+  return artifacts;
+}
+
+/**
  * Extract dependency ID from various formats
  * Dependencies can be: string, number, or object with various property names
  * @param {*} dep - Dependency in any format
@@ -235,7 +296,7 @@ function parseArguments() {
     'dry-run': { type: 'boolean', short: 'd', default: false },
     verbose: { type: 'boolean', short: 'v', default: false },
     'no-bundle': { type: 'boolean', default: false },
-    'no-eval': { type: 'boolean', default: false },
+    eval: { type: 'boolean', short: 'e', default: false },
     'eval-background': { type: 'boolean', default: false },
     resume: { type: 'boolean', short: 'r', default: false },
     help: { type: 'boolean', short: 'h', default: false },
@@ -272,8 +333,8 @@ Options:
   -d, --dry-run        Validate without executing
   -v, --verbose        Enable verbose logging
   --no-bundle          Skip bundle generation
-  --no-eval            Skip automatic output-eval invocation
-  --eval-background    Run output-eval in background
+  -e, --eval           Run output-eval after execution (requires LLM_API_KEY)
+  --eval-background    Run output-eval in background (implies --eval)
   -r, --resume         Resume from last checkpoint
   -h, --help           Show this help
   -V, --version        Show version
@@ -334,16 +395,28 @@ async function executeToolViaServer(sessionClient, sessionId, toolName, paramete
  * @param {Object[]} previousOutputs
  * @param {SessionClient} sessionClient - Session client for tool execution
  * @param {string} sessionId - Session ID for sandbox isolation
+ * @param {Object} [sessionStorage] - Session storage (notes and research)
  * @returns {Promise<Object>}
  */
-async function executeTask(task, goal, context, actionLlm, toolManifest, previousOutputs, sessionClient, sessionId) {
+async function executeTask(task, goal, context, actionLlm, toolManifest, previousOutputs, sessionClient, sessionId, sessionStorage = null) {
+  // Fetch session notes if not provided (for cross-task context)
+  if (!sessionStorage) {
+    try {
+      sessionStorage = await sessionClient.getSessionNotes(sessionId);
+    } catch (err) {
+      console.warn(`[WARN] Could not fetch session notes: ${err.message}`);
+      sessionStorage = { notes: [], content: {} };
+    }
+  }
+
   // Build action prompt
   const { systemPrompt, userPrompt } = buildActionPrompt({
     task,
     goal,
     toolManifest,
     context: context?.formattedContent || '',
-    previousOutputs
+    previousOutputs,
+    sessionStorage
   });
 
   // Send to Action LLM
@@ -395,7 +468,7 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
           // Check for explicit failure - exitCode must exist and be non-zero
           const hasExitCodeError = typeof parsed.exitCode === 'number' && parsed.exitCode !== 0;
           if (parsed.success === false || hasExitCodeError) {
-            console.log(`      ❌ Tool returned error (exit code: ${parsed.exitCode ?? 'N/A'})`);
+            console.log(`      [x] Tool returned error (exit code: ${parsed.exitCode ?? 'N/A'})`);
             if (parsed.stderr) {
               console.log(`      stderr: ${parsed.stderr.slice(0, 300)}${parsed.stderr.length > 300 ? '...' : ''}`);
             }
@@ -414,7 +487,7 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
         ? toolResult.error.message : toolResult.error;
       const errCode = typeof toolResult.error === 'object' && toolResult.error.code
         ? ` [${toolResult.error.code}]` : '';
-      console.log(`      ❌ Tool Error${errCode}: ${errMsg}`);
+      console.log(`      [x] Tool Error${errCode}: ${errMsg}`);
     }
   } else {
     // No tool use detected, use the task's predefined parameters
@@ -427,7 +500,7 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
       : {};
 
     if (!toolName) {
-      console.log(`      ⚠️  No tool specified for task, skipping execution`);
+      console.log(`      [!]  No tool specified for task, skipping execution`);
       return { skipped: true, reason: 'no tool specified' };
     }
 
@@ -454,7 +527,7 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
           // Check for explicit failure - exitCode must exist and be non-zero
           const hasExitCodeError = typeof parsed.exitCode === 'number' && parsed.exitCode !== 0;
           if (parsed.success === false || hasExitCodeError) {
-            console.log(`      ❌ Tool returned error (exit code: ${parsed.exitCode ?? 'N/A'})`);
+            console.log(`      [x] Tool returned error (exit code: ${parsed.exitCode ?? 'N/A'})`);
             if (parsed.stderr) {
               console.log(`      stderr: ${parsed.stderr.slice(0, 300)}${parsed.stderr.length > 300 ? '...' : ''}`);
             }
@@ -473,7 +546,16 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
         ? toolResult.error.message : toolResult.error;
       const errCode = typeof toolResult.error === 'object' && toolResult.error.code
         ? ` [${toolResult.error.code}]` : '';
-      console.log(`      ❌ Tool Error${errCode}: ${errMsg}`);
+      console.log(`      [x] Tool Error${errCode}: ${errMsg}`);
+    }
+  }
+
+  // Extract artifacts from tool invocations
+  const artifacts = extractArtifacts(toolInvocations);
+  if (artifacts.length > 0) {
+    console.log(`      [#] Artifacts: ${artifacts.length} file(s) created`);
+    for (const artifact of artifacts) {
+      console.log(`         - ${artifact.path}`);
     }
   }
 
@@ -482,6 +564,7 @@ async function executeTask(task, goal, context, actionLlm, toolManifest, previou
     success: toolInvocations.every(t => t.success),
     output: response.content,
     toolInvocations,
+    artifacts,
     reasoning: response.content.split('</tool_use>')[1]?.trim() || 'Task executed',
     tokenUsage: response.usage,
     metadata: {
@@ -654,8 +737,8 @@ async function main(args) {
   const outputWriter = new OutputWriter(outputDir, sessionId);
   const bundleGenerator = new BundleGenerator(outputDir);
 
-  // Initialize OutputEvalRunner
-  const outputEvalEnabled = !args['no-eval'] && config.outputEval?.enabled !== false;
+  // Initialize OutputEvalRunner (disabled by default, enable with --eval or --eval-background)
+  const outputEvalEnabled = args.eval || args['eval-background'] || config.outputEval?.enabled === true;
   const outputEvalRunner = new OutputEvalRunner({
     ...config.outputEval,
     enabled: outputEvalEnabled,
@@ -732,6 +815,7 @@ async function main(args) {
   // Execution log entries
   const logEntries = [];
   const previousOutputs = [];
+  const allArtifacts = [];
 
   // Track when tasks become ready (dependencies met) for relative scheduling
   const taskReadyTimes = new Map();
@@ -845,7 +929,7 @@ async function main(args) {
     if (task.delay) {
       const delayMs = parseDelay(task.delay);
       if (delayMs && delayMs > 0) {
-        console.log(`  ⏳ Waiting ${task.delay} before execution...`);
+        console.log(`  [...] Waiting ${task.delay} before execution...`);
         await sleep(delayMs);
       }
     }
@@ -914,6 +998,17 @@ async function main(args) {
           ...executionResult,
           evaluation
         });
+
+        // Collect artifacts from this task
+        if (executionResult.artifacts?.length > 0) {
+          for (const artifact of executionResult.artifacts) {
+            allArtifacts.push({
+              ...artifact,
+              taskId: task.id,
+              goalId: task.goalId
+            });
+          }
+        }
 
         previousOutputs.push({
           taskId: task.id,
@@ -986,8 +1081,13 @@ async function main(args) {
     totalTokens: metrics.totalTokenUsage.totalTokens,
     tasks: queueManager.getState().allTasks,
     issues: queueManager.getState().failedTasks.map(t => t.error?.message || 'Unknown error'),
-    artifacts: []
+    artifacts: allArtifacts
   });
+
+  // Log artifact summary
+  if (allArtifacts.length > 0) {
+    display.info(`Total artifacts generated: ${allArtifacts.length}`);
+  }
 
   // Generate bundle if successful
   let bundlePath = null;

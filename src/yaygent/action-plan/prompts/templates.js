@@ -9,7 +9,7 @@
  * @returns {{systemPrompt: string, userPrompt: string}}
  */
 export function buildActionPrompt(data) {
-  const { task, goal, toolManifest, context, previousOutputs } = data;
+  const { task, goal, toolManifest, context, previousOutputs, sessionStorage } = data;
 
   const systemPrompt = `You are an expert task executor. Your role is to execute tasks using the available tools to achieve the specified goals.
 
@@ -61,8 +61,40 @@ ${JSON.stringify(task.tool?.command?.parameters || {}, null, 2)}
     }
   }
 
+  // Include session storage (notes, research findings) for cross-task context
+  if (sessionStorage) {
+    const { notes, content } = sessionStorage;
+
+    if (notes && notes.length > 0) {
+      userPrompt += `\n\n## Session Storage (Notes & Research)
+IMPORTANT: The following notes contain data from previous tasks in this session.
+Use notepad_read to access any of these notes. Use the EXACT filenames shown below.
+
+<available_notes>
+${notes.map(n => `  - ${n}`).join('\n')}
+</available_notes>
+`;
+
+      // Include content summaries for quick reference
+      if (content && Object.keys(content).length > 0) {
+        userPrompt += `\n<note_contents>\n`;
+        for (const [name, noteContent] of Object.entries(content)) {
+          // Truncate long content but show enough for context
+          const preview = noteContent.length > 2000
+            ? noteContent.slice(0, 2000) + '\n...[truncated]'
+            : noteContent;
+          userPrompt += `<note filename="${name}">\n${preview}\n</note>\n`;
+        }
+        userPrompt += `</note_contents>\n`;
+      }
+    }
+  }
+
   userPrompt += `\n\n## Instructions
 Execute this task to achieve the goal. Use the predefined parameters unless you have a specific reason to modify them.
+
+IMPORTANT: If you need to reference data from previous tasks, check the Session Storage section above.
+The notes contain research findings and data that previous tasks saved for you to use.
 
 Respond with a <tool_use> block containing the tool call, followed by your reasoning.`;
 

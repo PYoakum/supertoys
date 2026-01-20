@@ -284,6 +284,69 @@ export class SessionClient {
     const response = await this.request('GET', `/api/sandbox/${sessionId}`);
     return response.data;
   }
+
+  /**
+   * Get session notes (list of all notes stored in session)
+   * @param {string} sessionId
+   * @returns {Promise<{notes: string[], content: Object}>} - Notes list and their content
+   */
+  async getSessionNotes(sessionId) {
+    try {
+      // List available notes
+      const listResult = await this.executeTool('notepad_list', { sessionId }, sessionId);
+      const notesList = listResult.result?.content?.[0]?.text || '';
+
+      if (!notesList || notesList === 'No notes found') {
+        return { notes: [], content: {} };
+      }
+
+      const noteNames = notesList.split('\n').filter(n => n.trim());
+      const content = {};
+
+      // Fetch content of each note
+      for (const noteName of noteNames) {
+        try {
+          const readResult = await this.executeTool('notepad_read', {
+            sessionId,
+            filename: noteName
+          }, sessionId);
+          const noteContent = readResult.result?.content?.[0]?.text;
+          if (noteContent) {
+            content[noteName] = noteContent;
+          }
+        } catch (err) {
+          // Skip notes that fail to read
+          console.warn(`Failed to read note ${noteName}: ${err.message}`);
+        }
+      }
+
+      return { notes: noteNames, content };
+    } catch (err) {
+      console.warn(`Failed to fetch session notes: ${err.message}`);
+      return { notes: [], content: {} };
+    }
+  }
+
+  /**
+   * Get session research findings from context_research_browser
+   * @param {string} sessionId
+   * @returns {Promise<Object[]>} - Array of research findings
+   */
+  async getSessionResearch(sessionId) {
+    try {
+      const sandboxInfo = await this.getSandboxInfo(sessionId);
+      if (!sandboxInfo.exists) {
+        return [];
+      }
+
+      // Research findings are stored in context/ directory
+      // This info is already in session.context, so we return empty here
+      // and let the caller use session.context instead
+      return [];
+    } catch (err) {
+      return [];
+    }
+  }
 }
 
 export default SessionClient;
