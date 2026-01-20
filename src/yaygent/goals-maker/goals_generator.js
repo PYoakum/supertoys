@@ -1232,6 +1232,9 @@ async function prompt(question, defaultValue = "") {
   // Drain any buffered input and ensure clean stdin state
   await new Promise(resolve => setImmediate(resolve));
 
+  // Pause animation during readline input (animation cursor movement interferes with readline)
+  const wasAnimating = pauseBorderAnimation();
+
   process.stdin.resume();
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
@@ -1269,12 +1272,20 @@ async function prompt(question, defaultValue = "") {
         process.stdout.write("\x1b[2K");
       }
 
+      // Resume animation if it was running
+      if (wasAnimating) {
+        resumeBorderAnimation();
+      }
+
       resolve(answer.trim() || defaultValue);
     });
   });
 }
 
 async function promptPassword(question) {
+  // Pause animation during input (animation cursor movement can interfere)
+  const wasAnimating = pauseBorderAnimation();
+
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -1307,14 +1318,14 @@ async function promptPassword(question) {
 
     // Function to redraw the masked input field
     const redrawInput = () => {
-      // Move to exact row and column (animation may have moved cursor)
+      // Move to exact row and column
       moveTo(promptRow, promptPrefixLen + 1);
       process.stdout.write("\x1b[K"); // Clear from cursor to end of line
       // Show asterisks for the password length
       if (password.length > 0) {
         process.stdout.write("*".repeat(password.length));
       }
-      // Update column position for animation to restore to
+      // Update column position
       currentContentCol = promptPrefixLen + 1 + password.length;
     };
 
@@ -1339,11 +1350,17 @@ async function promptPassword(question) {
           currentContentRow = promptRow + 1; // Track the row after input
           currentContentCol = 1; // Reset column to start
 
+          // Resume animation if it was running
+          if (wasAnimating) {
+            resumeBorderAnimation();
+          }
+
           resolve(password);
           return;
         } else if (char === "\u0003") {
           // Ctrl+C
           stdin.setRawMode(false);
+          if (wasAnimating) resumeBorderAnimation();
           process.exit(0);
         } else if (char === "\u007F" || char === "\b") {
           // Backspace
@@ -1365,6 +1382,9 @@ async function promptPassword(question) {
 }
 
 async function promptSelect(question, choices) {
+  // Pause animation during selection (cursor movement interferes)
+  const wasAnimating = pauseBorderAnimation();
+
   let selectedIndex = 0;
 
   // Capture the starting row from our tracker
@@ -1412,6 +1432,7 @@ async function promptSelect(question, choices) {
         // Ctrl+C
         stdin.setRawMode(false);
         showCursor();
+        if (wasAnimating) resumeBorderAnimation();
         process.exit(0);
       } else if (key === "\r" || key === "\n") {
         stdin.setRawMode(false);
@@ -1429,6 +1450,12 @@ async function promptSelect(question, choices) {
         currentContentCol = 1;
         moveTo(currentContentRow, 1);
         showCursor();
+
+        // Resume animation if it was running
+        if (wasAnimating) {
+          resumeBorderAnimation();
+        }
+
         resolve(choices[selectedIndex].value);
       } else if (key === "\x1b[A" || key === "k") {
         // Up arrow or k
