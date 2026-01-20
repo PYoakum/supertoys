@@ -338,12 +338,27 @@ export class NotepadTool {
     // Fallback to file storage
     const filePath = this.getFilePath(filename, sessionId);
     if (!existsSync(filePath)) {
-      // List available notes to help with debugging
+      // List available notes and find best fuzzy match
       const availableNotes = await this._listAvailableNotes(sessionId);
-      const notesList = availableNotes.length > 0
-        ? `\nAvailable notes: ${availableNotes.join(', ')}`
-        : '\nNo notes available in this session.';
-      throw new Error(`Note not found: ${filename}${sessionId ? ` (session: ${sessionId.slice(0, 8)}...)` : ''}${notesList}`);
+      const { match, score } = this._findBestMatch(filename, availableNotes);
+
+      let errorMsg = `Note not found: "${filename}"`;
+      if (sessionId) {
+        errorMsg += ` (session: ${sessionId.slice(0, 8)}...)`;
+      }
+
+      if (match && score > 0.3) {
+        errorMsg += `\n\n>>> DID YOU MEAN: "${match}" <<<`;
+        errorMsg += `\n\nRetry with: notepad_read({ filename: "${match}", sessionId: "${sessionId || ''}" })`;
+      }
+
+      if (availableNotes.length > 0) {
+        errorMsg += `\n\nAll available notes: ${availableNotes.join(', ')}`;
+      } else {
+        errorMsg += '\n\nNo notes available in this session.';
+      }
+
+      throw new Error(errorMsg);
     }
 
     const content = await readFile(filePath, 'utf-8');
@@ -356,6 +371,59 @@ export class NotepadTool {
         }
       ]
     };
+  }
+
+  /**
+   * Find best fuzzy match for a filename
+   * @param {string} query - Query filename
+   * @param {string[]} candidates - Available filenames
+   * @returns {{ match: string|null, score: number }}
+   */
+  _findBestMatch(query, candidates) {
+    if (candidates.length === 0) return { match: null, score: 0 };
+
+    const normalize = (s) => s.toLowerCase().replace(/[-_\.]/g, '').replace(/\s+/g, '');
+    const queryNorm = normalize(query);
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const candidate of candidates) {
+      const candNorm = normalize(candidate);
+
+      // Check for substring match
+      if (candNorm.includes(queryNorm) || queryNorm.includes(candNorm)) {
+        const score = Math.min(queryNorm.length, candNorm.length) / Math.max(queryNorm.length, candNorm.length);
+        if (score > bestScore) {
+          bestScore = score + 0.3; // Boost substring matches
+          bestMatch = candidate;
+        }
+      }
+
+      // Check for common prefix
+      let commonPrefix = 0;
+      for (let i = 0; i < Math.min(queryNorm.length, candNorm.length); i++) {
+        if (queryNorm[i] === candNorm[i]) commonPrefix++;
+        else break;
+      }
+      const prefixScore = commonPrefix / Math.max(queryNorm.length, candNorm.length);
+      if (prefixScore > bestScore) {
+        bestScore = prefixScore;
+        bestMatch = candidate;
+      }
+
+      // Check for word overlap
+      const queryWords = query.toLowerCase().split(/[-_\.\s]+/);
+      const candWords = candidate.toLowerCase().split(/[-_\.\s]+/);
+      const commonWords = queryWords.filter(w => candWords.some(cw => cw.includes(w) || w.includes(cw)));
+      const wordScore = commonWords.length / Math.max(queryWords.length, candWords.length);
+      if (wordScore > bestScore) {
+        bestScore = wordScore;
+        bestMatch = candidate;
+      }
+    }
+
+    return { match: bestMatch, score: bestScore };
   }
 
   /**
