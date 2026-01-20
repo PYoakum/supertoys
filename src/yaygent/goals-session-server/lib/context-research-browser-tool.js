@@ -28,7 +28,14 @@ const DEFAULT_CONFIG = {
     'nav', 'footer', 'header', 'aside',
     '.advertisement', '.ad', '.ads', '.sidebar',
     '#cookie-banner', '.cookie-notice', '.popup'
-  ]
+  ],
+  // Pipeline settings
+  pipeline: {
+    maxUrls: 5,              // Max URLs to process in one batch
+    chunkSize: 15000,        // Max chars per chunk passed between phases
+    minRelevanceScore: 0.4,  // Minimum score to keep in validate phase
+    parallelFetches: 3       // Concurrent browser fetches
+  }
 };
 
 /**
@@ -497,6 +504,626 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
     };
   }
 
+  // ============================================================
+  // PIPELINE PHASE METHODS
+  // ============================================================
+
+  /**
+   * Phase 1: GATHER - Fetch multiple URLs in parallel, extract raw content
+   * @param {string[]} urls - URLs to fetch
+   * @param {string} sessionId - Session ID for sandbox
+   * @param {number} timeout - Timeout per fetch
+   * @returns {Promise<Object[]>} Array of {url, title, content, error}
+   * @private
+   */
+  async _gatherPhase(urls, sessionId, timeout) {
+    const chunkSize = DEFAULT_CONFIG.pipeline.chunkSize;
+    const parallelFetches = DEFAULT_CONFIG.pipeline.parallelFetches;
+
+    const results = [];
+    const browser = await this.getBrowser();
+
+    // Process URLs in batches to limit concurrency
+    for (let i = 0; i < urls.length; i += parallelFetches) {
+      const batch = urls.slice(i, i + parallelFetches);
+      const batchPromises = batch.map(async (url) => {
+        const context = await browser.newContext({
+          viewport: { width: 1280, height: 720 },
+          userAgent: 'Mozilla/5.0 (compatible; YayAgent Research Bot/1.0)'
+        });
+
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(timeout);
+
+          await page.goto(url, {
+            waitUntil: this.waitFor,
+            timeout
+          });
+
+          // Remove noise elements
+          for (const sel of this.removeSelectors) {
+            try {
+              await page.evaluate((s) => {
+                document.querySelectorAll(s).forEach(el => el.remove());
+              }, sel);
+            } catch { /* selector might not exist */ }
+          }
+
+          const pageTitle = await page.title();
+
+          // Extract main content
+          let html = await page.evaluate(() => {
+            const selectors = ['main', 'article', '[role="main"]', '.content', '#content'];
+            for (const s of selectors) {
+              const el = document.querySelector(s);
+              if (el) return el.innerHTML;
+            }
+            return document.body.innerHTML;
+          });
+
+          let content = htmlToMarkdown(html);
+
+          // Truncate to chunk size for pipeline efficiency
+          if (content.length > chunkSize) {
+            content = content.slice(0, chunkSize) + '\n\n[...content truncated for pipeline...]';
+          }
+
+          return { url, title: pageTitle, content, error: null };
+        } catch (err) {
+          return { url, title: null, content: null, error: err.message };
+        } finally {
+          await context.close();
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+    }
+
+    return results;
+  }
+
+  /**
+   * Phase 2: VALIDATE - Score relevance and filter chunks
+   * @param {Object[]} gathered - Results from gather phase
+   * @param {string} intent - Research intent
+   * @returns {Promise<Object[]>} Filtered results with relevance scores
+   * @private
+   */
+  async _validatePhase(gathered, intent) {
+    if (!this.llmClient) {
+      // Without LLM, pass through all non-error results
+      return gathered.filter(g => !g.error).map(g => ({ ...g, relevance: 0.7 }));
+    }
+
+    const validChunks = gathered.filter(g => !g.error && g.content);
+    if (validChunks.length === 0) return [];
+
+    // Build batched prompt with all chunks
+    const chunksText = validChunks.map((chunk, i) =>
+      `[SOURCE ${i + 1}]\nURL: ${chunk.url}\nTitle: ${chunk.title}\nContent:\n${chunk.content.slice(0, 5000)}\n`
+    ).join('\n---\n');
+
+    const systemPrompt = `You are a research relevance scorer. Given a research intent and multiple content sources, score each source's relevance from 0.0 to 1.0.
+
+Output ONLY valid TOML with scores for each source:
+
+[[source]]
+index = 1
+relevance = 0.85
+reason = "Directly addresses the topic"
+
+[[source]]
+index = 2
+relevance = 0.3
+reason = "Tangentially related"`;
+
+    const userPrompt = `RESEARCH INTENT: ${intent}
+
+Score the relevance of each source to this intent:
+
+${chunksText}`;
+
+    try {
+      const response = await this.llmClient.send({
+        systemPrompt,
+        userPrompt,
+        parameters: { temperature: 0.2, maxTokens: 1024 }
+      });
+
+      const scores = this._parseValidationResponse(response.content, validChunks.length);
+
+      // Apply scores and filter by minimum relevance
+      const minScore = DEFAULT_CONFIG.pipeline.minRelevanceScore;
+      return validChunks
+        .map((chunk, i) => ({
+          ...chunk,
+          relevance: scores[i]?.relevance || 0.5,
+          relevanceReason: scores[i]?.reason || 'Default score'
+        }))
+        .filter(chunk => chunk.relevance >= minScore);
+    } catch (err) {
+      console.error('Validation phase LLM error:', err.message);
+      // Fallback: return all with default score
+      return validChunks.map(g => ({ ...g, relevance: 0.6 }));
+    }
+  }
+
+  /**
+   * Parse validation phase TOML response
+   * @param {string} tomlStr
+   * @param {number} expectedCount
+   * @returns {Object[]}
+   * @private
+   */
+  _parseValidationResponse(tomlStr, expectedCount) {
+    const scores = [];
+    const clean = tomlStr.replace(/^```toml?\n?/i, '').replace(/\n?```$/i, '').trim();
+
+    let currentItem = null;
+    for (const line of clean.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed === '[[source]]') {
+        if (currentItem) scores.push(currentItem);
+        currentItem = { index: scores.length + 1, relevance: 0.5, reason: '' };
+        continue;
+      }
+      if (currentItem) {
+        const match = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+        if (match) {
+          const [, key, value] = match;
+          if (key === 'relevance') {
+            currentItem.relevance = parseFloat(value) || 0.5;
+          } else if (key === 'reason') {
+            currentItem.reason = value.replace(/^["']|["']$/g, '');
+          } else if (key === 'index') {
+            currentItem.index = parseInt(value) || currentItem.index;
+          }
+        }
+      }
+    }
+    if (currentItem) scores.push(currentItem);
+
+    // Sort by index and return
+    return scores.sort((a, b) => a.index - b.index);
+  }
+
+  /**
+   * Phase 3: ANALYZE - Extract structured findings from validated content
+   * @param {Object[]} validated - Validated chunks with relevance scores
+   * @param {string} intent - Research intent
+   * @returns {Promise<Object>} Structured analysis
+   * @private
+   */
+  async _analyzePhase(validated, intent) {
+    if (!this.llmClient || validated.length === 0) {
+      // Basic analysis without LLM
+      return this._basicBatchAnalysis(validated);
+    }
+
+    // Combine validated chunks, prioritizing by relevance
+    const sorted = [...validated].sort((a, b) => b.relevance - a.relevance);
+    const combinedContent = sorted.map(v =>
+      `## From: ${v.title} (relevance: ${v.relevance.toFixed(2)})\n${v.content.slice(0, 8000)}`
+    ).join('\n\n---\n\n');
+
+    const systemPrompt = `You are a research analyst. Extract structured findings from the provided content based on the research intent.
+
+Output ONLY valid TOML:
+
+summary = "2-3 sentence summary addressing the research intent"
+
+tags = ["tag1", "tag2", "tag3"]
+key_concepts = ["concept1", "concept2", "concept3"]
+
+[[findings]]
+topic = "Topic name"
+details = "Specific finding with concrete details, examples, or data"
+sources = ["source title 1"]
+importance = "high"
+
+[[findings]]
+topic = "Another topic"
+details = "Another specific finding"
+sources = ["source title 2"]
+importance = "medium"
+
+INSTRUCTIONS:
+- Focus findings on what's relevant to the research intent
+- Include 5-10 specific, detailed findings
+- Each finding should have concrete information, not vague statements
+- Tag importance as high/medium/low based on relevance to intent`;
+
+    const userPrompt = `RESEARCH INTENT: ${intent}
+
+VALIDATED RESEARCH CONTENT:
+${combinedContent}`;
+
+    try {
+      const response = await this.llmClient.send({
+        systemPrompt,
+        userPrompt,
+        parameters: { temperature: 0.3, maxTokens: 3000 }
+      });
+
+      return this._parseAnalysisResponse(response.content);
+    } catch (err) {
+      console.error('Analysis phase LLM error:', err.message);
+      return this._basicBatchAnalysis(validated);
+    }
+  }
+
+  /**
+   * Parse analysis phase TOML response
+   * @param {string} tomlStr
+   * @returns {Object}
+   * @private
+   */
+  _parseAnalysisResponse(tomlStr) {
+    const result = {
+      summary: '',
+      tags: [],
+      key_concepts: [],
+      findings: []
+    };
+
+    const clean = tomlStr.replace(/^```toml?\n?/i, '').replace(/\n?```$/i, '').trim();
+    let currentFinding = null;
+
+    for (const line of clean.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (trimmed === '[[findings]]') {
+        if (currentFinding) result.findings.push(currentFinding);
+        currentFinding = { topic: '', details: '', sources: [], importance: 'medium' };
+        continue;
+      }
+
+      const match = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+      if (match) {
+        const [, key, value] = match;
+        const parsed = this._parseTomlValue(value);
+
+        if (currentFinding) {
+          currentFinding[key] = parsed;
+        } else if (key in result) {
+          result[key] = parsed;
+        }
+      }
+    }
+    if (currentFinding) result.findings.push(currentFinding);
+
+    return result;
+  }
+
+  /**
+   * Basic batch analysis without LLM
+   * @param {Object[]} validated
+   * @returns {Object}
+   * @private
+   */
+  _basicBatchAnalysis(validated) {
+    const allContent = validated.map(v => v.content).join('\n\n');
+    const headings = allContent.match(/^#{1,3}\s+(.+)$/gm) || [];
+    const tags = headings.map(h => h.replace(/^#+\s*/, '').toLowerCase().replace(/[^a-z0-9-]/g, '-')).filter(Boolean);
+
+    return {
+      summary: `Research gathered from ${validated.length} sources.`,
+      tags: [...new Set(tags)].slice(0, 10),
+      key_concepts: [],
+      findings: validated.map(v => ({
+        topic: v.title || v.url,
+        details: v.content.slice(0, 200) + '...',
+        sources: [v.url],
+        importance: v.relevance > 0.7 ? 'high' : 'medium'
+      }))
+    };
+  }
+
+  /**
+   * Phase 4: SYNTHESIZE - Combine findings into final report
+   * @param {Object} analysis - Analysis from phase 3
+   * @param {Object[]} validated - Validated sources
+   * @param {string} intent - Research intent
+   * @returns {Promise<Object>} Final synthesized report
+   * @private
+   */
+  async _synthesizePhase(analysis, validated, intent) {
+    if (!this.llmClient) {
+      return {
+        ...analysis,
+        synthesis: analysis.summary,
+        sources: validated.map(v => ({ url: v.url, title: v.title, relevance: v.relevance }))
+      };
+    }
+
+    const findingsText = analysis.findings.map((f, i) =>
+      `${i + 1}. [${f.importance}] ${f.topic}: ${f.details}`
+    ).join('\n');
+
+    const systemPrompt = `You are a research synthesizer. Create a cohesive summary that addresses the research intent using the extracted findings.
+
+Output ONLY valid TOML:
+
+synthesis = """
+A comprehensive 2-4 paragraph synthesis that:
+- Directly addresses the research intent
+- Integrates key findings into a coherent narrative
+- Highlights the most important discoveries
+- Notes any gaps or areas needing further research
+"""
+
+[[actionable_insights]]
+insight = "Specific actionable insight"
+application = "How to apply this"
+
+[[actionable_insights]]
+insight = "Another insight"
+application = "How to apply this"`;
+
+    const userPrompt = `RESEARCH INTENT: ${intent}
+
+EXTRACTED FINDINGS:
+${findingsText}
+
+KEY CONCEPTS: ${analysis.key_concepts.join(', ')}
+
+Synthesize these findings into a cohesive response to the research intent.`;
+
+    try {
+      const response = await this.llmClient.send({
+        systemPrompt,
+        userPrompt,
+        parameters: { temperature: 0.4, maxTokens: 2000 }
+      });
+
+      const synthesized = this._parseSynthesisResponse(response.content);
+
+      return {
+        ...analysis,
+        synthesis: synthesized.synthesis,
+        actionable_insights: synthesized.actionable_insights,
+        sources: validated.map(v => ({ url: v.url, title: v.title, relevance: v.relevance }))
+      };
+    } catch (err) {
+      console.error('Synthesis phase LLM error:', err.message);
+      return {
+        ...analysis,
+        synthesis: analysis.summary,
+        sources: validated.map(v => ({ url: v.url, title: v.title, relevance: v.relevance }))
+      };
+    }
+  }
+
+  /**
+   * Parse synthesis phase TOML response
+   * @param {string} tomlStr
+   * @returns {Object}
+   * @private
+   */
+  _parseSynthesisResponse(tomlStr) {
+    const result = {
+      synthesis: '',
+      actionable_insights: []
+    };
+
+    const clean = tomlStr.replace(/^```toml?\n?/i, '').replace(/\n?```$/i, '').trim();
+    let currentInsight = null;
+    let inMultiline = false;
+    let multilineKey = '';
+    let multilineValue = '';
+
+    for (const line of clean.split('\n')) {
+      const trimmed = line.trim();
+
+      // Handle multiline strings
+      if (inMultiline) {
+        if (trimmed === '"""') {
+          result[multilineKey] = multilineValue.trim();
+          inMultiline = false;
+          multilineKey = '';
+          multilineValue = '';
+        } else {
+          multilineValue += line + '\n';
+        }
+        continue;
+      }
+
+      if (trimmed === '[[actionable_insights]]') {
+        if (currentInsight) result.actionable_insights.push(currentInsight);
+        currentInsight = { insight: '', application: '' };
+        continue;
+      }
+
+      const match = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+      if (match) {
+        const [, key, value] = match;
+        if (value === '"""') {
+          inMultiline = true;
+          multilineKey = key;
+          multilineValue = '';
+        } else if (currentInsight) {
+          currentInsight[key] = value.replace(/^["']|["']$/g, '');
+        } else {
+          result[key] = value.replace(/^["']|["']$/g, '');
+        }
+      }
+    }
+    if (currentInsight) result.actionable_insights.push(currentInsight);
+
+    return result;
+  }
+
+  /**
+   * Format synthesis results as a markdown report
+   * @param {Object} result - Pipeline result
+   * @param {string} intent - Research intent
+   * @returns {string} Markdown report
+   * @private
+   */
+  _formatSynthesisReport(result, intent) {
+    const lines = [
+      '# Research Synthesis Report',
+      '',
+      `> **Intent:** ${intent}`,
+      '',
+      `> **Generated:** ${new Date().toISOString()}`,
+      '',
+      '---',
+      '',
+      '## Summary',
+      '',
+      result.summary || 'No summary available.',
+      '',
+      '## Synthesis',
+      '',
+      result.synthesis || result.summary || 'No synthesis available.',
+      ''
+    ];
+
+    // Add tags
+    if (result.tags && result.tags.length > 0) {
+      lines.push('## Tags', '', result.tags.map(t => `\`${t}\``).join(' '), '');
+    }
+
+    // Add key concepts
+    if (result.key_concepts && result.key_concepts.length > 0) {
+      lines.push('## Key Concepts', '', result.key_concepts.map(c => `- ${c}`).join('\n'), '');
+    }
+
+    // Add findings
+    if (result.findings && result.findings.length > 0) {
+      lines.push('## Key Findings', '');
+      for (const finding of result.findings) {
+        lines.push(`### ${finding.topic || 'Finding'}`);
+        lines.push('');
+        lines.push(`**Importance:** ${finding.importance || 'medium'}`);
+        lines.push('');
+        lines.push(finding.details || finding.finding || 'No details.');
+        lines.push('');
+        if (finding.sources && finding.sources.length > 0) {
+          lines.push(`*Sources: ${finding.sources.join(', ')}*`);
+          lines.push('');
+        }
+      }
+    }
+
+    // Add actionable insights
+    if (result.actionable_insights && result.actionable_insights.length > 0) {
+      lines.push('## Actionable Insights', '');
+      for (const insight of result.actionable_insights) {
+        lines.push(`- **${insight.insight}**`);
+        if (insight.application) {
+          lines.push(`  - Application: ${insight.application}`);
+        }
+        lines.push('');
+      }
+    }
+
+    // Add sources
+    if (result.sources && result.sources.length > 0) {
+      lines.push('## Sources', '');
+      for (const source of result.sources) {
+        const relevance = source.relevance ? ` (relevance: ${source.relevance.toFixed(2)})` : '';
+        lines.push(`- [${source.title || source.url}](${source.url})${relevance}`);
+      }
+      lines.push('');
+    }
+
+    // Add pipeline stats
+    if (result.pipeline_stats) {
+      const stats = result.pipeline_stats;
+      lines.push('---', '', '## Pipeline Statistics', '');
+      lines.push(`- URLs requested: ${stats.urls_requested}`);
+      lines.push(`- URLs fetched: ${stats.urls_fetched}`);
+      lines.push(`- URLs validated: ${stats.urls_validated}`);
+      lines.push(`- Findings extracted: ${stats.findings_count}`);
+      lines.push(`- Duration: ${stats.duration}ms`);
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Run the complete research pipeline
+   * @param {Object} args - Pipeline arguments
+   * @returns {Promise<Object>} Pipeline results
+   * @private
+   */
+  async _runPipeline(args) {
+    const { sessionId, urls, intent, timeout } = args;
+    const startTime = Date.now();
+    const phases = { gather: null, validate: null, analyze: null, synthesize: null };
+
+    try {
+      // Phase 1: GATHER
+      console.log(`[Pipeline] Phase 1: Gathering ${urls.length} URLs...`);
+      phases.gather = await this._gatherPhase(urls, sessionId, timeout);
+      const successfulGathers = phases.gather.filter(g => !g.error);
+      console.log(`[Pipeline] Gathered ${successfulGathers.length}/${urls.length} successfully`);
+
+      if (successfulGathers.length === 0) {
+        return {
+          success: false,
+          error: 'All URLs failed to fetch',
+          phases,
+          duration: Date.now() - startTime
+        };
+      }
+
+      // Phase 2: VALIDATE
+      console.log(`[Pipeline] Phase 2: Validating relevance...`);
+      phases.validate = await this._validatePhase(phases.gather, intent);
+      console.log(`[Pipeline] ${phases.validate.length} chunks passed validation`);
+
+      if (phases.validate.length === 0) {
+        return {
+          success: false,
+          error: 'No content passed relevance validation',
+          phases,
+          duration: Date.now() - startTime
+        };
+      }
+
+      // Phase 3: ANALYZE
+      console.log(`[Pipeline] Phase 3: Analyzing content...`);
+      phases.analyze = await this._analyzePhase(phases.validate, intent);
+      console.log(`[Pipeline] Extracted ${phases.analyze.findings?.length || 0} findings`);
+
+      // Phase 4: SYNTHESIZE
+      console.log(`[Pipeline] Phase 4: Synthesizing results...`);
+      phases.synthesize = await this._synthesizePhase(phases.analyze, phases.validate, intent);
+      console.log(`[Pipeline] Synthesis complete`);
+
+      return {
+        success: true,
+        ...phases.synthesize,
+        pipeline_stats: {
+          urls_requested: urls.length,
+          urls_fetched: successfulGathers.length,
+          urls_validated: phases.validate.length,
+          findings_count: phases.analyze.findings?.length || 0,
+          duration: Date.now() - startTime
+        }
+      };
+    } catch (err) {
+      console.error('[Pipeline] Error:', err.message);
+      return {
+        success: false,
+        error: err.message,
+        phases,
+        duration: Date.now() - startTime
+      };
+    }
+  }
+
+  // ============================================================
+  // END PIPELINE PHASE METHODS
+  // ============================================================
+
   /**
    * Check if host is allowed
    * @param {string} hostname
@@ -526,7 +1153,8 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
   async execute(args) {
     const {
       sessionId,
-      url,
+      url,             // Single URL (legacy/simple mode)
+      urls,            // Multiple URLs (pipeline mode)
       filename,
       title,
       selector,          // Optional: CSS selector to extract specific content
@@ -534,17 +1162,14 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
       includeMetadata = true,
       addToContext = true,
       analyze = true,    // Auto-analyze content after fetching
-      intent,            // Optional: Research intent to guide analysis
+      intent,            // Research intent to guide analysis (required for pipeline)
+      usePipeline,       // Force pipeline mode even for single URL
       timeout: requestTimeout
     } = args;
 
     // Validate
     if (!sessionId) {
       return this.formatError('sessionId is required for sandbox isolation');
-    }
-
-    if (!url) {
-      return this.formatError('url is required');
     }
 
     // Get timeout from session manager or use default
@@ -557,12 +1182,87 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
       }
     }
 
-    // Parse URL
+    // Determine if we should use pipeline mode
+    const urlList = urls || (url ? [url] : []);
+    const shouldUsePipeline = usePipeline || urlList.length > 1 || (intent && urlList.length === 1);
+
+    if (urlList.length === 0) {
+      return this.formatError('url or urls is required');
+    }
+
+    // Validate URLs
+    for (const u of urlList) {
+      try {
+        const parsed = new URL(u);
+        if (!this.isHostAllowed(parsed.hostname)) {
+          return this.formatError(`Host not allowed: ${parsed.hostname}`);
+        }
+      } catch {
+        return this.formatError(`Invalid URL: ${u}`);
+      }
+    }
+
+    // PIPELINE MODE: Multiple URLs or explicit pipeline request
+    if (shouldUsePipeline) {
+      if (!intent) {
+        return this.formatError('intent is required for pipeline mode (multiple URLs or usePipeline=true)');
+      }
+
+      const maxUrls = DEFAULT_CONFIG.pipeline.maxUrls;
+      if (urlList.length > maxUrls) {
+        return this.formatError(`Maximum ${maxUrls} URLs allowed per pipeline request`);
+      }
+
+      console.log(`[Research] Starting pipeline with ${urlList.length} URLs, intent: "${intent.slice(0, 50)}..."`);
+
+      const result = await this._runPipeline({
+        sessionId,
+        urls: urlList,
+        intent,
+        timeout
+      });
+
+      // Record timeout event
+      if (this.sessionManager) {
+        try {
+          this.sessionManager.recordTimeoutEvent(
+            sessionId,
+            'context_research_browser',
+            !result.success,
+            result.pipeline_stats?.duration || result.duration
+          );
+        } catch { /* ignore */ }
+      }
+
+      // Save synthesis to context if successful
+      if (result.success && addToContext) {
+        try {
+          const sandboxPath = await this.sandboxManager.ensureSandbox(sessionId);
+          const artifactsDir = join(sandboxPath, 'artifacts');
+          if (!existsSync(artifactsDir)) {
+            await mkdir(artifactsDir, { recursive: true });
+          }
+
+          const reportPath = join(artifactsDir, 'research_synthesis.md');
+          const reportContent = this._formatSynthesisReport(result, intent);
+          await writeFile(reportPath, reportContent, 'utf-8');
+
+          result.report_path = 'artifacts/research_synthesis.md';
+        } catch (err) {
+          console.warn('Could not save synthesis report:', err.message);
+        }
+      }
+
+      return this.formatResponse(result);
+    }
+
+    // LEGACY MODE: Single URL without pipeline
+    const singleUrl = urlList[0];
     let parsedUrl;
     try {
-      parsedUrl = new URL(url);
+      parsedUrl = new URL(singleUrl);
     } catch {
-      return this.formatError(`Invalid URL: ${url}`);
+      return this.formatError(`Invalid URL: ${singleUrl}`);
     }
 
     // Check host allowlist
@@ -593,7 +1293,7 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
 
       try {
         // Navigate
-        await page.goto(url, {
+        await page.goto(singleUrl, {
           waitUntil: this.waitFor === 'networkidle' ? 'networkidle' : 'domcontentloaded',
           timeout
         });
@@ -689,7 +1389,7 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
         }
 
         // Generate filename
-        const outputFilename = filename || urlToFilename(url);
+        const outputFilename = filename || urlToFilename(singleUrl);
         const outputPath = join(contextDir, outputFilename);
 
         // Write to file
@@ -860,25 +1560,32 @@ ${content.slice(0, this.analysisMaxContentLength)}`;
         name: 'context_research_browser',
         description: `Fetch web page content, convert to markdown, analyze key findings, and add to session context.
 
+MODES:
+1. SINGLE URL MODE: Provide 'url' for simple one-page research
+2. PIPELINE MODE: Provide 'urls' array for multi-source research with phased processing
+
+PIPELINE MODE (Recommended for research tasks):
+When using 'urls' (array) or setting 'usePipeline: true', the tool runs a 4-phase pipeline:
+- Phase 1 (GATHER): Parallel fetch of all URLs, extract content to markdown
+- Phase 2 (VALIDATE): LLM scores each source's relevance to intent, filters low-scoring
+- Phase 3 (ANALYZE): LLM extracts structured findings from validated content
+- Phase 4 (SYNTHESIZE): LLM combines findings into cohesive report with actionable insights
+
+Pipeline mode REQUIRES the 'intent' parameter to guide relevance scoring and analysis.
+Saves a synthesis report to artifacts/research_synthesis.md.
+
 USE CASES:
 - Research documentation for a task
-- Gather reference material from websites
+- Gather reference material from multiple websites
 - Add external resources to session context
 - Extract and analyze specific content from web pages
 
-WORKFLOW:
+SINGLE URL WORKFLOW:
 1. Fetches URL with headless browser (handles JavaScript-rendered content)
 2. Extracts main content (or specific selector)
 3. Converts HTML to clean Markdown
-4. Analyzes content to extract key findings, tags, and concepts (guided by intent if provided)
+4. Analyzes content to extract key findings (guided by intent if provided)
 5. Saves to context directory in sandbox
-6. Optionally adds to session's context object
-
-OUTPUT:
-- Markdown file in sandbox/context/ directory
-- Includes YAML frontmatter with source URL, title, fetch date
-- Content is cleaned and formatted for LLM consumption
-- Analysis includes: summary, tags, key_concepts, key_findings
 
 ANALYSIS OUTPUT:
 - summary: 2-3 sentence summary directly addressing research intent
@@ -886,18 +1593,23 @@ ANALYSIS OUTPUT:
 - key_concepts: Main terminology and technical terms (5-10 items)
 - key_findings: Array of {topic, finding, importance} with specific details
 
+PIPELINE OUTPUT (additional):
+- synthesis: Cohesive narrative combining all findings
+- actionable_insights: Specific insights with applications
+- sources: List of validated sources with relevance scores
+- pipeline_stats: URLs requested/fetched/validated, findings count, duration
+
 INTENT-DRIVEN ANALYSIS:
-When 'intent' parameter is provided, analysis focuses on extracting information relevant to that objective.
+The 'intent' parameter guides what information to extract and prioritize.
 Example intent: "identify video game music styles, chord progressions, and compositional techniques"
-The analysis will then prioritize findings about styles, progressions, and techniques.
 
 FEATURES:
 - Handles JavaScript-rendered pages
 - Removes navigation, ads, popups automatically
-- Extracts main content area intelligently
-- Supports custom CSS selectors for specific content
+- Parallel fetching for multiple URLs (pipeline mode)
+- Relevance-based filtering (pipeline mode)
 - Automatic LLM-powered content analysis
-- Intent-driven analysis for task-specific extraction`,
+- Intent-driven extraction for task-specific results`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -907,50 +1619,61 @@ FEATURES:
             },
             url: {
               type: 'string',
-              description: 'URL to fetch content from (required)'
+              description: 'Single URL to fetch (use for simple one-page research)'
+            },
+            urls: {
+              type: 'array',
+              items: { type: 'string' },
+              maxItems: 5,
+              description: 'Array of URLs to fetch and process through pipeline (max 5). Requires intent parameter.'
+            },
+            usePipeline: {
+              type: 'boolean',
+              default: false,
+              description: 'Force pipeline mode even for single URL. Enables phased processing with relevance validation.'
+            },
+            intent: {
+              type: 'string',
+              description: 'Research intent/objective. REQUIRED for pipeline mode. Guides relevance scoring and analysis focus. Example: "identify video game music styles, chord progressions, and compositional techniques"'
             },
             filename: {
               type: 'string',
-              description: 'Output filename (optional, auto-generated from URL if not provided)'
+              description: 'Output filename for single URL mode (optional, auto-generated from URL)'
             },
             title: {
               type: 'string',
-              description: 'Override page title in metadata'
+              description: 'Override page title in metadata (single URL mode)'
             },
             selector: {
               type: 'string',
-              description: 'CSS selector to extract specific content (optional, extracts main content by default)'
+              description: 'CSS selector to extract specific content (single URL mode)'
             },
             waitForSelector: {
               type: 'string',
-              description: 'CSS selector to wait for before extracting (for dynamic content)'
+              description: 'CSS selector to wait for before extracting (for dynamic content, single URL mode)'
             },
             includeMetadata: {
               type: 'boolean',
               default: true,
-              description: 'Include YAML frontmatter with source URL and metadata'
+              description: 'Include YAML frontmatter with source URL and metadata (single URL mode)'
             },
             addToContext: {
               type: 'boolean',
               default: true,
-              description: 'Add the file to session context object (if session exists)'
+              description: 'Add to session context (single URL) or save synthesis report (pipeline)'
             },
             analyze: {
               type: 'boolean',
               default: true,
-              description: 'Analyze content and include summary, tags, key_concepts, and key_findings in response'
-            },
-            intent: {
-              type: 'string',
-              description: 'Research intent/objective to guide analysis. When provided, the analysis will focus on extracting information relevant to this goal. Example: "identify video game music styles, chord progressions, and compositional techniques"'
+              description: 'Analyze content and include findings in response (single URL mode)'
             },
             timeout: {
               type: 'integer',
-              default: 30000,
-              description: 'Page load timeout in milliseconds'
+              default: 60000,
+              description: 'Page load timeout in milliseconds per URL'
             }
           },
-          required: ['sessionId', 'url']
+          required: ['sessionId']
         }
       }
     );
