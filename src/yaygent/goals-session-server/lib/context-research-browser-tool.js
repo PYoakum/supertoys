@@ -20,8 +20,8 @@ import { createHash } from 'crypto';
  * Default configuration
  */
 const DEFAULT_CONFIG = {
-  timeout: 30000,
-  waitFor: 'networkidle',
+  timeout: 60000,  // 60 seconds for JS-heavy pages
+  waitFor: 'domcontentloaded',  // Faster than networkidle, still waits for DOM
   maxContentLength: 500000,  // 500KB max content
   removeSelectors: [
     'script', 'style', 'noscript', 'iframe', 'svg',
