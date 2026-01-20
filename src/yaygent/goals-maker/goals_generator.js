@@ -658,7 +658,9 @@ function moveTo(row, col) {
 }
 
 // Clean up rows near the bottom separator to fix border artifacts
-function cleanSeparatorRows() {
+async function cleanSeparatorRows() {
+  // Small delay to let animation frame complete before cleanup
+  await new Promise(resolve => setTimeout(resolve, 150));
   const { rows } = getTerminalSize();
   for (let i = 5; i <= 7; i++) {
     moveTo(rows - i, 1);
@@ -1257,7 +1259,7 @@ async function prompt(question, defaultValue = "") {
   inPromptInput = true;
 
   // Clean separator rows after enabling prompt mode to prevent race condition
-  cleanSeparatorRows();
+  await cleanSeparatorRows();
 
   // Position at current tracked row
   moveTo(currentContentRow, 1);
@@ -1301,7 +1303,7 @@ async function promptPassword(question) {
   inPromptInput = true;
 
   // Clean separator rows after enabling prompt mode to prevent race condition
-  cleanSeparatorRows();
+  await cleanSeparatorRows();
 
   // Position at current tracked row and clear
   moveTo(promptRow, 1);
@@ -1387,7 +1389,7 @@ async function promptSelect(question, choices) {
   inPromptInput = true;
 
   // Clean separator rows after enabling prompt mode to prevent race condition
-  cleanSeparatorRows();
+  await cleanSeparatorRows();
 
   // Render choice at specific index
   const renderChoice = (index) => {
@@ -1488,7 +1490,7 @@ async function promptConfirm(question, defaultValue = true) {
   inPromptInput = true;
 
   // Clean separator rows after enabling prompt mode to prevent race condition
-  cleanSeparatorRows();
+  await cleanSeparatorRows();
 
   // Position at current tracked row
   moveTo(currentContentRow, 1);
@@ -2704,7 +2706,7 @@ async function main() {
   const model = await prompt("Model name (optional)", defaultModel);
 
   // Extra cleanup before API key to prevent border creep between prompts
-  cleanSeparatorRows();
+  await cleanSeparatorRows();
 
   const apiKey = await promptPassword("API Key");
   if (!apiKey) {
