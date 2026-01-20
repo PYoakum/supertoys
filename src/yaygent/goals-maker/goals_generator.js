@@ -460,7 +460,11 @@ function renderMultilineBuffer() {
 }
 
 // Insert text at cursor position (handles paste with multiple chars/lines)
+// Auto-wraps long lines to fit window width
 function multilineInsertText(text) {
+  const { windowWidth } = multilineBuffer;
+  const wrapWidth = windowWidth - 1; // Leave room for cursor
+
   // Split pasted text into lines
   const inputLines = text.split(/\r?\n/);
 
@@ -471,8 +475,35 @@ function multilineInsertText(text) {
     const currentLine = multilineBuffer.lines[multilineBuffer.cursorLine] || '';
     const before = currentLine.slice(0, multilineBuffer.cursorCol);
     const after = currentLine.slice(multilineBuffer.cursorCol);
-    multilineBuffer.lines[multilineBuffer.cursorLine] = before + chars + after;
-    multilineBuffer.cursorCol += chars.length;
+    let newContent = before + chars + after;
+
+    // Auto-wrap if line exceeds window width
+    while (newContent.length > wrapWidth) {
+      // Find a good break point (word boundary or hyphenate)
+      let breakPoint = wrapWidth;
+
+      // Look for last space within wrap width
+      const lastSpace = newContent.lastIndexOf(' ', wrapWidth);
+      if (lastSpace > wrapWidth * 0.4) {
+        // Break at word boundary
+        breakPoint = lastSpace;
+        multilineBuffer.lines[multilineBuffer.cursorLine] = newContent.slice(0, breakPoint);
+        newContent = newContent.slice(breakPoint + 1); // Skip the space
+      } else {
+        // No good word break, hyphenate
+        breakPoint = wrapWidth - 1;
+        multilineBuffer.lines[multilineBuffer.cursorLine] = newContent.slice(0, breakPoint) + '-';
+        newContent = newContent.slice(breakPoint);
+      }
+
+      // Move to next line
+      multilineBuffer.cursorLine++;
+      multilineBuffer.lines.splice(multilineBuffer.cursorLine, 0, '');
+    }
+
+    // Set final content and cursor position
+    multilineBuffer.lines[multilineBuffer.cursorLine] = newContent;
+    multilineBuffer.cursorCol = newContent.length - after.length;
 
     // If there are more lines to paste, insert a newline
     if (i < inputLines.length - 1) {
