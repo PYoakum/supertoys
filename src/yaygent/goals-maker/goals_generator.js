@@ -88,6 +88,7 @@ let currentContentCol = 1; // Current column position (1-indexed)
 let inMultilineInput = false; // Flag to prevent cursor repositioning during multiline input
 let multilineInputStartRow = 14; // Where multiline input begins
 let multilineInputCurrentRow = 14; // Current row during multiline input
+let inPromptInput = false; // Flag for readline prompt input (save/restore cursor during animation)
 
 function getTerminalSize() {
   return {
@@ -766,8 +767,8 @@ function renderAnimatedBorders() {
   // Build all output as a single string for atomic write
   let output = "";
 
-  // Save cursor position during multiline input (readline manages cursor, we must restore it)
-  if (inMultilineInput) {
+  // Save cursor position during input (readline manages cursor, we must restore it)
+  if (inMultilineInput || inPromptInput) {
     output += "\x1b[s"; // Save cursor
   }
 
@@ -838,7 +839,7 @@ function renderAnimatedBorders() {
   }
 
   // Move cursor back to content position
-  if (inMultilineInput) {
+  if (inMultilineInput || inPromptInput) {
     output += "\x1b[u"; // Restore cursor to where readline had it
   } else {
     output += `\x1b[${currentContentRow};${currentContentCol}H`;
@@ -1232,9 +1233,6 @@ async function prompt(question, defaultValue = "") {
   // Drain any buffered input and ensure clean stdin state
   await new Promise(resolve => setImmediate(resolve));
 
-  // Pause animation during readline input (animation cursor movement interferes with readline)
-  const wasAnimating = pauseBorderAnimation();
-
   process.stdin.resume();
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
@@ -1254,12 +1252,16 @@ async function prompt(question, defaultValue = "") {
   const defaultHintLen = defaultValue ? defaultValue.length + 3 : 0; // " (default)"
   const promptLen = 2 + question.length + defaultHintLen + 2; // "? " + question + hint + ": "
 
+  // Enable prompt input mode so animation preserves cursor position
+  inPromptInput = true;
+
   return new Promise((resolve) => {
     // Set column position for animation (will be at end of prompt when waiting for input)
     currentContentCol = promptLen + 1;
 
     rl.question(`${c("cyan", "?")} ${c("bold", question)}${defaultHint}: `, (answer) => {
       rl.close();
+      inPromptInput = false; // Disable prompt input mode
       currentContentRow++; // Track the row after input
       currentContentCol = 1; // Reset column
       // Clamp to max content row
@@ -1272,20 +1274,12 @@ async function prompt(question, defaultValue = "") {
         process.stdout.write("\x1b[2K");
       }
 
-      // Resume animation if it was running
-      if (wasAnimating) {
-        resumeBorderAnimation();
-      }
-
       resolve(answer.trim() || defaultValue);
     });
   });
 }
 
 async function promptPassword(question) {
-  // Pause animation during input (animation cursor movement can interfere)
-  const wasAnimating = pauseBorderAnimation();
-
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -1302,6 +1296,9 @@ async function promptPassword(question) {
   // Build the prompt prefix
   const promptPrefix = `${c("cyan", "?")} ${c("bold", question)}: `;
   const promptPrefixLen = question.length + 4; // "? " + question + ": "
+
+  // Enable prompt input mode so animation preserves cursor position
+  inPromptInput = true;
 
   return new Promise((resolve) => {
     process.stdout.write(promptPrefix);
@@ -1336,6 +1333,7 @@ async function promptPassword(question) {
           stdin.setRawMode(false);
           stdin.removeListener("data", onData);
           stdin.pause();
+          inPromptInput = false; // Disable prompt input mode
 
           // Clean up rows near separator to fix border artifacts
           const { rows } = getTerminalSize();
@@ -1350,17 +1348,12 @@ async function promptPassword(question) {
           currentContentRow = promptRow + 1; // Track the row after input
           currentContentCol = 1; // Reset column to start
 
-          // Resume animation if it was running
-          if (wasAnimating) {
-            resumeBorderAnimation();
-          }
-
           resolve(password);
           return;
         } else if (char === "\u0003") {
           // Ctrl+C
           stdin.setRawMode(false);
-          if (wasAnimating) resumeBorderAnimation();
+          inPromptInput = false;
           process.exit(0);
         } else if (char === "\u007F" || char === "\b") {
           // Backspace
@@ -1382,13 +1375,13 @@ async function promptPassword(question) {
 }
 
 async function promptSelect(question, choices) {
-  // Pause animation during selection (cursor movement interferes)
-  const wasAnimating = pauseBorderAnimation();
-
   let selectedIndex = 0;
 
   // Capture the starting row from our tracker
   const menuStartRow = getCurrentRow();
+
+  // Enable prompt input mode so animation preserves cursor position
+  inPromptInput = true;
 
   // Render choice at specific index
   const renderChoice = (index) => {
@@ -1432,11 +1425,12 @@ async function promptSelect(question, choices) {
         // Ctrl+C
         stdin.setRawMode(false);
         showCursor();
-        if (wasAnimating) resumeBorderAnimation();
+        inPromptInput = false;
         process.exit(0);
       } else if (key === "\r" || key === "\n") {
         stdin.setRawMode(false);
         stdin.removeListener("data", onKey);
+        inPromptInput = false; // Disable prompt input mode
 
         // Clean up rows near separator to fix border artifacts
         const { rows } = getTerminalSize();
@@ -1450,12 +1444,6 @@ async function promptSelect(question, choices) {
         currentContentCol = 1;
         moveTo(currentContentRow, 1);
         showCursor();
-
-        // Resume animation if it was running
-        if (wasAnimating) {
-          resumeBorderAnimation();
-        }
-
         resolve(choices[selectedIndex].value);
       } else if (key === "\x1b[A" || key === "k") {
         // Up arrow or k
