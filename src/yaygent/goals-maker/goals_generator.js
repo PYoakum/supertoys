@@ -319,11 +319,7 @@ function printLine(text = "") {
       currentContentRow++;
 
       // Clean up rows near separator to fix border artifacts
-      const { rows } = getTerminalSize();
-      for (let i = 5; i <= 7; i++) {
-        moveTo(rows - i, 1);
-        process.stdout.write("\x1b[2K");
-      }
+      cleanSeparatorRows();
 
       // Restore cursor position
       moveTo(currentContentRow, 1);
@@ -659,6 +655,15 @@ function showCursor() {
 
 function moveTo(row, col) {
   process.stdout.write(`\x1b[${row};${col}H`);
+}
+
+// Clean up rows near the bottom separator to fix border artifacts
+function cleanSeparatorRows() {
+  const { rows } = getTerminalSize();
+  for (let i = 5; i <= 7; i++) {
+    moveTo(rows - i, 1);
+    process.stdout.write("\x1b[2K");
+  }
 }
 
 // Query current cursor row position
@@ -1233,6 +1238,9 @@ async function prompt(question, defaultValue = "") {
   // Drain any buffered input and ensure clean stdin state
   await new Promise(resolve => setImmediate(resolve));
 
+  // Clean separator rows before starting input
+  cleanSeparatorRows();
+
   process.stdin.resume();
   const rl = createRL();
   const defaultHint = defaultValue ? c("dim", ` (${defaultValue})`) : "";
@@ -1268,11 +1276,7 @@ async function prompt(question, defaultValue = "") {
       if (currentContentRow > maxRow) currentContentRow = maxRow;
 
       // Clean up rows near separator to fix border artifacts
-      const { rows } = getTerminalSize();
-      for (let i = 5; i <= 7; i++) {
-        moveTo(rows - i, 1);
-        process.stdout.write("\x1b[2K");
-      }
+      cleanSeparatorRows();
 
       resolve(answer.trim() || defaultValue);
     });
@@ -1280,6 +1284,9 @@ async function prompt(question, defaultValue = "") {
 }
 
 async function promptPassword(question) {
+  // Clean separator rows before starting input
+  cleanSeparatorRows();
+
   // Ensure currentContentRow is within valid bounds
   const minRow = getMinContentRow();
   const maxRow = getMaxContentRow();
@@ -1336,11 +1343,7 @@ async function promptPassword(question) {
           inPromptInput = false; // Disable prompt input mode
 
           // Clean up rows near separator to fix border artifacts
-          const { rows } = getTerminalSize();
-          for (let i = 5; i <= 7; i++) {
-            moveTo(rows - i, 1);
-            process.stdout.write("\x1b[2K");
-          }
+          cleanSeparatorRows();
 
           // Move to end of prompt row before newline
           moveTo(promptRow, promptPrefixLen + 1 + password.length);
@@ -1375,6 +1378,9 @@ async function promptPassword(question) {
 }
 
 async function promptSelect(question, choices) {
+  // Clean separator rows before starting input
+  cleanSeparatorRows();
+
   let selectedIndex = 0;
 
   // Capture the starting row from our tracker
@@ -1433,11 +1439,7 @@ async function promptSelect(question, choices) {
         inPromptInput = false; // Disable prompt input mode
 
         // Clean up rows near separator to fix border artifacts
-        const { rows } = getTerminalSize();
-        for (let i = 5; i <= 7; i++) {
-          moveTo(rows - i, 1);
-          process.stdout.write("\x1b[2K");
-        }
+        cleanSeparatorRows();
 
         // Move cursor below menu and reset column tracking
         currentContentRow = menuStartRow + 1 + choices.length;
@@ -1468,6 +1470,9 @@ async function promptSelect(question, choices) {
 async function promptConfirm(question, defaultValue = true) {
   // Drain any buffered input and ensure clean stdin state
   await new Promise(resolve => setImmediate(resolve));
+
+  // Clean separator rows before starting input
+  cleanSeparatorRows();
 
   process.stdin.resume();
   const rl = createRL();
@@ -1502,11 +1507,7 @@ async function promptConfirm(question, defaultValue = true) {
       if (currentContentRow > maxRow) currentContentRow = maxRow;
 
       // Clean up rows near separator to fix border artifacts
-      const { rows } = getTerminalSize();
-      for (let i = 5; i <= 7; i++) {
-        moveTo(rows - i, 1);
-        process.stdout.write("\x1b[2K");
-      }
+      cleanSeparatorRows();
 
       if (!answer) {
         resolve(defaultValue);
@@ -2701,15 +2702,6 @@ async function main() {
   }
 
   const model = await prompt("Model name (optional)", defaultModel);
-
-  // Clean up rows near separator before API key prompt
-  {
-    const { rows } = getTerminalSize();
-    for (let i = 5; i <= 7; i++) {
-      moveTo(rows - i, 1);
-      process.stdout.write("\x1b[2K");
-    }
-  }
 
   const apiKey = await promptPassword("API Key");
   if (!apiKey) {
