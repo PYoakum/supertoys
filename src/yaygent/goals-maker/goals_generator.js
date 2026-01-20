@@ -96,6 +96,81 @@ function getTerminalSize() {
   };
 }
 
+/**
+ * Wrap text to fit within a specified width, breaking at word boundaries.
+ * Long words that exceed the width are hyphenated.
+ * @param {string} text - Text to wrap
+ * @param {number} width - Maximum line width
+ * @param {string} [indent=''] - Indentation for continuation lines
+ * @returns {string[]} Array of wrapped lines
+ */
+function wrapText(text, width, indent = '') {
+  if (!text) return [''];
+
+  const lines = [];
+  const words = text.split(/\s+/);
+  let currentLine = '';
+
+  for (const word of words) {
+    // Skip empty words
+    if (!word) continue;
+
+    // Calculate available width (first line vs continuation)
+    const availableWidth = lines.length === 0 ? width : width - indent.length;
+    const lineStart = lines.length === 0 ? '' : indent;
+
+    // Check if word fits on current line
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+    if (testLine.length <= availableWidth) {
+      currentLine = testLine;
+    } else if (!currentLine) {
+      // Word is too long for a single line - hyphenate
+      let remaining = word;
+      while (remaining.length > 0) {
+        const availWidth = lines.length === 0 ? width : width - indent.length;
+        if (remaining.length <= availWidth) {
+          currentLine = remaining;
+          remaining = '';
+        } else {
+          // Leave room for hyphen
+          const breakPoint = availWidth - 1;
+          lines.push((lines.length === 0 ? '' : indent) + remaining.slice(0, breakPoint) + '-');
+          remaining = remaining.slice(breakPoint);
+        }
+      }
+    } else {
+      // Start new line
+      lines.push((lines.length === 0 ? '' : indent) + currentLine);
+
+      // Check if word itself needs hyphenation
+      const newAvailWidth = width - indent.length;
+      if (word.length > newAvailWidth) {
+        let remaining = word;
+        while (remaining.length > 0) {
+          if (remaining.length <= newAvailWidth) {
+            currentLine = remaining;
+            remaining = '';
+          } else {
+            const breakPoint = newAvailWidth - 1;
+            lines.push(indent + remaining.slice(0, breakPoint) + '-');
+            remaining = remaining.slice(breakPoint);
+          }
+        }
+      } else {
+        currentLine = word;
+      }
+    }
+  }
+
+  // Add final line
+  if (currentLine) {
+    lines.push((lines.length === 0 ? '' : indent) + currentLine);
+  }
+
+  return lines.length > 0 ? lines : [''];
+}
+
 function clearScreen() {
   // Clear entire screen
   process.stdout.write("\x1b[2J\x1b[H");
@@ -830,7 +905,15 @@ function formatGoalsSummary(goals) {
       lines.push(`${c("bold", "Name:")} ${goals.metadata.name}`);
     }
     if (goals.metadata.description) {
-      lines.push(`${c("bold", "Description:")} ${goals.metadata.description}`);
+      const { cols } = getTerminalSize();
+      const maxWidth = Math.min(cols - 4, 76); // Leave margin
+      const descLabel = `${c("bold", "Description:")} `;
+      const labelLen = 13; // "Description: " without ANSI codes
+      const wrappedDesc = wrapText(goals.metadata.description, maxWidth - labelLen, '             ');
+      lines.push(descLabel + wrappedDesc[0]);
+      for (let i = 1; i < wrappedDesc.length; i++) {
+        lines.push(wrappedDesc[i]);
+      }
     }
     if (goals.metadata.tags && goals.metadata.tags.length > 0) {
       lines.push(`${c("bold", "Tags:")} ${goals.metadata.tags.join(", ")}`);
@@ -847,7 +930,13 @@ function formatGoalsSummary(goals) {
     const num = `${i + 1}.`;
 
     lines.push(`  ${c("cyan", num)} ${c("bold", goal.id)}`);
-    lines.push(`     ${goal.objective}`);
+    // Wrap objective text
+    const { cols } = getTerminalSize();
+    const objMaxWidth = Math.min(cols - 10, 70);
+    const wrappedObj = wrapText(goal.objective, objMaxWidth, '');
+    for (const objLine of wrappedObj) {
+      lines.push(`     ${objLine}`);
+    }
 
     if (goal.priority) {
       lines.push(`     ${c("dim", `Priority: ${goal.priority}`)}`);
@@ -915,8 +1004,14 @@ function formatGoalDetail(goal, index, total) {
   // Success criteria
   if (goal.criteria && goal.criteria.success && goal.criteria.success.length > 0) {
     lines.push(`${c("bold", "Success Criteria:")}`);
+    const { cols } = getTerminalSize();
+    const critMaxWidth = Math.min(cols - 10, 70);
     for (const criterion of goal.criteria.success) {
-      lines.push(`  ${c("green", "[+]")} ${criterion}`);
+      const wrappedCrit = wrapText(criterion, critMaxWidth, '      ');
+      lines.push(`  ${c("green", "[+]")} ${wrappedCrit[0]}`);
+      for (let i = 1; i < wrappedCrit.length; i++) {
+        lines.push(wrappedCrit[i]);
+      }
     }
     lines.push("");
   }
@@ -924,8 +1019,14 @@ function formatGoalDetail(goal, index, total) {
   // Acceptance criteria
   if (goal.criteria && goal.criteria.acceptance && goal.criteria.acceptance.length > 0) {
     lines.push(`${c("bold", "Acceptance Criteria:")}`);
+    const { cols } = getTerminalSize();
+    const critMaxWidth = Math.min(cols - 10, 70);
     for (const criterion of goal.criteria.acceptance) {
-      lines.push(`  ${c("cyan", "*")} ${criterion}`);
+      const wrappedCrit = wrapText(criterion, critMaxWidth, '    ');
+      lines.push(`  ${c("cyan", "*")} ${wrappedCrit[0]}`);
+      for (let i = 1; i < wrappedCrit.length; i++) {
+        lines.push(wrappedCrit[i]);
+      }
     }
     lines.push("");
   }
@@ -933,8 +1034,14 @@ function formatGoalDetail(goal, index, total) {
   // Constraints
   if (goal.constraints && goal.constraints.length > 0) {
     lines.push(`${c("bold", "Constraints:")}`);
+    const { cols } = getTerminalSize();
+    const constMaxWidth = Math.min(cols - 10, 70);
     for (const constraint of goal.constraints) {
-      lines.push(`  ${c("yellow", "!")} ${constraint}`);
+      const wrappedConst = wrapText(constraint, constMaxWidth, '    ');
+      lines.push(`  ${c("yellow", "!")} ${wrappedConst[0]}`);
+      for (let i = 1; i < wrappedConst.length; i++) {
+        lines.push(wrappedConst[i]);
+      }
     }
     lines.push("");
   }
@@ -942,8 +1049,16 @@ function formatGoalDetail(goal, index, total) {
   // Context
   if (goal.context && Object.keys(goal.context).length > 0) {
     lines.push(`${c("bold", "Context:")}`);
+    const { cols } = getTerminalSize();
+    const ctxMaxWidth = Math.min(cols - 10, 70);
     for (const [key, value] of Object.entries(goal.context)) {
-      lines.push(`  ${c("dim", key + ":")} ${value}`);
+      const prefix = `${c("dim", key + ":")} `;
+      const prefixLen = key.length + 2;
+      const wrappedVal = wrapText(String(value), ctxMaxWidth - prefixLen, '  ' + ' '.repeat(prefixLen));
+      lines.push(`  ${prefix}${wrappedVal[0]}`);
+      for (let i = 1; i < wrappedVal.length; i++) {
+        lines.push(wrappedVal[i]);
+      }
     }
     lines.push("");
   }
