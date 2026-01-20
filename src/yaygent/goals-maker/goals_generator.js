@@ -2707,6 +2707,8 @@ async function main() {
 
   // Extra cleanup before API key to prevent border creep between prompts
   await cleanSeparatorRows();
+  await new Promise(resolve => setTimeout(resolve, 400));
+  await cleanSeparatorRows();
 
   const apiKey = await promptPassword("API Key");
   if (!apiKey) {
