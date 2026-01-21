@@ -33,6 +33,7 @@ import { ReadFileTool } from './read-file-tool.js';
 import { ReadEmailTool } from './read-email-tool.js';
 import { SttTool } from './stt-tool.js';
 import { EditAudioTool } from './edit-audio-tool.js';
+import { AudioCleanupTool } from './audio-cleanup-tool.js';
 import { CreateDrumTool } from './create-drum-tool.js';
 import { MidiMp3Tool } from './midi-mp3-tool.js';
 import { TtsTool } from './tts-tool.js';
@@ -1068,6 +1069,12 @@ export function createToolRouter(options = {}) {
       timeout: options.editAudioTimeout || 300000
     });
     editAudio.registerTools(router);
+
+    // Initialize and register audio cleanup tool (dead air removal)
+    const audioCleanup = new AudioCleanupTool(options.sessionManager, {
+      timeout: options.editAudioTimeout || 300000
+    });
+    audioCleanup.registerTools(router);
 
     // Initialize and register drum machine tool
     const createDrum = new CreateDrumTool(options.sessionManager, {
