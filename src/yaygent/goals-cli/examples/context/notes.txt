@@ -1,8 +1,0 @@
-Project Notes
-=============
-
-This is a simple "Hello World" application written in the Svelte Framework for the Bun Runtime
-
-Dependencies:
-- Bun >= 1.0.0
-- Minimize external npm packages for core functionality

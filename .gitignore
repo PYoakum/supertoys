@@ -69,22 +69,9 @@ src/js-vm/src/bios/*
 # default documents directory for webedit
 src/webedit/documents
 
-# default directory for goal-keeper
-src/yaygent/goal-keeper/goals-inbox
-src/yaygent/goal-keeper/goals-inbox/*
-
-# default directory for LLM Logs
-src/yaygent/goals-session-server/llm-logs
-src/yaygent/goals-session-server/llm-logs/*
-src/yaygent/goals-cli/llm-logs
-
-# TTS models (large, downloaded separately)
-src/yaygent/goals-session-server/assets/other_models/tts
-
-# evaluation output
-src/yaygent/goals-cli/evaluation-output
-
-src/yaygent/goals-cli/scratch-pad
+# yaygent
+src/yaygent
+src/yaygent/*
 
 */package-lock.json
 

@@ -1,8 +1,0 @@
-Happy Birthday Melody - Note Notation:
-C4 C4 D4 C4 F4 E4
-C4 C4 D4 C4 G4 F4
-C4 C4 C5 A4 F4 E4 D4
-Bb4 Bb4 A4 F4 G4 F4
-Timing: Each note is a quarter note except where indicated
-Tempo: 120 BPM (moderate)
-Key: F Major

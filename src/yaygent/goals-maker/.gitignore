@@ -1,9 +1,0 @@
-# Dependencies
-node_modules/
-
-# Generated output
-goals-output/
-completed-work/
-
-# OS files
-.DS_Store
