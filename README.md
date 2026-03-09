@@ -490,15 +490,46 @@ cd src/rs-h2md && cargo run -- input.html [-o output.md]
 
 ## NPM Scripts
 
-| Script | Command |
-|--------|---------|
-| `bun run commander` | Run the Commander task runner |
-| `bun run crawl` | Run the Puppeteer crawl CLI |
-| `bun run crawl-server` | Start the crawl server |
-| `bun run micro` | Start the microserver |
-| `bun run h2c` | Convert HTML to CSV |
-| `bun run c2j` | Convert CSV to JSON |
-| `bun run xtractor` | Extract JSON values to text |
+| Script | Tool | Description |
+|--------|------|-------------|
+| `bun run api-router` | api-router | File-based API route generator |
+| `bun run auth-tools` | auth-tools | JWT authentication server |
+| `bun run caravan` | caravan | POST file contents to an endpoint |
+| `bun run cli-scaffold` | cli-scaffold | Universal CLI router |
+| `bun run commander` | commander | JSON-driven task runner |
+| `bun run croupier` | croupier | Static file server |
+| `bun run c2j` | csv2json-cli | Convert CSV to JSON |
+| `bun run csv2json2sql` | csv2json2sql | CSV/JSON/SQL conversion server |
+| `bun run dirmap` | dirmap | Directory manifest generator |
+| `bun run executor` | executor | Shell command runner with output routing |
+| `bun run h2c` | html2csv | Convert HTML to CSV |
+| `bun run html2md` | html2md | Bidirectional HTML/Markdown converter |
+| `bun run http-test` | http-testing | Test server with echo/hash endpoints |
+| `bun run ipsum` | ipsum-cli | Lorem ipsum generator CLI |
+| `bun run js-cron` | js-cron | Cron-based task scheduler |
+| `bun run js-cypher` | js-cypher | Encoding, hashing, and HMAC CLI |
+| `bun run js-proxy` | js-proxy | YAML-configured reverse proxy |
+| `bun run js-term` | js-term | xterm.js terminal interface |
+| `bun run js-tui` | js-tui | Terminal UI framework |
+| `bun run js-vm` | js-vm | x86 virtual machine emulator |
+| `bun run xtractor` | json-xtractor | Extract JSON values to text |
+| `bun run md-handler` | md-handler | Serve markdown from SQLite as HTML |
+| `bun run md2html` | md2html | Markdown to HTML renderer |
+| `bun run md2json` | md2json | Bidirectional Markdown/JSON converter |
+| `bun run micro` | microserver | Serve a single file over HTTP |
+| `bun run minipress` | minipress | HTML document generator from JSON config |
+| `bun run no-js` | no-js | Server-rendered HTML pages |
+| `bun run picocache` | picocache | Caching HTTP proxy |
+| `bun run crawl` | puppet-reader | Puppeteer crawl CLI |
+| `bun run crawl-server` | puppet-reader | Crawl server for programmatic scraping |
+| `bun run scrapbook` | scrapbook | ImageMagick image manipulation CLI |
+| `bun run sql-crud` | sql-crud-tools | PostgreSQL CRUD helpers |
+| `bun run str-replacer` | str-replacer | String replacement tool |
+| `bun run tablemaker` | tablemaker | Table generation server |
+| `bun run webedit` | webedit | Web editor server |
+| `bun run webhook` | webhook | Webhook provisioning server |
+| `bun run ws-tools` | ws-tools | WebSocket server |
+| `bun run yaml2html` | yaml2html | YAML to HTML converter |
 
 ## License
 
